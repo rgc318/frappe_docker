@@ -9,6 +9,8 @@ services:
 
   db:
     image: mariadb:11.8
+    ports:
+      - "3307:3306"
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       start_period: 5s
