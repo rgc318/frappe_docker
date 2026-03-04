@@ -15,6 +15,7 @@ x-backend-defaults: &backend_defaults
   <<: [*depends_on_configurator, *customizable_image]
   volumes:
     - sites:/home/frappe/frappe-bench/sites
+    - ./apps/myapp:/home/frappe/frappe-bench/apps/myapp
 
 services:
   configurator:
@@ -26,6 +27,7 @@ services:
     # add redis_socketio for backward compatibility
     command:
       - >
+        ./env/bin/pip install -e apps/myapp;
         ls -1 apps > sites/apps.txt;
         bench set-config -g db_host $$DB_HOST;
         bench set-config -gp db_port $$DB_PORT;
@@ -46,6 +48,13 @@ services:
   backend:
     <<: *backend_defaults
     platform: linux/amd64
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - >
+        [ ! -d "apps/myapp/myapp.egg-info" ] && ./env/bin/pip install -e apps/myapp;
+        exec bench serve
 
   frontend:
     <<: *customizable_image
@@ -63,6 +72,7 @@ services:
       CLIENT_MAX_BODY_SIZE: ${CLIENT_MAX_BODY_SIZE:-50m}
     volumes:
       - sites:/home/frappe/frappe-bench/sites
+      # - ./apps:/home/frappe/frappe-bench/apps
     depends_on:
       - backend
       - websocket
@@ -70,6 +80,9 @@ services:
   websocket:
     <<: [*depends_on_configurator, *customizable_image]
     platform: linux/amd64
+    entrypoint:
+      - bash
+      - -c
     command:
       - node
       - /home/frappe/frappe-bench/apps/frappe/socketio.js
@@ -79,17 +92,36 @@ services:
   queue-short:
     <<: *backend_defaults
     platform: linux/amd64
-    command: bench worker --queue short,default
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - >
+        [ ! -d "apps/myapp/myapp.egg-info" ] && ./env/bin/pip install -e apps/myapp;
+        exec bench worker --queue short,default
 
   queue-long:
     <<: *backend_defaults
     platform: linux/amd64
-    command: bench worker --queue long,default,short
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - >
+        [ ! -d "apps/myapp/myapp.egg-info" ] && ./env/bin/pip install -e apps/myapp;
+        exec bench worker --queue long,default,short
+
 
   scheduler:
     <<: *backend_defaults
     platform: linux/amd64
-    command: bench schedule
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - >
+        [ ! -d "apps/myapp/myapp.egg-info" ] && ./env/bin/pip install -e apps/myapp;
+        exec bench schedule
 
 # ERPNext requires local assets access (Frappe does not)
 volumes:
