@@ -16,6 +16,7 @@ x-backend-defaults: &backend_defaults
   volumes:
     - sites:/home/frappe/frappe-bench/sites
     - ./apps/myapp:/home/frappe/frappe-bench/apps/myapp
+    - bench-env-vol:/home/frappe/frappe-bench/env
 
 services:
   configurator:
@@ -48,6 +49,8 @@ services:
   backend:
     <<: *backend_defaults
     platform: linux/amd64
+    environment:
+      ENABLE_PYCHARM_DEBUG: "1"
     entrypoint:
       - bash
       - -c
@@ -126,3 +129,4 @@ services:
 # ERPNext requires local assets access (Frappe does not)
 volumes:
   sites:
+  bench-env-vol:
