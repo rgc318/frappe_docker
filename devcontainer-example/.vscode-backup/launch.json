@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Bench Web (myapp 调试)",
+      "type": "debugpy",
+      "request": "launch",
+      // 修正：去掉多余的 frappe-bench 路径
+      "program": "${workspaceFolder}/apps/frappe/frappe/utils/bench_helper.py",
+      "args": [
+        "frappe",
+        "serve",
+        "--port",
+        "8000",
+        "--noreload",   // 调试模式建议禁用自动重载，防止断点失效
+        "--nothreading" // 禁用多线程以确保断点精准捕捉
+      ],
+      "python": "${workspaceFolder}/env/bin/python", // 使用你 uv 安装的环境
+      "cwd": "${workspaceFolder}/sites",
+      "env": {
+        "DEV_SERVER": "1"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Bench Worker (Default)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/frappe/frappe/utils/bench_helper.py",
+      "args": ["frappe", "worker", "--queue", "default"],
+      "python": "${workspaceFolder}/env/bin/python",
+      "cwd": "${workspaceFolder}/sites"
+    }
+  ]
+}

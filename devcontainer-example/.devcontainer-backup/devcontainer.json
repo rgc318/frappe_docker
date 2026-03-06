@@ -1,0 +1,43 @@
+{
+  "name": "Frappe Dev (myapp)",
+  // 👈 重点：按顺序引用你目录下的所有 compose 文件
+  "dockerComposeFile": [
+    "../compose.yaml",                       // 基础定义
+    "../overrides/compose.redis.yaml",        // Redis
+    "../overrides/compose.mariadb.yaml",      // 数据库 (MariaDB 11.8)
+    "../overrides/compose.noproxy.yaml",      // 禁用反向代理，方便直连 8000
+     "docker-compose.yml"
+  ],
+  "service": "backend",                       // 对应你 compose 里的服务名
+  "workspaceFolder": "/home/frappe/frappe-bench", // 容器内的真实代码路径
+  "remoteUser": "frappe",
+  "forwardPorts": [8000, 9000, 5678],         // 转发业务、SocketIO 和调试端口
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.debugpy",                  // 核心调试插件
+        "charliermarsh.ruff",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-mysql"
+      ],
+      "settings": {
+        // 自动识别你用 uv 安装好依赖的虚拟环境
+        "python.defaultInterpreterPath": "/home/frappe/frappe-bench/env/bin/python",
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "sqltools.connections": [
+          {
+            "name": "MariaDB",
+            "driver": "MariaDB",
+            "server": "db",                   // 对应 compose 里的数据库服务名
+            "port": 3306,
+            "username": "root",
+            "password": "123",                // 匹配你的环境变量
+            "database": "mysql"
+          }
+        ]
+      }
+    }
+  },
+  "shutdownAction": "stopCompose"
+}

@@ -1,0 +1,19 @@
+services:
+  backend:
+    # 1. 修复参数：'missing' 确保本地构建的镜像不被远程拉取干扰
+    pull_policy: missing
+
+    # 2. 核心修复：强制清除继承的 entrypoint
+    entrypoint: []
+
+    # 3. 核心修复：必须写成字符串格式，防止被 bash -c 拆散参数
+    command: "sleep infinity"
+
+    # 4. 精准挂载调试配置
+    volumes:
+      - ./.vscode:/home/frappe/frappe-bench/.vscode:cached
+
+    working_dir: /home/frappe/frappe-bench
+    ports:
+      - "8000:8000"
+      - "5678:5678"
