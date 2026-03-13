@@ -37,7 +37,21 @@ Current verified state:
     - account info page
     - system info page
     - settings page
+  - user context now reads:
+    - current username
+    - user profile summary
+    - current user roles
   - frontend auth handling already reserves optional token mode for future backend support
+  - settings page now supports:
+    - backend base URL override
+    - default company
+    - default warehouse
+    - sales flow mode
+    - purchase flow mode
+  - company and warehouse settings already support:
+    - candidate search
+    - existence validation against backend master data
+    - field-level error prompts
   - bottom tab icon mapping has been fixed for web/Android fallback icons
   - current UI polishing is focused on login and user-module pages
 - `myapp-web`
@@ -156,3 +170,9 @@ The intended structure is:
   - environment/runtime details
 - `Settings`:
   - backend address and later client-side configuration
+
+The current settings design follows this boundary:
+
+- app-side operator preferences remain local to frontend
+- system-level master data maintenance is not moved into mobile yet
+- company and warehouse settings must still match backend master data before they can be saved
