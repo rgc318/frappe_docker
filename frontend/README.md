@@ -21,6 +21,30 @@ Current frontend split:
   - Target devices: desktop browsers
   - Recommended stack: React + Ant Design Pro + TypeScript
 
+## Current Progress
+
+Current verified state:
+
+- `myapp-mobile`
+  - Expo project initialized and verified with `npm run web`
+  - route skeleton implemented
+  - login/session flow connected to ERPNext built-in auth
+  - user module implemented with:
+    - login
+    - session restore
+    - logout
+    - me page
+    - account info page
+    - system info page
+    - settings page
+  - frontend auth handling already reserves optional token mode for future backend support
+  - bottom tab icon mapping has been fixed for web/Android fallback icons
+  - current UI polishing is focused on login and user-module pages
+- `myapp-web`
+  - Ant Design Pro project initialized and verified with `npm run dev`
+  - still at starter-template stage
+  - business pages have not started yet
+
 ## Related Backend Docs
 
 Use the backend docs under `apps/myapp` as the single source of truth.
@@ -103,3 +127,32 @@ Each frontend page spec should clearly state:
 - key actions
 - success result
 - common failure cases
+
+## Mobile Route Direction
+
+The mobile project should use Expo Router with this structure direction:
+
+- `login.tsx` for authentication
+- `(tabs)` for first-level navigation
+- `sales/*` for sales flow pages
+- `purchase/*` for purchase flow pages
+- `common/*` for shared picker and helper pages
+
+The tab layer should stay shallow. Detailed transaction pages should not all be placed directly inside tabs.
+
+The current mobile route plan also includes user-module subpages:
+
+- `account-info.tsx`
+- `system-info.tsx`
+- `settings.tsx`
+
+The intended structure is:
+
+- `Me` page:
+  - overview and entry page only
+- `Account Info`:
+  - account-facing details
+- `System Info`:
+  - environment/runtime details
+- `Settings`:
+  - backend address and later client-side configuration
