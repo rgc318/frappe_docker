@@ -52,12 +52,97 @@ Current verified state:
     - candidate search
     - existence validation against backend master data
     - field-level error prompts
+  - first real mobile business flow has started:
+    - product search
+    - sales order draft
+    - sales order creation
+  - current sales-order page is being reworked toward:
+    - document-centered layout
+    - inline product search inside the order page
+    - editable quantity and price
+    - compact order meta area
+    - bottom fixed action bar
   - bottom tab icon mapping has been fixed for web/Android fallback icons
-  - current UI polishing is focused on login and user-module pages
+  - current UI polishing has expanded from login/user pages to:
+    - home workbench page
+    - product search page
+    - sales order page
 - `myapp-web`
   - Ant Design Pro project initialized and verified with `npm run dev`
   - still at starter-template stage
   - business pages have not started yet
+
+## Reference Materials
+
+The mobile design work in this phase should not rely only on abstract discussion. Use the following local folders as the current visual reference source:
+
+- Reference product screenshots:
+  - `/home/rgc318/python-project/frappe_docker/reference_photos`
+- Current implementation screenshots:
+  - `/home/rgc318/python-project/frappe_docker/screenshots`
+
+Current most relevant reference images:
+
+- Home / dashboard:
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/home-dashboard-overview.jpg`
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/home-dashboard-overview-02.jpg`
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/home-dashboard-overview-03.jpg`
+- Sales order / billing form:
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/sales-order-form-full.jpg`
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/sales-order-form-full-02.jpg`
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/sales-order-form-full-03.jpg`
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/sales-order-form-shipping-section.jpg`
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/sales-order-form-shipping-summary.jpg`
+- Product / customer / settings related:
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/product-list-page.jpg`
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/customer-selection-page.jpg`
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/settings-page.jpg`
+  - `/home/rgc318/python-project/frappe_docker/reference_photos/my-profile-page.jpg`
+
+Use the references as layout and interaction guidance, not as a full visual copy target.
+
+## Current Design Direction
+
+This phase has already clarified several design constraints:
+
+- Do not force all pages into one generic card-heavy shell
+- Use references for:
+  - information hierarchy
+  - spacing density
+  - action placement
+  - document-first flow
+- Do not blindly copy:
+  - color style
+  - marketing decoration
+  - third-party product branding
+
+Current agreed mobile design direction:
+
+- Home page:
+  - top search
+  - quick shortcuts
+  - detailed data modules below
+- Sales order page:
+  - order document as the core object
+  - product area should dominate the page
+  - customer/company/warehouse/date are supporting information, not the visual main body
+  - bottom fixed action area is acceptable
+- Me/settings pages:
+  - grouped list structure
+  - avoid excessive nested cards
+  - field-level validation should be obvious
+
+## Current Design Issues Already Identified
+
+The following issues were explicitly discovered during this round and should continue to guide later changes:
+
+- Search pages should not waste the first screen on oversized title headers
+- Home shortcuts should use icon-above/text-below alignment and stable grid spacing
+- Search boxes must be real searchable inputs, not fake navigation placeholders
+- Sales order flow must be document-centered; product search is a sub-step inside order creation
+- Company/warehouse validation should be shown at the field level, not only as weak page-level messages
+- App-side settings are local operator preferences, not backend master-data management pages
+- Warehouse/company creation and broader master-data maintenance are not current mobile priorities
 
 ## Related Backend Docs
 
