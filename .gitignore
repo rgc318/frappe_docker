@@ -29,3 +29,7 @@ venv
 # NodeJS
 node_modules
 apps/*
+
+# Local staging overrides
+deploy/staging/staging.env
+deploy/staging/apps.staging.json
