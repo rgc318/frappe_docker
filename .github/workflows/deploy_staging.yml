@@ -1,0 +1,87 @@
+name: Deploy staging stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Published image tag to deploy"
+        required: true
+        default: "staging-latest"
+        type: string
+      site_name:
+        description: "Site name for bench migrate"
+        required: true
+        default: "staging.example.com"
+        type: string
+      run_health_check:
+        description: "Run check-staging.sh after deploy"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  SERVER_PATH: /srv/frappe_docker
+
+jobs:
+  deploy:
+    name: Deploy staging server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Start ssh-agent and load key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+
+      - name: Trust staging server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          ssh -p "${STAGING_SSH_PORT}" "${STAGING_SSH_USER}@${STAGING_SSH_HOST}" "\
+            cd ${SERVER_PATH} && \
+            git pull --ff-only origin main && \
+            python3 - <<'PY' && \
+from pathlib import Path
+env_path = Path('deploy/staging/staging.env')
+if not env_path.exists():
+    raise SystemExit('Missing deploy/staging/staging.env on server. Run ./deploy/staging/init-staging-server.sh first.')
+text = env_path.read_text()
+lines = []
+found = False
+for line in text.splitlines():
+    if line.startswith('CUSTOM_TAG='):
+        lines.append('CUSTOM_TAG=${{ inputs.image_tag }}')
+        found = True
+    else:
+        lines.append(line)
+if not found:
+    lines.append('CUSTOM_TAG=${{ inputs.image_tag }}')
+env_path.write_text('\\n'.join(lines) + '\\n')
+PY
+            echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USERNAME}' --password-stdin && \
+            SITE_NAME='${{ inputs.site_name }}' ./deploy/staging/deploy-staging.sh \
+          "
+
+      - name: Run health check
+        if: ${{ inputs.run_health_check }}
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+        run: |
+          ssh -p "${STAGING_SSH_PORT}" "${STAGING_SSH_USER}@${STAGING_SSH_HOST}" "\
+            cd ${SERVER_PATH} && \
+            ./deploy/staging/check-staging.sh \
+          "

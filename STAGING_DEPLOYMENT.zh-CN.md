@@ -171,6 +171,7 @@ ssh-keyscan -p 10022 39.104.204.79 >> ~/.ssh/known_hosts
 工作流位置：
 
 - `/home/rgc318/python-project/frappe_docker/.github/workflows/build_myapp_staging_image.yml`
+- `/home/rgc318/python-project/frappe_docker/.github/workflows/deploy_staging.yml`
 
 镜像建议形态：
 
@@ -182,6 +183,17 @@ ssh-keyscan -p 10022 39.104.204.79 >> ~/.ssh/known_hosts
 - `myapp` 不需要放进测试服务器源码目录
 - `myapp` 会在 CI 构建镜像时被远程拉取并烘焙进镜像
 - 测试服务器 compose 只需要引用该镜像
+- 推荐把测试服务器部署目录固定在：
+  - `/srv/frappe_docker`
+
+GitHub Actions SSH 部署建议准备以下 secrets：
+
+- `STAGING_SSH_HOST`
+- `STAGING_SSH_PORT`
+- `STAGING_SSH_USER`
+- `STAGING_SSH_PRIVATE_KEY`
+- `GHCR_USERNAME`
+- `GHCR_TOKEN`
 
 ---
 
@@ -471,6 +483,17 @@ https://staging.example.com
 - 测试机拉新镜像
 - 重启容器
 - 执行 migrate
+
+推荐脚本：
+
+- 初始化服务器：
+  - `./deploy/staging/init-staging-server.sh`
+- 启动：
+  - `./deploy/staging/start-staging.sh`
+- 升级：
+  - `SITE_NAME=staging.example.com ./deploy/staging/deploy-staging.sh`
+- 检查：
+  - `./deploy/staging/check-staging.sh`
 
 ---
 

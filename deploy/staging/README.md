@@ -14,6 +14,10 @@ Files:
   - starts the staging stack with HTTPS
 - `deploy-staging.sh`
   - pulls the latest image, restarts the stack, and optionally runs `bench migrate`
+- `init-staging-server.sh`
+  - prepares the server directories and creates `staging.env` from the example
+- `check-staging.sh`
+  - verifies the compose services and basic HTTP endpoints after deployment
 - `stop-staging.sh`
   - stops the staging stack
 - `INIT_SITE.zh-CN.md`
@@ -30,6 +34,7 @@ Recommended long-term path:
 Workflow:
 
 - `/home/rgc318/python-project/frappe_docker/.github/workflows/build_myapp_staging_image.yml`
+- `/home/rgc318/python-project/frappe_docker/.github/workflows/deploy_staging.yml`
 
 Suggested image reference in `staging.env`:
 
@@ -39,15 +44,22 @@ CUSTOM_TAG=staging-latest
 PULL_POLICY=always
 ```
 
+Required GitHub secrets for SSH deploy:
+
+- `STAGING_SSH_HOST`
+- `STAGING_SSH_PORT`
+- `STAGING_SSH_USER`
+- `STAGING_SSH_PRIVATE_KEY`
+- `GHCR_USERNAME`
+- `GHCR_TOKEN`
+
 Recommended first-time flow:
 
 ```bash
-cp deploy/staging/staging.env.example deploy/staging/staging.env
-cp deploy/staging/apps.staging.json.example deploy/staging/apps.staging.json
+./deploy/staging/init-staging-server.sh
 
-# edit deploy/staging/staging.env and deploy/staging/apps.staging.json
+# edit deploy/staging/staging.env
 
-./deploy/staging/build-staging-image.sh
 ./deploy/staging/start-staging.sh
 ```
 
@@ -59,4 +71,10 @@ Common update flow after the first deployment:
 
 ```bash
 SITE_NAME=staging.example.com ./deploy/staging/deploy-staging.sh
+```
+
+Common post-deploy verification:
+
+```bash
+./deploy/staging/check-staging.sh
 ```
