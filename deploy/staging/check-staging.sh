@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/deploy/staging/staging.env}"
+STAGING_MODE="${STAGING_MODE:-${DEPLOY_MODE:-internal}}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing env file: ${ENV_FILE}"
@@ -16,7 +17,7 @@ compose() {
     -f "${ROOT_DIR}/compose.yaml" \
     -f "${ROOT_DIR}/overrides/compose.redis.yaml" \
     -f "${ROOT_DIR}/overrides/compose.mariadb.yaml" \
-    -f "${ROOT_DIR}/overrides/compose.https.yaml" \
+    -f "${PROXY_OVERRIDE}" \
     "$@"
 }
 
@@ -29,11 +30,16 @@ HOSTS="$(get_env NGINX_PROXY_HOSTS)"
 HTTPS_PORT="$(get_env HTTPS_PUBLISH_PORT)"
 HTTP_PORT="$(get_env HTTP_PUBLISH_PORT)"
 BASE_URL="${STAGING_BASE_URL:-}"
+PROXY_OVERRIDE="${ROOT_DIR}/overrides/compose.noproxy.yaml"
+
+if [[ "${STAGING_MODE}" == "https" ]]; then
+  PROXY_OVERRIDE="${ROOT_DIR}/overrides/compose.https.yaml"
+fi
 
 if [[ -z "${BASE_URL}" ]]; then
   PRIMARY_HOST="${HOSTS%%,*}"
   PRIMARY_HOST="${PRIMARY_HOST%% *}"
-  if [[ -n "${PRIMARY_HOST}" ]]; then
+  if [[ "${STAGING_MODE}" == "https" && -n "${PRIMARY_HOST}" ]]; then
     if [[ "${HTTPS_PORT}" == "443" || -n "${HTTPS_PORT}" ]]; then
       BASE_URL="https://${PRIMARY_HOST}"
     elif [[ -n "${HTTP_PORT}" ]]; then
@@ -41,6 +47,8 @@ if [[ -z "${BASE_URL}" ]]; then
     else
       BASE_URL="http://${PRIMARY_HOST}"
     fi
+  elif [[ -n "${HTTP_PORT}" ]]; then
+    BASE_URL="http://127.0.0.1:${HTTP_PORT}"
   fi
 fi
 

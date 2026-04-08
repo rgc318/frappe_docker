@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/deploy/staging/staging.env}"
+STAGING_MODE="${STAGING_MODE:-${DEPLOY_MODE:-internal}}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing env file: ${ENV_FILE}"
@@ -11,10 +12,15 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+PROXY_OVERRIDE="${ROOT_DIR}/overrides/compose.noproxy.yaml"
+if [[ "${STAGING_MODE}" == "https" ]]; then
+  PROXY_OVERRIDE="${ROOT_DIR}/overrides/compose.https.yaml"
+fi
+
 docker compose \
   --env-file "${ENV_FILE}" \
   -f "${ROOT_DIR}/compose.yaml" \
   -f "${ROOT_DIR}/overrides/compose.redis.yaml" \
   -f "${ROOT_DIR}/overrides/compose.mariadb.yaml" \
-  -f "${ROOT_DIR}/overrides/compose.https.yaml" \
+  -f "${PROXY_OVERRIDE}" \
   up -d

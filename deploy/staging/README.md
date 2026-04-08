@@ -44,6 +44,15 @@ CUSTOM_TAG=staging-latest
 PULL_POLICY=always
 ```
 
+Mode switch:
+
+- `STAGING_MODE=internal`
+  - use `compose.noproxy.yaml`
+  - recommended for first-time LAN testing
+- `STAGING_MODE=https`
+  - use `compose.https.yaml`
+  - switch to this after the domain and certificate path are ready
+
 Required GitHub secrets for SSH deploy:
 
 - `STAGING_SSH_HOST`
