@@ -65,9 +65,11 @@
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/deploy-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/rollback-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/backup-staging.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/restore-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/check-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/init-site.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/DATA_MIGRATION.zh-CN.md`
 
 ---
 
@@ -394,11 +396,60 @@ SITE_NAME=all ./deploy/staging/backup-staging.sh
 - 目标站点的 `site_config.json`
 - `private/backups` 下由 `bench backup --with-files` 生成的数据库和文件备份
 
+如果要把本地开发站点的数据恢复到远程 staging，推荐使用：
+
+```bash
+SITE_NAME=staging.example.com \
+RESTORE_DIR=/srv/frappe_docker/tmp/restore-localhost-20260409 \
+./deploy/staging/restore-staging.sh
+```
+
+该脚本会：
+
+- 先对当前 staging 站点做一份安全备份
+- 再恢复指定目录中的数据库、公有文件和私有文件
+- 自动执行 `migrate`
+- 自动清缓存并关闭维护模式
+
+更完整的本地到 staging 数据迁移说明见：
+
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/DATA_MIGRATION.zh-CN.md`
+
 ---
 
-## 12. 访问方式补充
+## 12. 本地数据迁移到 Staging
 
-### 12.1 站点已建好但直接访问 IP 返回 404
+当前推荐的数据迁移路径是：
+
+1. 在本地把站点整理成目标状态
+2. 在本地执行 `bench backup --with-files`
+3. 把备份文件上传到：
+   - `/srv/frappe_docker/tmp/<restore-dir>`
+4. 在服务器上运行：
+   - `./deploy/staging/restore-staging.sh`
+5. 执行：
+   - `./deploy/staging/check-staging.sh`
+
+这样迁过去的通常包括：
+
+- 用户账号
+- 权限配置
+- ERPNext 和 `myapp` 的业务数据
+- 公有/私有附件文件
+- 大部分站点级配置
+
+注意：
+
+- 数据是跟着 `site` 走的，不是跟着 `app` 走的
+- 恢复会覆盖目标站点当前数据库和文件
+- 远端 `staging.env`、镜像 tag、部署骨架仍按远端环境维护
+- 建议只使用“清理之后重新生成”的最新本地备份
+
+---
+
+## 13. 访问方式补充
+
+### 13.1 站点已建好但直接访问 IP 返回 404
 
 现象：
 
@@ -443,9 +494,9 @@ cd /srv/frappe_docker
 
 ---
 
-## 13. 本次实际遇到的问题与解决方案
+## 14. 本次实际遇到的问题与解决方案
 
-### 13.1 本地 Docker 构建出网不稳定
+### 14.1 本地 Docker 构建出网不稳定
 
 现象：
 
@@ -461,7 +512,7 @@ cd /srv/frappe_docker
 - 不在测试服务器或本机构建最终镜像
 - 改用 GitHub Actions 构建并推送 GHCR 镜像
 
-### 13.2 GitHub Actions deploy SSH 失败
+### 14.2 GitHub Actions deploy SSH 失败
 
 现象：
 
@@ -480,7 +531,7 @@ cd /srv/frappe_docker
 - 使用无 passphrase 的 CI 专用 SSH 密钥
 - 本地先用同一把私钥验证可以登录服务器
 
-### 13.3 服务器 `git pull` 被拒绝
+### 14.3 服务器 `git pull` 被拒绝
 
 现象：
 
@@ -500,7 +551,7 @@ git checkout -- deploy/staging/*.sh
 git pull --ff-only origin main
 ```
 
-### 13.4 staging 启动后 `No module named 'myapp'`
+### 14.4 staging 启动后 `No module named 'myapp'`
 
 现象：
 
@@ -521,7 +572,7 @@ git pull --ff-only origin main
   - `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.staging.yaml`
 - staging 改为只使用镜像中的 `myapp`
 
-### 13.5 数据库端口冲突
+### 14.5 数据库端口冲突
 
 现象：
 
@@ -538,7 +589,7 @@ git pull --ff-only origin main
   - `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.mariadb.staging.yaml`
 - staging 数据库不再映射宿主机端口
 
-### 13.6 首次部署时 `bench migrate` 报站点不存在
+### 14.6 首次部署时 `bench migrate` 报站点不存在
 
 现象：
 
@@ -555,7 +606,7 @@ git pull --ff-only origin main
 - `deploy-staging.sh` 先检查站点是否存在
 - 不存在时跳过 migrate，并提示先建站
 
-### 13.7 首次部署健康检查返回 404
+### 14.7 首次部署健康检查返回 404
 
 现象：
 
@@ -573,7 +624,7 @@ git pull --ff-only origin main
   - 则判定为“基础栈已起来，但站点未初始化”
   - 不再视为失败
 
-### 13.8 新增脚本或文档后 `Lint` 因 formatter 失败
+### 14.8 新增脚本或文档后 `Lint` 因 formatter 失败
 
 现象：
 
@@ -636,9 +687,50 @@ git pull --ff-only origin main
   - `stop.sh`
   - `install_x11_deps.sh`
 
+### 14.9 第一次恢复错用了清理前的旧备份
+
+现象：
+
+- staging 恢复完成
+- 健康检查通过
+- 但事务数据数量仍然很大
+
+原因：
+
+- 使用的是本地清理动作之前生成的旧备份
+- 备份文件时间点早于清理时间点
+
+解决：
+
+- 在本地数据清理完成后重新执行一次：
+
+```bash
+bench --site localhost backup --with-files
+```
+
+- 只恢复最新的清理后备份
+- 恢复前可先核对关键表数量，确认本地事务数据已经为 `0`
+
+### 14.10 恢复后短暂返回 503
+
+现象：
+
+- 容器正常
+- 首页返回 `503`
+
+原因：
+
+- 站点恢复后仍处于 maintenance mode
+
+解决：
+
+- `restore-staging.sh` 在恢复末尾自动执行：
+  - `bench --site <site> set-maintenance-mode off`
+- 若手动恢复，也应在恢复完成后显式关闭维护模式
+
 ---
 
-## 14. 当前建议
+## 15. 当前建议
 
 如果此时：
 

@@ -26,12 +26,16 @@ Files:
   - switches `CUSTOM_TAG` to an older image tag, restarts the stack, and optionally runs the health check
 - `backup-staging.sh`
   - runs `bench backup --with-files`, packages the generated site backups, and copies the archive to the host
+- `restore-staging.sh`
+  - restores a site from backup files already uploaded to the staging server, with a safety backup before overwrite
 - `check-staging.sh`
   - verifies the compose services and basic HTTP endpoints after deployment
 - `stop-staging.sh`
   - stops the staging stack
 - `INIT_SITE.zh-CN.md`
   - first-time site creation and app installation guide
+- `DATA_MIGRATION.zh-CN.md`
+  - local-to-staging data migration and restore guide
 
 Recommended long-term path:
 
@@ -123,6 +127,14 @@ Common backup flow:
 SITE_NAME=all ./deploy/staging/backup-staging.sh
 ```
 
+Common restore flow:
+
+```bash
+SITE_NAME=staging.example.com \
+RESTORE_DIR=/srv/frappe_docker/tmp/restore-localhost-20260409 \
+./deploy/staging/restore-staging.sh
+```
+
 By default, backup archives are written to:
 
 ```bash
@@ -134,3 +146,7 @@ Common post-deploy verification:
 ```bash
 ./deploy/staging/check-staging.sh
 ```
+
+For local cleaned-data migration into staging, follow:
+
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/DATA_MIGRATION.zh-CN.md`
