@@ -38,8 +38,14 @@ echo "Restarting staging stack..."
 compose up -d
 
 if [[ -n "${SITE_NAME}" && "${SKIP_MIGRATE}" != "1" ]]; then
-  echo "Running bench migrate for site: ${SITE_NAME}"
-  compose exec backend bash -lc "bench --site ${SITE_NAME} migrate"
+  echo "Checking site before migrate: ${SITE_NAME}"
+  if compose exec backend bash -lc "bench --site ${SITE_NAME} list-apps >/dev/null 2>&1"; then
+    echo "Running bench migrate for site: ${SITE_NAME}"
+    compose exec backend bash -lc "bench --site ${SITE_NAME} migrate"
+  else
+    echo "Skipping migrate because site does not exist yet: ${SITE_NAME}"
+    echo "Initialize the site first by following deploy/staging/INIT_SITE.zh-CN.md"
+  fi
 else
   echo "Skipping migrate."
   echo "Set SITE_NAME=<your-site> to run bench migrate automatically."
