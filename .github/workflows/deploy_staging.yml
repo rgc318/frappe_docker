@@ -31,57 +31,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Start ssh-agent and load key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-
-      - name: Trust staging server host key
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_HOST }}" >> ~/.ssh/known_hosts
-
       - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
         env:
-          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
-          STAGING_SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
-          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-        run: |
-          ssh -p "${STAGING_SSH_PORT}" "${STAGING_SSH_USER}@${STAGING_SSH_HOST}" "\
-            cd ${SERVER_PATH} && \
-            git pull --ff-only origin main && \
-            python3 - <<'PY' && \
-from pathlib import Path
-env_path = Path('deploy/staging/staging.env')
-if not env_path.exists():
-    raise SystemExit('Missing deploy/staging/staging.env on server. Run ./deploy/staging/init-staging-server.sh first.')
-text = env_path.read_text()
-lines = []
-found = False
-for line in text.splitlines():
-    if line.startswith('CUSTOM_TAG='):
-        lines.append('CUSTOM_TAG=${{ inputs.image_tag }}')
-        found = True
-    else:
-        lines.append(line)
-if not found:
-    lines.append('CUSTOM_TAG=${{ inputs.image_tag }}')
-env_path.write_text('\\n'.join(lines) + '\\n')
-PY
-            echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USERNAME}' --password-stdin && \
-            SITE_NAME='${{ inputs.site_name }}' ./deploy/staging/deploy-staging.sh \
-          "
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          SITE_NAME: ${{ inputs.site_name }}
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          port: ${{ secrets.STAGING_SSH_PORT }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          script_stop: true
+          envs: GHCR_USERNAME,GHCR_TOKEN,IMAGE_TAG,SITE_NAME
+          script: |
+            set -euo pipefail
+            cd /srv/frappe_docker
+            git pull --ff-only origin main
+
+            if [ ! -f deploy/staging/staging.env ]; then
+              echo "Missing deploy/staging/staging.env on server. Run ./deploy/staging/init-staging-server.sh first."
+              exit 1
+            fi
+
+            if grep -q '^CUSTOM_TAG=' deploy/staging/staging.env; then
+              sed -i "s/^CUSTOM_TAG=.*/CUSTOM_TAG=${IMAGE_TAG}/" deploy/staging/staging.env
+            else
+              printf '\nCUSTOM_TAG=%s\n' "${IMAGE_TAG}" >> deploy/staging/staging.env
+            fi
+
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+            SITE_NAME="${SITE_NAME}" ./deploy/staging/deploy-staging.sh
 
       - name: Run health check
         if: ${{ inputs.run_health_check }}
-        env:
-          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
-          STAGING_SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
-          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
-        run: |
-          ssh -p "${STAGING_SSH_PORT}" "${STAGING_SSH_USER}@${STAGING_SSH_HOST}" "\
-            cd ${SERVER_PATH} && \
-            ./deploy/staging/check-staging.sh \
-          "
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          port: ${{ secrets.STAGING_SSH_PORT }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /srv/frappe_docker
+            ./deploy/staging/check-staging.sh
