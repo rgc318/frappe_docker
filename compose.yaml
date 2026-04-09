@@ -4,7 +4,7 @@ x-customizable-image: &customizable_image
   # about using custom images.
   image: ${CUSTOM_IMAGE:-frappe/erpnext}:${CUSTOM_TAG:-$ERPNEXT_VERSION}
   pull_policy: ${PULL_POLICY:-always}
-#  pull_policy: missing
+  #  pull_policy: missing
   restart: ${RESTART_POLICY:-unless-stopped}
 
 x-depends-on-configurator: &depends_on_configurator
@@ -14,13 +14,13 @@ x-depends-on-configurator: &depends_on_configurator
 
 x-backend-defaults: &backend_defaults
   <<: [*depends_on_configurator, *customizable_image]
-#  extra_hosts:
-#    - "host.docker.internal:host-gateway"
+  #  extra_hosts:
+  #    - "host.docker.internal:host-gateway"
   volumes:
     - sites:/home/frappe/frappe-bench/sites
     - ./apps/myapp:/home/frappe/frappe-bench/apps/myapp
     - bench-env-vol:/home/frappe/frappe-bench/env
-#    - ./.vscode:/home/frappe/frappe-bench/.vscode:cached
+    #    - ./.vscode:/home/frappe/frappe-bench/.vscode:cached
 
 services:
   configurator:
@@ -116,7 +116,6 @@ services:
       - >
         [ ! -d "apps/myapp/myapp.egg-info" ] && ./env/bin/pip install -e apps/myapp;
         exec bench worker --queue long,default,short
-
 
   scheduler:
     <<: *backend_defaults

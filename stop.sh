@@ -9,19 +9,19 @@ REMOVE_ORPHANS=false
 # 解析参数
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -v)
-      REMOVE_VOLUMES=true
-      shift
-      ;;
-    -r)
-      REMOVE_ORPHANS=true
-      shift
-      ;;
-    *)
-      echo "Unknown option: $1"
-      echo "Usage: ./stop.sh [-v] [-r]"
-      exit 1
-      ;;
+  -v)
+    REMOVE_VOLUMES=true
+    shift
+    ;;
+  -r)
+    REMOVE_ORPHANS=true
+    shift
+    ;;
+  *)
+    echo "Unknown option: $1"
+    echo "Usage: ./stop.sh [-v] [-r]"
+    exit 1
+    ;;
   esac
 done
 
