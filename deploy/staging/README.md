@@ -20,6 +20,8 @@ Files:
   - pulls the latest image, restarts the stack, and optionally runs `bench migrate`
 - `init-staging-server.sh`
   - prepares the server directories and creates `staging.env` from the example
+- `init-site.sh`
+  - creates the first staging site, installs apps, runs migrate, and optionally sets the default site
 - `check-staging.sh`
   - verifies the compose services and basic HTTP endpoints after deployment
 - `stop-staging.sh`
@@ -75,9 +77,23 @@ Recommended first-time flow:
 
 ./deploy/staging/start-staging.sh
 
-# first-time site creation is manual
-# follow deploy/staging/INIT_SITE.zh-CN.md
+SITE_NAME=staging.example.com ADMIN_PASSWORD='<admin-password>' ./deploy/staging/init-site.sh
 ```
+
+If the site is already initialized but direct IP access still returns `404`, add this to `deploy/staging/staging.env`:
+
+```bash
+FRAPPE_SITE_NAME_HEADER=staging.example.com
+```
+
+Then restart staging:
+
+```bash
+./deploy/staging/stop-staging.sh
+./deploy/staging/start-staging.sh
+```
+
+This makes the staging frontend route LAN/IP requests to the intended single site during the internal testing phase.
 
 After the stack is up, initialize the staging site by following:
 

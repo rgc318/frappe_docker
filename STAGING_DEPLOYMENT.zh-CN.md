@@ -271,11 +271,8 @@ FRAPPE_PATH=https://github.com/frappe/frappe
 1. 通过 `Lint`
 2. 手动运行 `Build myapp staging image`
 3. 手动运行 `Deploy staging stack`
-4. 手动创建站点
-5. 安装 `erpnext`
-6. 安装 `myapp`
-7. 执行 `migrate`
-8. 再次运行 `check-staging.sh`
+4. 使用 `init-site.sh` 创建站点
+5. 再次运行 `check-staging.sh`
 
 为什么不是先建站？
 
@@ -309,9 +306,28 @@ FRAPPE_PATH=https://github.com/frappe/frappe
 
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
 
-执行。
+执行。当前推荐优先使用独立初始化脚本，而不是把建站逻辑塞进日常 deploy。
 
-核心动作是：
+推荐命令：
+
+```bash
+cd /srv/frappe_docker
+SITE_NAME=staging.example.com \
+ADMIN_PASSWORD='<admin-password>' \
+./deploy/staging/init-site.sh
+```
+
+该脚本会自动完成：
+
+- 检查 staging 容器是否已启动
+- 检查站点是否已存在
+- 不存在时执行 `bench new-site`
+- 安装 `erpnext`
+- 安装 `myapp`
+- 执行 `migrate`
+- 可选执行 `bench use`
+
+底层核心动作仍然是：
 
 1. `bench new-site <site>`
 2. `bench --site <site> install-app erpnext`
@@ -338,9 +354,56 @@ FRAPPE_PATH=https://github.com/frappe/frappe
 
 ---
 
-## 12. 本次实际遇到的问题与解决方案
+## 12. 访问方式补充
 
-### 12.1 本地 Docker 构建出网不稳定
+### 12.1 站点已建好但直接访问 IP 返回 404
+
+现象：
+
+- `curl -I http://127.0.0.1:28080` 返回 `404`
+- 但：
+
+```bash
+curl -I -H 'Host: staging.example.com' http://127.0.0.1:28080
+```
+
+返回 `200`
+
+原因：
+
+- Frappe/NGINX 默认按请求里的 `Host` 头路由站点
+- 直接访问 `127.0.0.1:28080` 或 `局域网IP:28080` 时，`Host` 不是 `staging.example.com`
+- 所以请求没有命中刚创建好的站点
+
+解决：
+
+- 在：
+  - `/srv/frappe_docker/deploy/staging/staging.env`
+  中设置：
+
+```env
+FRAPPE_SITE_NAME_HEADER=staging.example.com
+```
+
+- 然后重启 staging：
+
+```bash
+cd /srv/frappe_docker
+./deploy/staging/stop-staging.sh
+./deploy/staging/start-staging.sh
+```
+
+说明：
+
+- 这是 `frappe_docker` 官方支持的环境变量机制
+- 适合当前“内网 IP + 单站点 staging”的阶段
+- 后续切正式域名后，可以再恢复按真实 Host 路由
+
+---
+
+## 13. 本次实际遇到的问题与解决方案
+
+### 13.1 本地 Docker 构建出网不稳定
 
 现象：
 
@@ -356,7 +419,7 @@ FRAPPE_PATH=https://github.com/frappe/frappe
 - 不在测试服务器或本机构建最终镜像
 - 改用 GitHub Actions 构建并推送 GHCR 镜像
 
-### 12.2 GitHub Actions deploy SSH 失败
+### 13.2 GitHub Actions deploy SSH 失败
 
 现象：
 
@@ -375,7 +438,7 @@ FRAPPE_PATH=https://github.com/frappe/frappe
 - 使用无 passphrase 的 CI 专用 SSH 密钥
 - 本地先用同一把私钥验证可以登录服务器
 
-### 12.3 服务器 `git pull` 被拒绝
+### 13.3 服务器 `git pull` 被拒绝
 
 现象：
 
@@ -395,7 +458,7 @@ git checkout -- deploy/staging/*.sh
 git pull --ff-only origin main
 ```
 
-### 12.4 staging 启动后 `No module named 'myapp'`
+### 13.4 staging 启动后 `No module named 'myapp'`
 
 现象：
 
@@ -416,7 +479,7 @@ git pull --ff-only origin main
   - `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.staging.yaml`
 - staging 改为只使用镜像中的 `myapp`
 
-### 12.5 数据库端口冲突
+### 13.5 数据库端口冲突
 
 现象：
 
@@ -433,7 +496,7 @@ git pull --ff-only origin main
   - `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.mariadb.staging.yaml`
 - staging 数据库不再映射宿主机端口
 
-### 12.6 首次部署时 `bench migrate` 报站点不存在
+### 13.6 首次部署时 `bench migrate` 报站点不存在
 
 现象：
 
@@ -450,7 +513,7 @@ git pull --ff-only origin main
 - `deploy-staging.sh` 先检查站点是否存在
 - 不存在时跳过 migrate，并提示先建站
 
-### 12.7 首次部署健康检查返回 404
+### 13.7 首次部署健康检查返回 404
 
 现象：
 
@@ -470,7 +533,7 @@ git pull --ff-only origin main
 
 ---
 
-## 13. 当前建议
+## 14. 当前建议
 
 如果此时：
 
@@ -479,8 +542,8 @@ git pull --ff-only origin main
 
 那么下一步就应该是：
 
-- 按 `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
-  手动创建第一个 staging 站点
+- 通过 `/home/rgc318/python-project/frappe_docker/deploy/staging/init-site.sh`
+  创建第一个 staging 站点
 
 建站完成后，再次运行：
 
