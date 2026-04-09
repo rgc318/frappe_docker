@@ -16,6 +16,6 @@ docker compose \
   --env-file "${ENV_FILE}" \
   -f "${COMPOSE_BASE}" \
   -f "${ROOT_DIR}/overrides/compose.redis.yaml" \
-  -f "${ROOT_DIR}/overrides/compose.mariadb.yaml" \
+  -f "${ROOT_DIR}/deploy/staging/compose.mariadb.staging.yaml" \
   -f "${PROXY_OVERRIDE}" \
   down "$@"
