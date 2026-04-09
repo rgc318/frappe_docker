@@ -61,6 +61,18 @@ jobs:
             exit 1
           fi
 
+          if ! printf '%s' "${STAGING_SSH_PORT}" | grep -Eq '^[0-9]+$'; then
+            echo "STAGING_SSH_PORT must be digits only, without spaces or newlines."
+            exit 1
+          fi
+
+          for key in STAGING_SSH_HOST STAGING_SSH_USER GHCR_USERNAME; do
+            if printf '%s' "${!key}" | grep -Eq '[[:space:]]'; then
+              printf '%s must not contain spaces or newlines.\n' "${key}"
+              exit 1
+            fi
+          done
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.2
         env:
