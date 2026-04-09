@@ -67,11 +67,30 @@ echo
 echo "== HTTP checks =="
 echo "Base URL: ${BASE_URL}"
 
-curl -kfsS "${BASE_URL}" >/dev/null
-echo "Homepage: OK"
+set +e
+homepage_status="$(curl -ksS -o /dev/null -w '%{http_code}' "${BASE_URL}")"
+ping_status="$(curl -ksS -o /dev/null -w '%{http_code}' "${BASE_URL}/api/method/ping")"
+set -e
 
-curl -kfsS "${BASE_URL}/api/method/ping" >/dev/null
-echo "Ping API: OK"
+if [[ "${homepage_status}" == "404" && "${ping_status}" == "404" ]]; then
+  echo "HTTP endpoint is reachable, but the staging site is not initialized yet."
+  echo "Finish first-time site creation by following deploy/staging/INIT_SITE.zh-CN.md"
+  exit 0
+fi
+
+if [[ "${homepage_status}" =~ ^[23] ]]; then
+  echo "Homepage: OK (${homepage_status})"
+else
+  echo "Homepage check failed with status ${homepage_status}"
+  exit 1
+fi
+
+if [[ "${ping_status}" =~ ^[23] ]]; then
+  echo "Ping API: OK (${ping_status})"
+else
+  echo "Ping API check failed with status ${ping_status}"
+  exit 1
+fi
 
 echo
 echo "Staging health check completed."
