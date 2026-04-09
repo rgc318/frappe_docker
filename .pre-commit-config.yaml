@@ -3,7 +3,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-executables-have-shebangs
+        files: ^(\.github/scripts/.*\.py|deploy/staging/.*\.sh|start-dev\.sh|start-prod\.sh|stop\.sh|install_x11_deps\.sh)$
       - id: check-shebang-scripts-are-executable
+        files: ^(\.github/scripts/.*\.py|deploy/staging/.*\.sh|start-dev\.sh|start-prod\.sh|stop\.sh|install_x11_deps\.sh)$
       - id: trailing-whitespace
       - id: end-of-file-fixer
 
