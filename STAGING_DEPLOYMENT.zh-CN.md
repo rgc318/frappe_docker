@@ -573,6 +573,69 @@ git pull --ff-only origin main
   - 则判定为“基础栈已起来，但站点未初始化”
   - 不再视为失败
 
+### 13.8 新增脚本或文档后 `Lint` 因 formatter 失败
+
+现象：
+
+- GitHub Actions 中：
+  - `prettier` 失败
+  - `shfmt` 失败
+- 日志中出现：
+  - `files were modified by this hook`
+
+原因：
+
+- 这不是业务逻辑错误，而是格式未完全符合仓库当前 formatter 规则
+- 仓库根目录使用：
+  - `/home/rgc318/python-project/frappe_docker/.pre-commit-config.yaml`
+  中定义的规则
+- 其中：
+  - `prettier` 会处理 Markdown / YAML / JSON
+  - `shfmt` 会处理 `deploy/staging/*.sh`
+  - `shellcheck` 会检查 shell 脚本写法
+- 只要这些工具还能自动改文件，CI 就会直接失败
+
+这次实际踩到的点包括：
+
+- `STAGING_DEPLOYMENT.zh-CN.md`
+  - 被 `prettier` 调整列表缩进
+- `deploy/staging/backup-staging.sh`
+  - 被 `shellcheck` 指出字符串写法问题
+  - 被 `shfmt` 调整 heredoc 和重定向排版
+- `deploy/staging/rollback-staging.sh`
+  - 被 `shfmt` 调整重定向空格
+
+解决：
+
+- 不要只看“代码能不能运行”
+- 还要确保文件经过和 CI 一致的 formatter 输出
+
+经验建议：
+
+1. 新增或修改 `deploy/staging/*.sh` 后
+   - 优先关注：
+     - `shellcheck`
+     - `shfmt`
+2. 修改大文档后
+   - 优先关注：
+     - `prettier`
+3. 当日志里只看到：
+   - `files were modified by this hook`
+   时，说明不是“工具坏了”，而是 formatter 还想继续改文件
+4. 如果本地缺少 `shfmt` 等环境
+   - 可以先以 GitHub Actions 最新 run 为准
+   - 把 formatter 改动再收回仓库
+
+判断技巧：
+
+- `prettier` 日志中，只有未显示 `(unchanged)` 的文件，才是它真正改过的文件
+- `shfmt` 虽然不总是把文件名打印得很明显，但它只会作用于：
+  - `deploy/staging/*.sh`
+  - `start-dev.sh`
+  - `start-prod.sh`
+  - `stop.sh`
+  - `install_x11_deps.sh`
+
 ---
 
 ## 14. 当前建议
