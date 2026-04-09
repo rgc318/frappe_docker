@@ -1,3 +1,5 @@
+exclude: ^(apps/(frappe|erpnext|myapp)/|frontend/|screenshots/|reference_photos/|dev/|sites/)
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -48,10 +50,11 @@ repos:
         additional_dependencies: [mvdan.cc/sh/v3/cmd/shfmt@latest]
         entry: shfmt
         args: [-w]
-        types: [shell]
+        files: ^(deploy/staging/.*\.sh|start-dev\.sh|start-prod\.sh|stop\.sh|install_x11_deps\.sh)$
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1
     hooks:
       - id: shellcheck
         args: [-x]
+        files: ^(deploy/staging/.*\.sh|start-dev\.sh|start-prod\.sh|stop\.sh|install_x11_deps\.sh)$

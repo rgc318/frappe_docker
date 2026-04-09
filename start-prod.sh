@@ -1,3 +1,5 @@
+#!/bin/bash
+
 docker compose \
   -f compose.yaml \
   -f overrides/compose.redis.yaml \
