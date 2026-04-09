@@ -40,7 +40,8 @@ compose up -d backend db redis-cache redis-queue
 echo "Running bench backup for site: ${SITE_NAME}"
 if [[ "${SITE_NAME}" == "all" ]]; then
   compose exec backend bash -lc "bench --site all backup --with-files"
-  archive_cmd="$(cat <<EOF
+  archive_cmd="$(
+    cat <<EOF
 set -euo pipefail
 cd /home/frappe/frappe-bench
 shopt -s nullglob
@@ -60,10 +61,11 @@ if [ "\${#paths[@]}" -eq 0 ]; then
 fi
 tar -czf "/tmp/${ARCHIVE_NAME}" "\${paths[@]}"
 EOF
-)"
+  )"
 else
   compose exec backend bash -lc "bench --site ${SITE_NAME} backup --with-files"
-  archive_cmd="$(cat <<EOF
+  archive_cmd="$(
+    cat <<EOF
 set -euo pipefail
 cd /home/frappe/frappe-bench
 paths=("sites/${SITE_NAME}/site_config.json" "sites/${SITE_NAME}/private/backups")
@@ -75,7 +77,7 @@ for path in "\${paths[@]}"; do
 done
 tar -czf "/tmp/${ARCHIVE_NAME}" -C /home/frappe/frappe-bench "sites/${SITE_NAME}/site_config.json" "sites/${SITE_NAME}/private/backups"
 EOF
-)"
+  )"
 fi
 
 echo "Packaging backup artifacts inside backend container..."
@@ -91,7 +93,7 @@ echo "Copying backup archive to host: ${BACKUP_ROOT}/${ARCHIVE_NAME}"
 docker cp "${backend_container}:/tmp/${ARCHIVE_NAME}" "${BACKUP_ROOT}/${ARCHIVE_NAME}"
 compose exec backend bash -lc "rm -f /tmp/${ARCHIVE_NAME}"
 
-cat > "${BACKUP_ROOT}/${ARCHIVE_NAME%.tar.gz}.metadata" <<EOF
+cat >"${BACKUP_ROOT}/${ARCHIVE_NAME%.tar.gz}.metadata" <<EOF
 timestamp=${TIMESTAMP}
 site_name=${SITE_NAME}
 archive_name=${ARCHIVE_NAME}

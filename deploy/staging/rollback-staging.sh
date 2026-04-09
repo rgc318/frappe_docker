@@ -32,7 +32,7 @@ echo "Switching staging tag to: ${ROLLBACK_TAG}"
 if grep -q '^CUSTOM_TAG=' "${ENV_FILE}"; then
   sed -i "s/^CUSTOM_TAG=.*/CUSTOM_TAG=${ROLLBACK_TAG}/" "${ENV_FILE}"
 else
-  printf '\nCUSTOM_TAG=%s\n' "${ROLLBACK_TAG}" >> "${ENV_FILE}"
+  printf '\nCUSTOM_TAG=%s\n' "${ROLLBACK_TAG}" >>"${ENV_FILE}"
 fi
 
 echo "Restarting staging stack with rollback tag..."

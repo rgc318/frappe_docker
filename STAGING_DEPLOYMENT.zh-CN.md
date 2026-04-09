@@ -421,7 +421,7 @@ curl -I -H 'Host: staging.example.com' http://127.0.0.1:28080
 
 - 在：
   - `/srv/frappe_docker/deploy/staging/staging.env`
-  中设置：
+    中设置：
 
 ```env
 FRAPPE_SITE_NAME_HEADER=staging.example.com
