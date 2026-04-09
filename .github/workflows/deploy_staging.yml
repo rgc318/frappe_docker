@@ -31,6 +31,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate deploy secrets
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+
+          for key in \
+            STAGING_SSH_HOST \
+            STAGING_SSH_PORT \
+            STAGING_SSH_USER \
+            STAGING_SSH_PRIVATE_KEY \
+            GHCR_USERNAME \
+            GHCR_TOKEN; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("${key}")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required GitHub Actions secrets: %s\n' "${missing[*]}"
+            exit 1
+          fi
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.2
         env:
@@ -43,7 +73,6 @@ jobs:
           port: ${{ secrets.STAGING_SSH_PORT }}
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-          script_stop: true
           envs: GHCR_USERNAME,GHCR_TOKEN,IMAGE_TAG,SITE_NAME
           script: |
             set -euo pipefail
@@ -72,7 +101,6 @@ jobs:
           port: ${{ secrets.STAGING_SSH_PORT }}
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-          script_stop: true
           script: |
             set -euo pipefail
             cd /srv/frappe_docker
