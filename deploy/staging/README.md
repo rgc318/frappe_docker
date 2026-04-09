@@ -8,10 +8,14 @@ Files:
   - copy to `staging.env` and fill real values
 - `apps.staging.json.example`
   - copy to `apps.staging.json` and define the apps baked into the image
+- `compose.staging.yaml`
+  - staging-only compose base that does not bind-mount `apps/myapp`
+- `compose.mariadb.staging.yaml`
+  - staging-only MariaDB override that does not publish database ports to the host
 - `build-staging-image.sh`
   - builds the custom image that already contains `myapp`
 - `start-staging.sh`
-  - starts the staging stack with HTTPS
+  - starts the staging stack
 - `deploy-staging.sh`
   - pulls the latest image, restarts the stack, and optionally runs `bench migrate`
 - `init-staging-server.sh`
@@ -70,6 +74,9 @@ Recommended first-time flow:
 # edit deploy/staging/staging.env
 
 ./deploy/staging/start-staging.sh
+
+# first-time site creation is manual
+# follow deploy/staging/INIT_SITE.zh-CN.md
 ```
 
 After the stack is up, initialize the staging site by following:

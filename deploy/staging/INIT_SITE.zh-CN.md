@@ -21,10 +21,10 @@
 ```bash
 docker compose \
   --env-file deploy/staging/staging.env \
-  -f compose.yaml \
+  -f deploy/staging/compose.staging.yaml \
   -f overrides/compose.redis.yaml \
-  -f overrides/compose.mariadb.yaml \
-  -f overrides/compose.https.yaml \
+  -f deploy/staging/compose.mariadb.staging.yaml \
+  -f overrides/compose.noproxy.yaml \
   ps
 ```
 
@@ -35,10 +35,10 @@ docker compose \
 ```bash
 docker compose \
   --env-file deploy/staging/staging.env \
-  -f compose.yaml \
+  -f deploy/staging/compose.staging.yaml \
   -f overrides/compose.redis.yaml \
-  -f overrides/compose.mariadb.yaml \
-  -f overrides/compose.https.yaml \
+  -f deploy/staging/compose.mariadb.staging.yaml \
+  -f overrides/compose.noproxy.yaml \
   exec backend \
   bash -lc "bench new-site staging.example.com --admin-password <admin-password> --db-root-password <db-root-password>"
 ```
@@ -56,19 +56,19 @@ docker compose \
 ```bash
 docker compose \
   --env-file deploy/staging/staging.env \
-  -f compose.yaml \
+  -f deploy/staging/compose.staging.yaml \
   -f overrides/compose.redis.yaml \
-  -f overrides/compose.mariadb.yaml \
-  -f overrides/compose.https.yaml \
+  -f deploy/staging/compose.mariadb.staging.yaml \
+  -f overrides/compose.noproxy.yaml \
   exec backend \
   bash -lc "bench --site staging.example.com install-app erpnext"
 
 docker compose \
   --env-file deploy/staging/staging.env \
-  -f compose.yaml \
+  -f deploy/staging/compose.staging.yaml \
   -f overrides/compose.redis.yaml \
-  -f overrides/compose.mariadb.yaml \
-  -f overrides/compose.https.yaml \
+  -f deploy/staging/compose.mariadb.staging.yaml \
+  -f overrides/compose.noproxy.yaml \
   exec backend \
   bash -lc "bench --site staging.example.com install-app myapp"
 ```
@@ -78,10 +78,10 @@ docker compose \
 ```bash
 docker compose \
   --env-file deploy/staging/staging.env \
-  -f compose.yaml \
+  -f deploy/staging/compose.staging.yaml \
   -f overrides/compose.redis.yaml \
-  -f overrides/compose.mariadb.yaml \
-  -f overrides/compose.https.yaml \
+  -f deploy/staging/compose.mariadb.staging.yaml \
+  -f overrides/compose.noproxy.yaml \
   exec backend \
   bash -lc "bench --site staging.example.com migrate"
 ```
@@ -93,10 +93,10 @@ docker compose \
 ```bash
 docker compose \
   --env-file deploy/staging/staging.env \
-  -f compose.yaml \
+  -f deploy/staging/compose.staging.yaml \
   -f overrides/compose.redis.yaml \
-  -f overrides/compose.mariadb.yaml \
-  -f overrides/compose.https.yaml \
+  -f deploy/staging/compose.mariadb.staging.yaml \
+  -f overrides/compose.noproxy.yaml \
   exec backend \
   bash -lc "bench use staging.example.com"
 ```

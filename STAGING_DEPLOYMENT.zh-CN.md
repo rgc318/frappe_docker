@@ -1,192 +1,120 @@
 # myapp 正式测试环境部署文档
 
-本文档用于指导在独立测试服务器上部署 `myapp` 的正式测试环境。
+本文档总结 `myapp` 正式测试环境从镜像构建、服务器初始化、首次部署到首次建站的完整流程，并记录这次实际部署中遇到的问题与对应解决方案。
 
 适用范围：
 
-- 当前仓库根目录为 `frappe_docker`
+- 根目录为 `frappe_docker`
 - 业务应用为 `apps/myapp`
-- 目标是部署一个接近生产、可公网访问、可长期复用的测试环境
+- 后端通过自定义镜像部署
+- 测试服务器部署目录固定为 `/srv/frappe_docker`
 
 不适用范围：
 
-- `pwd.yml` 一次性 demo 环境
-- 本地开发容器
-- 直接复用当前开发机站点
+- `pwd.yml` 一次性 demo
+- 本地开发环境
+- 继续在服务器映射 `apps/myapp` 源码目录的旧方案
 
 ---
 
-## 1. 目标与原则
+## 1. 当前采用的正式方案
 
-正式测试环境的目标是：
+当前测试环境采用的是：
 
-- 使用独立服务器或独立虚拟机
-- 使用独立站点，不复用开发站点
-- 使用独立数据库、Redis、sites 数据卷
-- 支持公网访问
-- 支持后续反复升级、迁移、备份和恢复
+1. `Lint`
+   - 校验根仓库脚本、YAML、JSON、workflow 和基础格式
+2. `Build myapp staging image`
+   - 由 GitHub Actions 构建包含 `myapp` 的镜像
+   - 推送到 `GHCR`
+3. `Deploy staging stack`
+   - 由 GitHub Actions 通过 SSH 登录测试服务器
+   - 拉取最新镜像
+   - 启动或更新 staging 容器栈
+4. 首次建站
+   - 手动执行 `bench new-site`
+   - 安装 `erpnext` 与 `myapp`
+5. 后续升级
+   - 继续通过 `Deploy staging stack`
+   - 若站点已存在，则自动执行 `bench migrate`
 
-当前项目的部署原则：
+核心原则：
 
-- 部署根目录仍然以 `frappe_docker` 为准
-- `myapp` 不需要新建新的 app，直接安装现有 `myapp`
-- 站点需要新建，例如：
-  - `staging.example.com`
-- `myapp` 推荐通过自定义镜像接入当前 bench
-- 正式测试环境不要直接使用当前仓库里偏开发态的 `compose.yaml`
-
-说明：
-
-- 当前根目录的 `compose.yaml` 已带有开发特征，例如本地源码挂载、调试端口、`bench serve`
-- 这些配置不适合直接用于正式测试环境
-- 建议单独生成测试环境专用 compose 文件
+- 测试服务器只保留 `frappe_docker` 部署骨架
+- 测试服务器不再映射 `apps/myapp` 源码目录
+- `myapp` 通过镜像烘焙进入 bench
+- 第一次部署时允许“容器已起来但站点尚未初始化”
 
 ---
 
-## 2. 推荐部署方式
+## 2. 关键文件
 
-当前阶段推荐采用：
+### 部署与构建
 
-- 服务器上拉取 `frappe_docker`
-- 使用 GitHub Actions 构建并推送“已包含 `myapp` 的自定义镜像”
-- 测试服务器通过 `staging.env` 引用该镜像
-- 新建独立 site
-- 在该 site 上安装 `erpnext` 与 `myapp`
+- `/home/rgc318/python-project/frappe_docker/.github/workflows/lint.yml`
+- `/home/rgc318/python-project/frappe_docker/.github/workflows/build_myapp_staging_image.yml`
+- `/home/rgc318/python-project/frappe_docker/.github/workflows/deploy_staging.yml`
 
-这是当前最适合本项目的方案，因为：
+### staging 运行文件
 
-- 你们的 `myapp` 当前是独立 git 仓库
-- 它不是 `frappe_docker` 根仓库的标准子模块
-- 因此不能假设测试机上 `git clone frappe_docker` 后会天然带有完整 `myapp`
-- 正式测试环境不应继续映射业务源码目录
-
-镜像中的 `myapp` 获取方式：
-
-- 由 GitHub Actions 在构建镜像时从远程仓库拉取
-- 测试服务器本身不需要保存 `apps/myapp` 源码目录
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.staging.yaml`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.mariadb.staging.yaml`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/staging.env.example`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/init-staging-server.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/start-staging.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/deploy-staging.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/check-staging.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
 
 ---
 
 ## 3. 服务器准备
 
-建议准备：
+测试服务器当前信息：
 
-- Linux 服务器，推荐 Ubuntu LTS
+- 主机：`39.104.204.79`
+- SSH 端口：`10022`
+- 用户：`vivy`
+- 部署目录：`/srv/frappe_docker`
+
+服务器需要准备：
+
 - Docker
 - Docker Compose v2
 - git
-- 公网 IP
-- 一个测试域名，例如：
-  - `staging.example.com`
+- 能访问 `GHCR`
+- 对 GitHub 仓库有读取能力（仅用于 `git pull frappe_docker`）
 
-建议目录：
+推荐目录边界：
 
-```text
-/opt/myapp-staging/
-  ├── frappe_docker/
-  ├── env/
-  └── generated/
-```
-
-推荐用途：
-
-- `frappe_docker/`
-  - 存放部署代码仓库
-- `env/`
-  - 存放测试环境专用 `.env`
-- `generated/`
-  - 存放通过 `docker compose config` 生成的最终 compose 文件
+- `/srv/frappe_docker`
+  - 部署骨架
+- `/srv/frappe_docker/deploy/staging/staging.env`
+  - 服务器实例化配置
+- Docker volumes
+  - 保存 `sites`、数据库、Redis、bench env
 
 ---
 
-## 4. 拉取部署仓库
+## 4. SSH 与 GitHub Actions Secrets
 
-在测试服务器上执行：
+### 4.1 SSH 三个角色
 
-```bash
-mkdir -p /opt/myapp-staging
-cd /opt/myapp-staging
+- 本地/CI 私钥
+  - 用于发起 SSH 认证
+- 服务器 `authorized_keys`
+  - 保存允许登录的公钥
+- 本地 `known_hosts`
+  - 保存服务器身份指纹
 
-git clone <你的 frappe_docker 仓库地址> frappe_docker
-cd frappe_docker
-```
+### 4.2 GitHub Actions 需要的 secrets
 
-说明：
+在仓库：
 
-- 这里拉取的是部署骨架
-- 不是直接依赖开发机目录拷贝
-- 后续更新测试环境主要通过“切换镜像 tag + 重新部署”完成
+- `Settings`
+- `Secrets and variables`
+- `Actions`
 
----
-
-## 5. SSH 准备
-
-正式测试环境建议通过 SSH 登录服务器进行部署和维护。
-
-需要区分三类 SSH 文件：
-
-- 本地 `~/.ssh/known_hosts`
-  - 保存“服务器身份公钥”
-  - 用于校验你连接的是不是那台目标服务器
-- 本地私钥，例如：
-  - `~/.ssh/id_ed25519`
-  - 用于你本机发起身份认证
-- 服务器端 `~/.ssh/authorized_keys`
-  - 保存“允许登录该服务器用户的公钥”
-
-规则：
-
-- 访问方需要有自己的一套公钥/私钥
-- 被访问服务器需要把访问方的公钥保存到：
-  - `~/.ssh/authorized_keys`
-- `known_hosts` 只保存在访问方本地，不需要传给服务器
-
-如果服务器有多台开发机或 CI 需要登录：
-
-- 仍然只需要一个 `authorized_keys` 文件
-- 每个访问来源追加一行公钥即可
-
-例如目标服务器用户为 `vivy` 时：
-
-- 服务器端公钥位置：
-  - `/home/vivy/.ssh/authorized_keys`
-
-如果首次连接时遇到 host key 校验问题，可在本地执行：
-
-```bash
-mkdir -p ~/.ssh
-ssh-keyscan -p 10022 39.104.204.79 >> ~/.ssh/known_hosts
-```
-
----
-
-## 6. 镜像准备
-
-推荐方式：
-
-- 在 GitHub Actions 中构建 staging 镜像
-- 推送到 GHCR
-- 测试服务器只负责拉取镜像
-
-工作流位置：
-
-- `/home/rgc318/python-project/frappe_docker/.github/workflows/build_myapp_staging_image.yml`
-- `/home/rgc318/python-project/frappe_docker/.github/workflows/deploy_staging.yml`
-
-镜像建议形态：
-
-- `ghcr.io/<github-owner>/myapp-erpnext:staging-latest`
-- 以及按日期或 commit 保留唯一 tag
-
-说明：
-
-- `myapp` 不需要放进测试服务器源码目录
-- `myapp` 会在 CI 构建镜像时被远程拉取并烘焙进镜像
-- 测试服务器 compose 只需要引用该镜像
-- 推荐把测试服务器部署目录固定在：
-  - `/srv/frappe_docker`
-
-GitHub Actions SSH 部署建议准备以下 secrets：
+中配置以下 repository secrets：
 
 - `STAGING_SSH_HOST`
 - `STAGING_SSH_PORT`
@@ -195,464 +123,373 @@ GitHub Actions SSH 部署建议准备以下 secrets：
 - `GHCR_USERNAME`
 - `GHCR_TOKEN`
 
----
+当前建议值：
 
-## 7. 生成测试环境专用 env 文件
+- `STAGING_SSH_HOST=39.104.204.79`
+- `STAGING_SSH_PORT=10022`
+- `STAGING_SSH_USER=vivy`
+- `GHCR_USERNAME=<你的 GitHub 用户名>`
+- `GHCR_TOKEN=<具有 read:packages 的 classic PAT>`
 
-创建测试环境 env 文件，例如：
+说明：
+
+- `STAGING_SSH_PRIVATE_KEY` 必须保存完整私钥内容
+- 不能保存 `.pub`
+- 不能只保存单行公钥
+
+### 4.3 推荐的 CI 专用密钥
+
+推荐单独生成一把无 passphrase 的 CI 私钥，例如：
 
 ```bash
-mkdir -p /opt/myapp-staging/env
-cp /opt/myapp-staging/frappe_docker/example.env /opt/myapp-staging/env/staging.env
+ssh-keygen -t ed25519 -N "" -C "github-actions-staging" -f ~/.ssh/github_actions_staging_ci
 ```
 
-至少修改以下项：
+将公钥追加到服务器：
+
+```bash
+printf '\n%s\n' "$(cat ~/.ssh/github_actions_staging_ci.pub)" >> ~/.ssh/authorized_keys
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+```
+
+本地验证：
+
+```bash
+ssh -i ~/.ssh/github_actions_staging_ci -p 10022 vivy@39.104.204.79
+```
+
+如果本地这条能成功，说明：
+
+- 私钥和公钥是配对的
+- 服务器端 `authorized_keys` 没问题
+
+---
+
+## 5. 镜像构建
+
+### 5.1 构建方式
+
+镜像构建不是在测试服务器上完成，而是通过 GitHub Actions：
+
+- `Build myapp staging image`
+
+在 CI 中构建并推送到 GHCR。
+
+镜像内容包括：
+
+- `frappe`
+- `erpnext`
+- `myapp`
+
+`myapp` 不是从测试服务器本地目录挂载进去，而是在构建阶段从远程仓库拉取并打包。
+
+### 5.2 镜像建议命名
+
+- `ghcr.io/<github-owner>/myapp-erpnext:staging-latest`
+
+后续也建议保留带日期或 commit 的 tag，便于回滚。
+
+---
+
+## 6. 服务器初始化
+
+第一次在服务器上准备 staging 环境时执行：
+
+```bash
+cd /srv/frappe_docker
+./deploy/staging/init-staging-server.sh
+```
+
+这个脚本会：
+
+- 创建必要目录
+- 生成 `deploy/staging/staging.env`
+- 准备 staging 相关脚本的执行权限
+
+它不会：
+
+- 启动容器
+- 建站
+- 安装 app
+
+---
+
+## 7. staging.env 推荐配置
+
+第一次建议先用内网模式跑通：
 
 ```env
 ERPNEXT_VERSION=v16.7.3
 
+STAGING_MODE=internal
+
+CUSTOM_IMAGE=ghcr.io/<github-owner>/myapp-erpnext
+CUSTOM_TAG=staging-latest
+PULL_POLICY=always
+
 DB_PASSWORD=<强密码>
+DB_PASSWORD_SECRETS_FILE=
 DB_HOST=
 DB_PORT=
 
-LETSENCRYPT_EMAIL=ops@example.com
+REDIS_CACHE=
+REDIS_QUEUE=
 
-SITES_RULE=Host(`staging.example.com`)
+FRAPPE_SITE_NAME_HEADER=
 
-HTTP_PUBLISH_PORT=80
-HTTPS_PUBLISH_PORT=443
-```
+STAGING_BASE_URL=http://127.0.0.1:28080
 
-如果使用内置 MariaDB 与 Redis：
+HTTP_PUBLISH_PORT=28080
+HTTPS_PUBLISH_PORT=28443
 
-- `DB_HOST` 保持空
-- `DB_PORT` 保持空
-- Redis 配置保持空
+UPSTREAM_REAL_IP_ADDRESS=
+UPSTREAM_REAL_IP_HEADER=
+UPSTREAM_REAL_IP_RECURSIVE=
 
-如果使用外部数据库：
+PROXY_READ_TIMEOUT=120
+CLIENT_MAX_BODY_SIZE=50m
 
-- 填写 `DB_HOST`
-- 填写 `DB_PORT`
-- 确保数据库连通
-
----
-
-## 8. 推荐 compose 组合
-
-正式测试环境推荐使用以下组合：
-
-- 基础：
-  - `compose.yaml`
-- 数据库：
-  - `overrides/compose.mariadb.yaml`
-- Redis：
-  - `overrides/compose.redis.yaml`
-- 代理：
-  - 对内测试：`overrides/compose.noproxy.yaml`
-  - 公网 HTTPS：`overrides/compose.https.yaml`
-
-如果目标是正式测试环境并需要公网访问，建议直接使用 HTTPS。
-
-生成最终 compose：
-
-```bash
-mkdir -p /opt/myapp-staging/generated
-
-docker compose \
-  --env-file /opt/myapp-staging/env/staging.env \
-  -f /opt/myapp-staging/frappe_docker/compose.yaml \
-  -f /opt/myapp-staging/frappe_docker/overrides/compose.mariadb.yaml \
-  -f /opt/myapp-staging/frappe_docker/overrides/compose.redis.yaml \
-  -f /opt/myapp-staging/frappe_docker/overrides/compose.https.yaml \
-  config > /opt/myapp-staging/generated/staging.compose.yaml
+FRAPPE_BRANCH=version-16
+FRAPPE_PATH=https://github.com/frappe/frappe
 ```
 
 说明：
 
-- 这里建议先生成最终 compose，而不是每次临时手敲很多 `-f`
-- 生成后的文件更适合审查、备份和重复部署
+- `28080` / `28443` 是因为服务器上 `80`、`8080`、`8000` 已被别的服务占用
+- 内网阶段不需要：
+  - `LETSENCRYPT_EMAIL`
+  - `SITES_RULE`
+  - `NGINX_PROXY_HOSTS`
 
 ---
 
-## 9. 启动基础容器栈
+## 8. 首次部署顺序
+
+当前推荐的首次部署顺序是：
+
+1. 通过 `Lint`
+2. 手动运行 `Build myapp staging image`
+3. 手动运行 `Deploy staging stack`
+4. 手动创建站点
+5. 安装 `erpnext`
+6. 安装 `myapp`
+7. 执行 `migrate`
+8. 再次运行 `check-staging.sh`
+
+为什么不是先建站？
+
+- 因为 `new-site` 必须依赖已经启动起来的 backend / db / redis 容器
+- 所以必须先把基础栈部署起来
+
+---
+
+## 9. 首次部署后的预期状态
+
+第一次运行 `Deploy staging stack` 时，以下情况都属于正常：
+
+- 镜像正常拉取
+- 容器栈成功启动
+- 首页返回 `404`
+- `/api/method/ping` 返回 `404`
+- `deploy-staging.sh` 跳过 `migrate`
+
+这说明：
+
+- staging 基础栈已启动
+- 但站点还没创建
+
+当前脚本已经支持这个场景，不会再把“未建站的 404”当成失败。
+
+---
+
+## 10. 首次建站
+
+首次建站请按：
+
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
+
+执行。
+
+核心动作是：
+
+1. `bench new-site <site>`
+2. `bench --site <site> install-app erpnext`
+3. `bench --site <site> install-app myapp`
+4. `bench --site <site> migrate`
+
+建站完成后，后续 `Deploy staging stack` 就可以自动对该站点执行 `migrate`。
+
+---
+
+## 11. 后续升级流程
+
+后续每次更新的标准流程：
+
+1. 代码更新后，通过 `Build myapp staging image` 构建新镜像
+2. 通过 `Deploy staging stack` 部署到测试服务器
+3. workflow 自动：
+   - `git pull --ff-only origin main`
+   - `docker login ghcr.io`
+   - `docker compose pull`
+   - `docker compose up -d`
+   - 若站点存在则自动 `bench migrate`
+4. 通过 `check-staging.sh` 做部署后检查
+
+---
+
+## 12. 本次实际遇到的问题与解决方案
+
+### 12.1 本地 Docker 构建出网不稳定
+
+现象：
+
+- `bench init` 在 Docker build 中拉取 `frappe`
+- `git clone` / `uv` / `PyPI` 访问不稳定
+
+结论：
+
+- 本地 Docker 构建阶段代理链路不稳定
+
+解决：
+
+- 不在测试服务器或本机构建最终镜像
+- 改用 GitHub Actions 构建并推送 GHCR 镜像
+
+### 12.2 GitHub Actions deploy SSH 失败
+
+现象：
+
+- `missing server host`
+- `unable to authenticate`
+
+原因：
+
+- `STAGING_SSH_*` secrets 未配置完整
+- 或 `STAGING_SSH_PRIVATE_KEY` 内容错误
+- 或端口、用户名带换行/空格
+
+解决：
+
+- 增加 workflow secrets 校验
+- 使用无 passphrase 的 CI 专用 SSH 密钥
+- 本地先用同一把私钥验证可以登录服务器
+
+### 12.3 服务器 `git pull` 被拒绝
+
+现象：
+
+- `Your local changes would be overwritten by merge`
+
+原因：
+
+- 服务器上 `deploy/staging/*.sh` 只有 mode 变化（`100644 -> 100755`）
+
+解决：
+
+- 在服务器执行：
 
 ```bash
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  up -d
+cd /srv/frappe_docker
+git checkout -- deploy/staging/*.sh
+git pull --ff-only origin main
 ```
 
-先确认容器启动正常：
+### 12.4 staging 启动后 `No module named 'myapp'`
+
+现象：
+
+- `configurator` 一直重启
+- 日志里出现：
+  - `ModuleNotFoundError: No module named 'myapp'`
+
+原因：
+
+- staging 还在沿用开发态 `compose.yaml`
+- 其中挂载了宿主机 `./apps/myapp`
+- 服务器上并没有这份源码目录
+- 结果把镜像里已经带的 `myapp` 覆盖没了
+
+解决：
+
+- 新增：
+  - `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.staging.yaml`
+- staging 改为只使用镜像中的 `myapp`
+
+### 12.5 数据库端口冲突
+
+现象：
+
+- `Bind for 0.0.0.0:3307 failed: port is already allocated`
+
+原因：
+
+- 公共 `overrides/compose.mariadb.yaml` 固定暴露宿主机 `3307`
+- 服务器已有其他服务占用该端口
+
+解决：
+
+- 新增：
+  - `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.mariadb.staging.yaml`
+- staging 数据库不再映射宿主机端口
+
+### 12.6 首次部署时 `bench migrate` 报站点不存在
+
+现象：
+
+- `Error: 404 Not Found: staging.example.com does not exist.`
+
+原因：
+
+- 首次部署时基础栈已启动
+- 但站点尚未执行 `new-site`
+- 老逻辑默认直接 migrate
+
+解决：
+
+- `deploy-staging.sh` 先检查站点是否存在
+- 不存在时跳过 migrate，并提示先建站
+
+### 12.7 首次部署健康检查返回 404
+
+现象：
+
+- `curl: (22) The requested URL returned error: 404`
+
+原因：
+
+- 第一次部署时没有站点
+- 首页和 `/api/method/ping` 返回 `404` 是正常现象
+
+解决：
+
+- `check-staging.sh` 已支持：
+  - 若首页和 ping 都是 `404`
+  - 则判定为“基础栈已起来，但站点未初始化”
+  - 不再视为失败
+
+---
+
+## 13. 当前建议
+
+如果此时：
+
+- `Build myapp staging image` 已成功
+- `Deploy staging stack` 已成功
+
+那么下一步就应该是：
+
+- 按 `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
+  手动创建第一个 staging 站点
+
+建站完成后，再次运行：
 
 ```bash
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  ps
+./deploy/staging/check-staging.sh
 ```
 
-重点检查：
+以及后续所有更新都走：
 
-- backend
-- frontend
-- websocket
-- queue-short
-- queue-long
-- scheduler
-- mariadb
-- redis-cache
-- redis-queue
+- `Deploy staging stack`
 
----
-
-## 10. 新建正式测试站点
-
-正式测试环境应新建独立站点，不复用本地开发站点。
-
-推荐站点名直接和域名一致，例如：
-
-- `staging.example.com`
-
-执行：
-
-```bash
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  exec backend \
-  bash -lc "bench new-site staging.example.com --admin-password <管理员密码> --db-root-password <数据库 root 密码>"
-```
-
-说明：
-
-- 如果使用容器内 MariaDB，`--db-root-password` 一般就是你设置的 `DB_PASSWORD`
-- 也可以按你们安全策略单独设置
-
----
-
-## 11. 安装 ERPNext 与 myapp
-
-新站点创建后，安装应用：
-
-```bash
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  exec backend \
-  bash -lc "bench --site staging.example.com install-app erpnext"
-```
-
-然后安装 `myapp`：
-
-```bash
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  exec backend \
-  bash -lc "bench --site staging.example.com install-app myapp"
-```
-
-最后执行迁移：
-
-```bash
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  exec backend \
-  bash -lc "bench --site staging.example.com migrate"
-```
-
-说明：
-
-- 当前镜像已包含 `myapp` 时，这一步不再需要执行 `bench get-app`
-- 测试服务器本身不保存 `apps/myapp` 源码目录
-- 只需要让 site 安装该 app 即可
-
----
-
-## 12. 配置公网访问
-
-要让公网可访问服务和文件，关键是：
-
-- 测试域名解析到服务器公网 IP
-- 反向代理正确工作
-- site 名与访问域名尽量一致
-
-推荐：
-
-- 域名：`staging.example.com`
-- site 名：`staging.example.com`
-
-这样可以保证：
-
-- API 访问稳定
-- `/files/...` 公有文件链接稳定
-- 多站点路由最自然
-
-如果使用 `compose.https.yaml`：
-
-- 确保 DNS 已解析到公网 IP
-- 确保 80/443 端口开放
-- 确保 `LETSENCRYPT_EMAIL` 已配置
-
----
-
-## 13. 商品图片、附件、PDF 的公网访问策略
-
-### 商品图片
-
-当前商品图片走 Frappe `File` 公有文件路径。
-
-典型 URL：
-
-```text
-https://staging.example.com/files/xxx.jpg
-```
-
-只要站点公网访问正常，这类文件通常即可直接访问。
-
-### 私有 PDF
-
-当前归档 PDF 属于私有文件。
-
-典型路径：
-
-```text
-/private/files/xxx.pdf
-```
-
-这类文件不应直接当成裸公网静态文件使用。
-
-正确方式：
-
-- 通过已登录态访问
-- 或通过业务接口下载
-
-### 当前项目策略
-
-- 商品图片：
-  - 公有访问
-  - 适合列表、详情、移动端直接展示
-- 归档 PDF：
-  - 私有访问
-  - 适合鉴权下载和留档
-
----
-
-## 14. 测试环境初始化建议
-
-建议部署完成后至少执行以下初始化：
-
-1. 创建管理员测试账号
-2. 创建正式测试公司
-3. 创建正式测试仓库
-4. 安装或导入标准 UOM
-5. 导入必要客户、供应商、商品测试数据
-6. 配置移动端后端地址为公网域名
-
-例如移动端应配置为：
-
-```text
-https://staging.example.com
-```
-
-不要继续使用：
-
-- `localhost`
-- `127.0.0.1`
-- 内网开发 IP
-
----
-
-## 15. 升级流程建议
-
-正式测试环境更新建议流程：
-
-1. 先在本地完成代码提交并推送远程仓库
-2. 通过 GitHub Actions 构建并推送新镜像
-3. 测试机更新 `CUSTOM_TAG` 或继续使用 `staging-latest`
-4. 执行：
-   - `SITE_NAME=staging.example.com ./deploy/staging/deploy-staging.sh`
-5. 做冒烟测试
-
-也就是说，正式测试环境的升级主线是：
-
-- 构建镜像
-- 推送镜像
-- 测试机拉新镜像
-- 重启容器
-- 执行 migrate
-
-推荐脚本：
-
-- 初始化服务器：
-  - `./deploy/staging/init-staging-server.sh`
-- 启动：
-  - `./deploy/staging/start-staging.sh`
-- 升级：
-  - `SITE_NAME=staging.example.com ./deploy/staging/deploy-staging.sh`
-- 检查：
-  - `./deploy/staging/check-staging.sh`
-
----
-
-## 16. 备份建议
-
-正式测试环境也应具备基础备份能力。
-
-至少备份：
-
-- `sites` 卷
-- 数据库
-- 私有文件
-- 公有文件
-
-官方文档中推荐可用：
-
-- `bench --site all backup`
-
-你们当前建议至少保留：
-
-- 每日备份
-- 最近 7 天
-
-如需定时执行，可在宿主机使用 cron 调度。
-
----
-
-## 17. 常见问题
-
-### Q1：需要新建新的 app 吗？
-
-不需要。
-
-当前只需要：
-
-- 使用现有 `myapp`
-- 将它接入当前 bench
-- 然后安装到新站点
-
-### Q2：需要新建新站点吗？
-
-需要，且强烈建议需要。
-
-正式测试环境应使用独立 site，不应直接复用开发站点。
-
-### Q3：测试服务器需要 `git clone` 或 `bench get-app myapp` 吗？
-
-正式测试环境当前推荐：
-
-- 不需要
-
-因为：
-
-- `myapp` 已经通过自定义镜像烘焙进 bench
-- 测试服务器本身只需要拉镜像，不需要再拉业务源码
-
-补充：
-
-- 在镜像构建阶段，`myapp` 仍然会从远程仓库拉取
-- 只是这一步发生在 GitHub Actions，不发生在测试服务器
-
-### Q4：部署根目录是不是 `frappe_docker`？
-
-是。
-
-因为：
-
-- `compose.yaml`
-- `overrides/`
-- `images/`
-- `resources/`
-
-这些都在 `frappe_docker` 根目录。
-
-### Q5：当前仓库里的开发态 compose 可以直接用于正式测试环境吗？
-
-不建议。
-
-因为当前 `compose.yaml` 已带开发特征，应先生成测试环境专用 compose。
-
-### Q6：测试服务器是否需要映射 `apps/myapp` 源码目录？
-
-不需要。
-
-正式测试环境更推荐：
-
-- 代码进镜像
-- 数据进 volume
-- 服务器不挂业务源码目录
-
----
-
-## 17. 推荐的最小完整流程
-
-```bash
-# 1. 拉取部署仓库
-git clone <frappe_docker 仓库地址> /opt/myapp-staging/frappe_docker
-
-# 2. 准备 env
-cp /opt/myapp-staging/frappe_docker/example.env /opt/myapp-staging/env/staging.env
-
-# 3. 生成 compose
-docker compose \
-  --env-file /opt/myapp-staging/env/staging.env \
-  -f /opt/myapp-staging/frappe_docker/compose.yaml \
-  -f /opt/myapp-staging/frappe_docker/overrides/compose.mariadb.yaml \
-  -f /opt/myapp-staging/frappe_docker/overrides/compose.redis.yaml \
-  -f /opt/myapp-staging/frappe_docker/overrides/compose.https.yaml \
-  config > /opt/myapp-staging/generated/staging.compose.yaml
-
-# 4. 启动容器
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  up -d
-
-# 5. 拉取业务 app
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  exec backend \
-  bash -lc "bench get-app git@github.com:rgc318/myapp.git"
-
-# 6. 新建站点
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  exec backend \
-  bash -lc "bench new-site staging.example.com --admin-password <管理员密码> --db-root-password <数据库 root 密码>"
-
-# 7. 安装应用
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  exec backend \
-  bash -lc "bench --site staging.example.com install-app erpnext"
-
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  exec backend \
-  bash -lc "bench --site staging.example.com install-app myapp"
-
-# 8. migrate
-docker compose \
-  --project-name myapp-staging \
-  -f /opt/myapp-staging/generated/staging.compose.yaml \
-  exec backend \
-  bash -lc "bench --site staging.example.com migrate"
-```
-
----
-
-## 18. 后续建议
-
-当前完成正式测试环境后，建议下一步继续做：
-
-1. 生成测试环境专用 compose 文件，纳入版本管理
-2. 为 `myapp` 增加更正式的镜像化部署方案
-3. 增加自动备份
-4. 增加测试环境初始化脚本
-5. 增加一份脱敏测试数据恢复流程
+即可。
