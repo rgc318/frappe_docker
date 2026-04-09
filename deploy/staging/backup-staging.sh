@@ -40,10 +40,42 @@ compose up -d backend db redis-cache redis-queue
 echo "Running bench backup for site: ${SITE_NAME}"
 if [[ "${SITE_NAME}" == "all" ]]; then
   compose exec backend bash -lc "bench --site all backup --with-files"
-  archive_cmd=$'set -euo pipefail\ncd /home/frappe/frappe-bench\nshopt -s nullglob\npaths=(sites/apps.txt sites/common_site_config.json)\nfor site_dir in sites/*; do\n  [ -d \"$site_dir\" ] || continue\n  site_name=\"${site_dir#sites/}\"\n  [ \"$site_name\" = assets ] && continue\n  paths+=(\"$site_dir/site_config.json\")\n  if [ -d \"$site_dir/private/backups\" ]; then\n    paths+=(\"$site_dir/private/backups\")\n  fi\ndone\nif [ \"${#paths[@]}\" -eq 0 ]; then\n  echo \"No backup paths found.\"\n  exit 1\nfi\ntar -czf \"/tmp/'"${ARCHIVE_NAME}"'\" \"${paths[@]}\"'
+  archive_cmd="$(cat <<EOF
+set -euo pipefail
+cd /home/frappe/frappe-bench
+shopt -s nullglob
+paths=(sites/apps.txt sites/common_site_config.json)
+for site_dir in sites/*; do
+  [ -d "\$site_dir" ] || continue
+  site_name="\${site_dir#sites/}"
+  [ "\$site_name" = assets ] && continue
+  paths+=("\$site_dir/site_config.json")
+  if [ -d "\$site_dir/private/backups" ]; then
+    paths+=("\$site_dir/private/backups")
+  fi
+done
+if [ "\${#paths[@]}" -eq 0 ]; then
+  echo "No backup paths found."
+  exit 1
+fi
+tar -czf "/tmp/${ARCHIVE_NAME}" "\${paths[@]}"
+EOF
+)"
 else
   compose exec backend bash -lc "bench --site ${SITE_NAME} backup --with-files"
-  archive_cmd=$'set -euo pipefail\ncd /home/frappe/frappe-bench\npaths=(\"sites/'"${SITE_NAME}"'/site_config.json\" \"sites/'"${SITE_NAME}"'/private/backups\")\nfor path in \"${paths[@]}\"; do\n  if [ ! -e \"$path\" ]; then\n    echo \"Missing backup path: $path\"\n    exit 1\n  fi\ndone\ntar -czf \"/tmp/'"${ARCHIVE_NAME}"'\" -C /home/frappe/frappe-bench \"sites/'"${SITE_NAME}"'/site_config.json\" \"sites/'"${SITE_NAME}"'/private/backups\"'
+  archive_cmd="$(cat <<EOF
+set -euo pipefail
+cd /home/frappe/frappe-bench
+paths=("sites/${SITE_NAME}/site_config.json" "sites/${SITE_NAME}/private/backups")
+for path in "\${paths[@]}"; do
+  if [ ! -e "\$path" ]; then
+    echo "Missing backup path: \$path"
+    exit 1
+  fi
+done
+tar -czf "/tmp/${ARCHIVE_NAME}" -C /home/frappe/frappe-bench "sites/${SITE_NAME}/site_config.json" "sites/${SITE_NAME}/private/backups"
+EOF
+)"
 fi
 
 echo "Packaging backup artifacts inside backend container..."
