@@ -64,6 +64,7 @@
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/start-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/deploy-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/rollback-staging.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/backup-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/check-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/init-site.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
@@ -375,6 +376,23 @@ ROLLBACK_TAG=staging-20260409-abc123 SITE_NAME=staging.example.com ./deploy/stag
 - 重启 staging 栈
 - 若站点存在则自动 `migrate`
 - 默认执行一次 `check-staging.sh`
+
+建议在较大升级前先执行一次备份：
+
+```bash
+SITE_NAME=all ./deploy/staging/backup-staging.sh
+```
+
+默认会在服务器上生成：
+
+- `/srv/frappe_docker/backups/staging/*.tar.gz`
+- `/srv/frappe_docker/backups/staging/*.metadata`
+
+归档内容包括：
+
+- `sites/common_site_config.json`
+- 目标站点的 `site_config.json`
+- `private/backups` 下由 `bench backup --with-files` 生成的数据库和文件备份
 
 ---
 

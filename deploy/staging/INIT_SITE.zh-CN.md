@@ -166,6 +166,12 @@ SITE_NAME=staging.example.com ./deploy/staging/deploy-staging.sh
 ROLLBACK_TAG=staging-20260409-abc123 SITE_NAME=staging.example.com ./deploy/staging/rollback-staging.sh
 ```
 
+建议在较大版本升级前先执行一次备份：
+
+```bash
+SITE_NAME=all ./deploy/staging/backup-staging.sh
+```
+
 ## 4. IP 访问补充
 
 如果站点已经创建成功，但直接访问：

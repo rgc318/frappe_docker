@@ -24,6 +24,8 @@ Files:
   - creates the first staging site, installs apps, runs migrate, and optionally sets the default site
 - `rollback-staging.sh`
   - switches `CUSTOM_TAG` to an older image tag, restarts the stack, and optionally runs the health check
+- `backup-staging.sh`
+  - runs `bench backup --with-files`, packages the generated site backups, and copies the archive to the host
 - `check-staging.sh`
   - verifies the compose services and basic HTTP endpoints after deployment
 - `stop-staging.sh`
@@ -113,6 +115,18 @@ Common rollback flow:
 
 ```bash
 ROLLBACK_TAG=staging-20260409-abc123 SITE_NAME=staging.example.com ./deploy/staging/rollback-staging.sh
+```
+
+Common backup flow:
+
+```bash
+SITE_NAME=all ./deploy/staging/backup-staging.sh
+```
+
+By default, backup archives are written to:
+
+```bash
+./backups/staging/
 ```
 
 Common post-deploy verification:
