@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/deploy/staging/staging.env}"
 STAGING_MODE="${STAGING_MODE:-${DEPLOY_MODE:-internal}}"
+COMPOSE_BASE="${ROOT_DIR}/deploy/staging/compose.staging.yaml"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing env file: ${ENV_FILE}"
@@ -23,7 +24,7 @@ fi
 compose() {
   docker compose \
     --env-file "${ENV_FILE}" \
-    -f "${ROOT_DIR}/compose.yaml" \
+    -f "${COMPOSE_BASE}" \
     -f "${ROOT_DIR}/overrides/compose.redis.yaml" \
     -f "${ROOT_DIR}/overrides/compose.mariadb.yaml" \
     -f "${PROXY_OVERRIDE}" \
