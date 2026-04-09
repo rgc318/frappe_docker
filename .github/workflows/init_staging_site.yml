@@ -1,0 +1,122 @@
+name: Init staging site
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_name:
+        description: "Site name to initialize"
+        required: true
+        default: "staging.example.com"
+        type: string
+      install_erpnext:
+        description: "Install erpnext on the site"
+        required: true
+        default: true
+        type: boolean
+      install_myapp:
+        description: "Install myapp on the site"
+        required: true
+        default: true
+        type: boolean
+      set_default_site:
+        description: "Run bench use after initialization"
+        required: true
+        default: true
+        type: boolean
+      run_health_check:
+        description: "Run check-staging.sh after site init"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  init-site:
+    name: Initialize staging site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate required secrets
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          STAGING_SITE_ADMIN_PASSWORD: ${{ secrets.STAGING_SITE_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          for key in \
+            STAGING_SSH_HOST \
+            STAGING_SSH_PORT \
+            STAGING_SSH_USER \
+            STAGING_SSH_PRIVATE_KEY \
+            STAGING_SITE_ADMIN_PASSWORD; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("${key}")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required GitHub Actions secrets: %s\n' "${missing[*]}"
+            exit 1
+          fi
+
+          if ! printf '%s' "${STAGING_SSH_PORT}" | grep -Eq '^[0-9]+$'; then
+            echo "STAGING_SSH_PORT must be digits only, without spaces or newlines."
+            exit 1
+          fi
+
+          for key in STAGING_SSH_HOST STAGING_SSH_USER; do
+            if printf '%s' "${!key}" | grep -Eq '[[:space:]]'; then
+              printf '%s must not contain spaces or newlines.\n' "${key}"
+              exit 1
+            fi
+          done
+
+      - name: Initialize site over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          SITE_NAME: ${{ inputs.site_name }}
+          ADMIN_PASSWORD: ${{ secrets.STAGING_SITE_ADMIN_PASSWORD }}
+          INSTALL_ERPNEXT: ${{ inputs.install_erpnext }}
+          INSTALL_MYAPP: ${{ inputs.install_myapp }}
+          SET_DEFAULT_SITE: ${{ inputs.set_default_site }}
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          port: ${{ secrets.STAGING_SSH_PORT }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          envs: SITE_NAME,ADMIN_PASSWORD,INSTALL_ERPNEXT,INSTALL_MYAPP,SET_DEFAULT_SITE
+          script: |
+            set -euo pipefail
+            cd /srv/frappe_docker
+            git pull --ff-only origin main
+
+            if [ ! -f deploy/staging/staging.env ]; then
+              echo "Missing deploy/staging/staging.env on server. Run ./deploy/staging/init-staging-server.sh first."
+              exit 1
+            fi
+
+            SITE_NAME="${SITE_NAME}" \
+            ADMIN_PASSWORD="${ADMIN_PASSWORD}" \
+            INSTALL_ERPNEXT="${INSTALL_ERPNEXT}" \
+            INSTALL_MYAPP="${INSTALL_MYAPP}" \
+            SET_DEFAULT_SITE="${SET_DEFAULT_SITE}" \
+            ./deploy/staging/init-site.sh
+
+      - name: Run health check
+        if: ${{ inputs.run_health_check }}
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          port: ${{ secrets.STAGING_SSH_PORT }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+            cd /srv/frappe_docker
+            ./deploy/staging/check-staging.sh

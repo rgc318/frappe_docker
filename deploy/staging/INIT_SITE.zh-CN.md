@@ -47,6 +47,14 @@ ADMIN_PASSWORD='<admin-password>' \
 - `SET_DEFAULT_SITE`
   - 默认 `1`
 
+如果你不想手动在服务器上执行，也可以使用 GitHub Actions：
+
+- `Init staging site`
+
+它会通过 SSH 到测试服务器执行同一个 `init-site.sh`，但需要事先配置：
+
+- `STAGING_SITE_ADMIN_PASSWORD`
+
 ## 2. 排障方式：手动执行
 
 如果初始化脚本执行中需要更细粒度排查，再按下面的分步命令手动执行。
@@ -151,6 +159,12 @@ SITE_NAME=staging.example.com ./deploy/staging/deploy-staging.sh
 - `docker compose pull`
 - `docker compose up -d`
 - 自动执行 `bench --site <site> migrate`
+
+如果某个新镜像版本异常，需要切回旧 tag，可以使用：
+
+```bash
+ROLLBACK_TAG=staging-20260409-abc123 SITE_NAME=staging.example.com ./deploy/staging/rollback-staging.sh
+```
 
 ## 4. IP 访问补充
 

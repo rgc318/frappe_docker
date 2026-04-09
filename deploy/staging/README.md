@@ -22,6 +22,8 @@ Files:
   - prepares the server directories and creates `staging.env` from the example
 - `init-site.sh`
   - creates the first staging site, installs apps, runs migrate, and optionally sets the default site
+- `rollback-staging.sh`
+  - switches `CUSTOM_TAG` to an older image tag, restarts the stack, and optionally runs the health check
 - `check-staging.sh`
   - verifies the compose services and basic HTTP endpoints after deployment
 - `stop-staging.sh`
@@ -41,6 +43,7 @@ Workflow:
 
 - `/home/rgc318/python-project/frappe_docker/.github/workflows/build_myapp_staging_image.yml`
 - `/home/rgc318/python-project/frappe_docker/.github/workflows/deploy_staging.yml`
+- `/home/rgc318/python-project/frappe_docker/.github/workflows/init_staging_site.yml`
 
 Suggested image reference in `staging.env`:
 
@@ -67,6 +70,7 @@ Required GitHub secrets for SSH deploy:
 - `STAGING_SSH_PRIVATE_KEY`
 - `GHCR_USERNAME`
 - `GHCR_TOKEN`
+- `STAGING_SITE_ADMIN_PASSWORD`
 
 Recommended first-time flow:
 
@@ -103,6 +107,12 @@ Common update flow after the first deployment:
 
 ```bash
 SITE_NAME=staging.example.com ./deploy/staging/deploy-staging.sh
+```
+
+Common rollback flow:
+
+```bash
+ROLLBACK_TAG=staging-20260409-abc123 SITE_NAME=staging.example.com ./deploy/staging/rollback-staging.sh
 ```
 
 Common post-deploy verification:

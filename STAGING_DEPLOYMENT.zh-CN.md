@@ -31,8 +31,8 @@
    - 拉取最新镜像
    - 启动或更新 staging 容器栈
 4. 首次建站
-   - 手动执行 `bench new-site`
-   - 安装 `erpnext` 与 `myapp`
+   - 使用 `init-site.sh`
+   - 或单独运行 `Init staging site` workflow
 5. 后续升级
    - 继续通过 `Deploy staging stack`
    - 若站点已存在，则自动执行 `bench migrate`
@@ -53,6 +53,7 @@
 - `/home/rgc318/python-project/frappe_docker/.github/workflows/lint.yml`
 - `/home/rgc318/python-project/frappe_docker/.github/workflows/build_myapp_staging_image.yml`
 - `/home/rgc318/python-project/frappe_docker/.github/workflows/deploy_staging.yml`
+- `/home/rgc318/python-project/frappe_docker/.github/workflows/init_staging_site.yml`
 
 ### staging 运行文件
 
@@ -62,7 +63,9 @@
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/init-staging-server.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/start-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/deploy-staging.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/rollback-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/check-staging.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/init-site.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
 
 ---
@@ -122,6 +125,7 @@
 - `STAGING_SSH_PRIVATE_KEY`
 - `GHCR_USERNAME`
 - `GHCR_TOKEN`
+- `STAGING_SITE_ADMIN_PASSWORD`
 
 当前建议值：
 
@@ -130,6 +134,7 @@
 - `STAGING_SSH_USER=vivy`
 - `GHCR_USERNAME=<你的 GitHub 用户名>`
 - `GHCR_TOKEN=<具有 read:packages 的 classic PAT>`
+- `STAGING_SITE_ADMIN_PASSWORD=<首次建站管理员密码>`
 
 说明：
 
@@ -317,6 +322,12 @@ ADMIN_PASSWORD='<admin-password>' \
 ./deploy/staging/init-site.sh
 ```
 
+如果你们希望把首次建站也纳入 GitHub Actions，而不是手动 SSH 到服务器，可以单独运行：
+
+- `Init staging site`
+
+它与日常 `Deploy staging stack` 分开，避免把一次性初始化动作混进常规发布流程。
+
 该脚本会自动完成：
 
 - 检查 staging 容器是否已启动
@@ -351,6 +362,19 @@ ADMIN_PASSWORD='<admin-password>' \
    - `docker compose up -d`
    - 若站点存在则自动 `bench migrate`
 4. 通过 `check-staging.sh` 做部署后检查
+
+如果某次镜像发布后需要快速回退，可在服务器执行：
+
+```bash
+ROLLBACK_TAG=staging-20260409-abc123 SITE_NAME=staging.example.com ./deploy/staging/rollback-staging.sh
+```
+
+该脚本会：
+
+- 修改 `deploy/staging/staging.env` 中的 `CUSTOM_TAG`
+- 重启 staging 栈
+- 若站点存在则自动 `migrate`
+- 默认执行一次 `check-staging.sh`
 
 ---
 
