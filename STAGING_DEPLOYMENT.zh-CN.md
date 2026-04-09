@@ -588,7 +588,7 @@ git pull --ff-only origin main
 - 这不是业务逻辑错误，而是格式未完全符合仓库当前 formatter 规则
 - 仓库根目录使用：
   - `/home/rgc318/python-project/frappe_docker/.pre-commit-config.yaml`
-  中定义的规则
+    中定义的规则
 - 其中：
   - `prettier` 会处理 Markdown / YAML / JSON
   - `shfmt` 会处理 `deploy/staging/*.sh`
@@ -621,7 +621,7 @@ git pull --ff-only origin main
      - `prettier`
 3. 当日志里只看到：
    - `files were modified by this hook`
-   时，说明不是“工具坏了”，而是 formatter 还想继续改文件
+     时，说明不是“工具坏了”，而是 formatter 还想继续改文件
 4. 如果本地缺少 `shfmt` 等环境
    - 可以先以 GitHub Actions 最新 run 为准
    - 把 formatter 改动再收回仓库
