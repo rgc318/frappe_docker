@@ -88,7 +88,7 @@ compose exec backend bash -lc "bench --site ${SITE_NAME} migrate"
 
 echo "Reconciling DB grants for ${SITE_NAME}"
 SITE_NAME="${SITE_NAME}" ENV_FILE="${ENV_FILE}" STAGING_MODE="${STAGING_MODE}" \
-  "${ROOT_DIR}/deploy/staging/fix-site-db-grants.sh"
+  bash "${ROOT_DIR}/deploy/staging/fix-site-db-grants.sh"
 
 if [[ "${SET_DEFAULT_SITE}" == "1" ]]; then
   echo "Setting default bench site to ${SITE_NAME}"
