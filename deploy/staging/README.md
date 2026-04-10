@@ -119,6 +119,8 @@ PDF note:
 
 - if printed PDFs must render Simplified Chinese correctly, keep a CJK font package in the image
 - the current bench image installs `fonts-noto-cjk`
+- the staging runtime image also needs the same package in:
+  - `/home/rgc318/python-project/frappe_docker/images/custom/myapp-staging/Containerfile`
 - this dependency was manually verified in the local development backend container:
   - before installing `fonts-noto-cjk`, generated PDFs could show garbled Chinese
   - after installing `fonts-noto-cjk`, Simplified Chinese PDF rendering worked correctly
