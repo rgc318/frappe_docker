@@ -76,11 +76,6 @@ if [[ -z "${DB_ROOT_PASSWORD}" ]]; then
 fi
 
 echo "Ensuring MariaDB user grant for site ${SITE_NAME}: ${DB_USER}@${DB_GRANT_HOST}"
-compose exec -T db sh -lc "MYSQL_PWD='${DB_ROOT_PASSWORD}' mariadb -uroot <<SQL
-CREATE USER IF NOT EXISTS '${DB_USER}'@'${DB_GRANT_HOST}' IDENTIFIED BY '${DB_PASSWORD}';
-ALTER USER '${DB_USER}'@'${DB_GRANT_HOST}' IDENTIFIED BY '${DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'${DB_GRANT_HOST}';
-FLUSH PRIVILEGES;
-SQL"
+compose exec -T db sh -lc "MYSQL_PWD='${DB_ROOT_PASSWORD}' mariadb -uroot -e \"CREATE USER IF NOT EXISTS '${DB_USER}'@'${DB_GRANT_HOST}' IDENTIFIED BY '${DB_PASSWORD}'; ALTER USER '${DB_USER}'@'${DB_GRANT_HOST}' IDENTIFIED BY '${DB_PASSWORD}'; GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'${DB_GRANT_HOST}'; FLUSH PRIVILEGES;\""
 
 echo "DB grant reconciliation completed for site: ${SITE_NAME}"
