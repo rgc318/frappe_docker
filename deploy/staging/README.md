@@ -119,6 +119,12 @@ PDF note:
 
 - if printed PDFs must render Simplified Chinese correctly, keep a CJK font package in the image
 - the current bench image installs `fonts-noto-cjk`
+- this dependency was manually verified in the local development backend container:
+  - before installing `fonts-noto-cjk`, generated PDFs could show garbled Chinese
+  - after installing `fonts-noto-cjk`, Simplified Chinese PDF rendering worked correctly
+- when PDF Chinese output becomes garbled again after rebuilding containers, first confirm the running container still contains:
+  - `fonts-noto-cjk`
+  - visible CJK families from `fc-list :lang=zh`
 - after changing PDF/font dependencies in `images/bench/Dockerfile`, rebuild the staging image first and then deploy
 
 Common rollback flow:
