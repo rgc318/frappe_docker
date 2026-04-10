@@ -32,6 +32,7 @@ ADMIN_PASSWORD='<admin-password>' \
 - 安装 `erpnext`
 - 安装 `myapp`
 - 执行 `migrate`
+- 校正站点数据库用户授权（默认 `db_user@'%'`）
 - 可选执行 `bench use`
 
 可用环境变量：
@@ -158,6 +159,7 @@ SITE_NAME=staging.example.com ./deploy/staging/deploy-staging.sh
 
 - `docker compose pull`
 - `docker compose up -d`
+- 若站点已存在，自动校正一次站点数据库用户授权（默认 `db_user@'%'`）
 - 自动执行 `bench --site <site> migrate`
 
 如果某个新镜像版本异常，需要切回旧 tag，可以使用：

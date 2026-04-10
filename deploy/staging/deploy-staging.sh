@@ -37,6 +37,12 @@ compose pull
 echo "Restarting staging stack..."
 compose up -d
 
+if [[ -n "${SITE_NAME}" ]]; then
+  echo "Reconciling site database grants for: ${SITE_NAME}"
+  SITE_NAME="${SITE_NAME}" ENV_FILE="${ENV_FILE}" STAGING_MODE="${STAGING_MODE}" \
+    "${ROOT_DIR}/deploy/staging/fix-site-db-grants.sh"
+fi
+
 if [[ -n "${SITE_NAME}" && "${SKIP_MIGRATE}" != "1" ]]; then
   echo "Checking site before migrate: ${SITE_NAME}"
   if compose exec backend bash -lc "bench --site ${SITE_NAME} list-apps >/dev/null 2>&1"; then
