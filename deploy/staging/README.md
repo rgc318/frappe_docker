@@ -115,6 +115,12 @@ Common update flow after the first deployment:
 SITE_NAME=staging.example.com ./deploy/staging/deploy-staging.sh
 ```
 
+PDF note:
+
+- if printed PDFs must render Simplified Chinese correctly, keep a CJK font package in the image
+- the current bench image installs `fonts-noto-cjk`
+- after changing PDF/font dependencies in `images/bench/Dockerfile`, rebuild the staging image first and then deploy
+
 Common rollback flow:
 
 ```bash
