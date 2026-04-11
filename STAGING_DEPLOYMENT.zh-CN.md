@@ -44,6 +44,37 @@
 - `myapp` 通过镜像烘焙进入 bench
 - 第一次部署时允许“容器已起来但站点尚未初始化”
 
+### 1.1 分支与发布流程
+
+当前建议采用三层分支模型：
+
+- `main`
+  - 稳定发布分支
+  - 只合入已经验证过、可以部署或打包的版本
+  - 后端 staging 部署、移动端 release APK 等正式发布动作以 `main` 为基准
+- `develop`
+  - 日常集成测试分支
+  - 功能分支完成后先合入 `develop` 做联调和检查
+  - 默认只跑检查类 workflow，不自动发布 APK，也不自动部署服务器
+- `feature/*` / `fix/*`
+  - 单个功能或修复分支
+  - 从 `develop` 拉出，完成后合回 `develop`
+  - 待一批改动验证稳定后，再由 `develop` 合入 `main`
+
+推荐流转顺序：
+
+```text
+feature/* -> develop -> main -> build/deploy/release
+```
+
+操作约定：
+
+- 不建议日常直接推送开发中代码到 `main`
+- 需要正式测试包或 staging 镜像时，再把确认过的 `develop` 合入 `main`
+- 如果只是临时验证后端镜像或部署脚本，优先使用 `workflow_dispatch` 手动触发
+- `Build myapp staging image` 的 `myapp_ref` 应优先选择已验证的 `main`、tag 或明确 commit；只有调试时才建议填 `develop`
+- `Deploy staging stack` 会在服务器上拉取 `frappe_docker` 的 `main` 部署骨架，因此部署脚本变更也应先合入 `main`
+
 ---
 
 ## 2. 关键文件
