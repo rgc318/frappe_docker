@@ -64,6 +64,20 @@ Notes:
 - The `development` directory is ignored by git. It is mounted and available inside the container. Create all your benches (installations of bench, the tool that manages frappe) inside this directory.
 - Node v14 and v10 are installed. Check with `nvm ls`. Node v14 is used by default.
 
+### Local PDF Chinese Font Note
+
+This project uses the VS Code Dev Container as the main local development environment.
+
+- Local development still starts from the upstream ERPNext image instead of maintaining a separate local derivative image.
+- To keep PDF Chinese rendering available after container recreation, `.devcontainer/devcontainer.json` runs an idempotent `postStartCommand`.
+- The command checks whether `fonts-noto-cjk` is already installed.
+- If the font package is missing, it installs:
+  - `fontconfig`
+  - `fonts-noto-cjk`
+- Normal container restarts should not reinstall the package once it already exists.
+
+This keeps local development lighter than rebuilding a custom ERPNext image for every upstream image update, while still making PDF Chinese rendering work in the Dev Container.
+
 ### Setup first bench
 
 > Jump to [scripts](#setup-bench--new-site-using-script) section to setup a bench automatically. Alternatively, you can setup a bench manually using below guide.
