@@ -258,6 +258,82 @@ cd /srv/frappe_docker
 
 第一次建议先用内网模式跑通：
 
+---
+
+## 8. staging CORS 配置
+
+如果有以下来源要直接从浏览器访问 staging 后端：
+
+- Cloudflare Pages 预览域名
+- 自定义 Web 预览域名
+- 本地 `localhost` 调试
+- 公网 `IP:port` 形式的预览地址
+
+则必须把这些完整 origin 加入 Frappe 的 `allow_cors`。
+
+当前 staging 实际读取的配置文件是：
+
+- Docker volume 内的 `sites/common_site_config.json`
+- 容器内路径：`/home/frappe/frappe-bench/sites/common_site_config.json`
+
+本次联调里实际加入过的值包括：
+
+- `https://myapp-mobile-staging.pages.dev`
+- `https://mobile-staging.rgcdev.top`
+- `http://localhost:8081`
+- `http://39.104.204.79:18089`
+
+### 8.1 修改建议
+
+最稳的做法是从运行中的 backend 容器内修改：
+
+```bash
+docker exec staging-backend-1 python3 -c '...'
+```
+
+原因：
+
+- 宿主机上的 Docker volume 路径可能没有当前 SSH 用户写权限
+- 直接改容器内的 `common_site_config.json` 更贴近 Frappe 实际读取位置
+
+### 8.2 修改后必须重启的服务
+
+修改 `allow_cors` 后，至少重启：
+
+- `staging-backend-1`
+- `staging-frontend-1`
+- `staging-websocket-1`
+
+例如：
+
+```bash
+cd /srv/frappe_docker
+docker compose -p staging restart backend frontend websocket
+```
+
+### 8.3 如何验证是否生效
+
+推荐直接带 `Origin` 做预检请求：
+
+```bash
+curl -sS -X OPTIONS -D - -o /dev/null \
+  -H "Origin: http://39.104.204.79:18089" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type" \
+  https://erpnext.rgcdev.top/api/method/login
+```
+
+如果生效，响应头里应包含：
+
+- `Access-Control-Allow-Origin: <对应 origin>`
+- `Access-Control-Allow-Credentials: true`
+
+### 8.4 经验说明
+
+- CORS 放开后，只代表浏览器可以发请求
+- 如果前端与后端仍然是跨站关系，登录后的 Cookie / Session 仍可能不稳定
+- 因此对长期使用的 Web 预览，依然更推荐同主域名访问，而不是公网 `IP:port`
+
 ```env
 ERPNEXT_VERSION=v16.7.3
 
