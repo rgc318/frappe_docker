@@ -62,7 +62,7 @@ services:
       - -c
     command:
       - >
-        [ ! -d "apps/myapp/myapp.egg-info" ] && ./env/bin/pip install -e apps/myapp;
+        ./env/bin/pip install -e apps/myapp;
         exec bench serve
 
   frontend:
@@ -103,7 +103,7 @@ services:
       - -c
     command:
       - >
-        [ ! -d "apps/myapp/myapp.egg-info" ] && ./env/bin/pip install -e apps/myapp;
+        ./env/bin/pip install -e apps/myapp;
         exec bench worker --queue short,default
 
   queue-long:
@@ -114,7 +114,7 @@ services:
       - -c
     command:
       - >
-        [ ! -d "apps/myapp/myapp.egg-info" ] && ./env/bin/pip install -e apps/myapp;
+        ./env/bin/pip install -e apps/myapp;
         exec bench worker --queue long,default,short
 
   scheduler:
@@ -125,7 +125,7 @@ services:
       - -c
     command:
       - >
-        [ ! -d "apps/myapp/myapp.egg-info" ] && ./env/bin/pip install -e apps/myapp;
+        ./env/bin/pip install -e apps/myapp;
         exec bench schedule
 
 # ERPNext requires local assets access (Frappe does not)

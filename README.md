@@ -32,6 +32,27 @@ frappe_docker/
 - `compose.yaml` - Base compose file for production setups (production)
 - `pwd.yml` - Disposable demo environment (non-production)
 
+### Local myapp Development
+
+This workspace includes a project-specific `myapp` development setup. Use `./start-dev.sh` to start the local stack with the same compose files used by the dev workflow:
+
+```bash
+./start-dev.sh
+```
+
+The script expands to:
+
+```bash
+docker compose \
+  -f compose.yaml \
+  -f overrides/compose.redis.yaml \
+  -f overrides/compose.mariadb.yaml \
+  -f overrides/compose.noproxy.yaml \
+  up -d
+```
+
+`compose.yaml` bind-mounts `apps/myapp` and runs `./env/bin/pip install -e apps/myapp` for the backend, workers, scheduler, and configurator. This means Python dependencies declared by `apps/myapp/pyproject.toml`, including `rgc-backend-kit>=0.1.0,<0.2.0`, are installed automatically from PyPI when the app services start. Do not install `rgc-backend-kit` manually from `/tmp` or a host-local source checkout.
+
 ## Documentation
 
 **The official documentation for `frappe_docker` is maintained in the `docs/` folder in this repository.**
