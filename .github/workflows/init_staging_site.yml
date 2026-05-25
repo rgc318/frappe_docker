@@ -85,16 +85,29 @@ jobs:
           INSTALL_ERPNEXT: ${{ inputs.install_erpnext }}
           INSTALL_MYAPP: ${{ inputs.install_myapp }}
           SET_DEFAULT_SITE: ${{ inputs.set_default_site }}
+          DEPLOY_REF_NAME: ${{ github.ref_name }}
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}
           port: ${{ secrets.STAGING_SSH_PORT }}
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-          envs: SITE_NAME,ADMIN_PASSWORD,INSTALL_ERPNEXT,INSTALL_MYAPP,SET_DEFAULT_SITE
+          envs: SITE_NAME,ADMIN_PASSWORD,INSTALL_ERPNEXT,INSTALL_MYAPP,SET_DEFAULT_SITE,DEPLOY_REF_NAME
           script: |
             set -euo pipefail
             cd /srv/frappe_docker
-            git pull --ff-only origin main
+
+            if ! git ls-remote --exit-code --heads origin "${DEPLOY_REF_NAME}" >/dev/null; then
+              echo "Deploy ref must be an existing branch: ${DEPLOY_REF_NAME}"
+              exit 1
+            fi
+
+            git fetch --prune origin "${DEPLOY_REF_NAME}"
+            if git show-ref --verify --quiet "refs/heads/${DEPLOY_REF_NAME}"; then
+              git checkout "${DEPLOY_REF_NAME}"
+            else
+              git checkout -b "${DEPLOY_REF_NAME}" "origin/${DEPLOY_REF_NAME}"
+            fi
+            git pull --ff-only origin "${DEPLOY_REF_NAME}"
 
             if [ ! -f deploy/staging/staging.env ]; then
               echo "Missing deploy/staging/staging.env on server. Run ./deploy/staging/init-staging-server.sh first."

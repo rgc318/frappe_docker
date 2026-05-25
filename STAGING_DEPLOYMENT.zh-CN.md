@@ -75,7 +75,7 @@ feature/* -> develop -> main -> build/deploy/release
 - 需要正式测试包或 staging 镜像时，再把确认过的 `develop` 合入 `main`
 - 如果只是临时验证后端镜像或部署脚本，优先使用 `workflow_dispatch` 手动触发
 - `Build myapp staging image` 的 `myapp_ref` 应优先选择已验证的 `main`、tag 或明确 commit；只有调试时才建议填 `develop`
-- `Deploy staging stack` 会在服务器上拉取 `frappe_docker` 的 `main` 部署骨架，因此部署脚本变更也应先合入 `main`
+- `Deploy staging stack` 与 `Init staging site` 会让服务器上的 `frappe_docker` 切换到当前 workflow 运行所选择的分支；例如在 Actions 页面选择 `develop` 运行，就会部署 `frappe_docker@develop` 的部署脚本
 
 ---
 
@@ -477,7 +477,8 @@ ADMIN_PASSWORD='<admin-password>' \
 1. 代码更新后，通过 `Build myapp staging image` 构建新镜像
 2. 通过 `Deploy staging stack` 部署到测试服务器
 3. workflow 自动：
-   - `git pull --ff-only origin main`
+   - 切换服务器 `/srv/frappe_docker` 到当前 workflow 选择的分支
+   - `git pull --ff-only origin <当前分支>`
    - `docker login ghcr.io`
    - `docker compose pull`
    - `docker compose up -d`
@@ -666,7 +667,7 @@ cd /srv/frappe_docker
 ```bash
 cd /srv/frappe_docker
 git checkout -- deploy/staging/*.sh
-git pull --ff-only origin main
+git pull --ff-only origin <当前部署分支>
 ```
 
 ### 14.4 staging 启动后 `No module named 'myapp'`
