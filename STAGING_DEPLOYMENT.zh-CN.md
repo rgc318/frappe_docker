@@ -94,9 +94,11 @@ feature/* -> develop -> main -> build/deploy/release
 `images/custom/myapp-staging/Containerfile` 在 bench 初始化完成后会显式执行：
 
 ```bash
-./env/bin/pip install -e apps/frappe
-./env/bin/pip install -e apps/erpnext
-./env/bin/pip install --force-reinstall -e apps/myapp
+./env/bin/pip install --force-reinstall \
+  -r /opt/frappe/requirements.staging.txt \
+  -e apps/frappe \
+  -e apps/erpnext \
+  -e apps/myapp
 ./env/bin/python - <<'PY'
 import frappe
 import erpnext
@@ -107,7 +109,7 @@ PY
 ./env/bin/pip check
 ```
 
-这一步会读取 Frappe、ERPNext 与 `myapp` 的 `pyproject.toml`，强制刷新 app 的 editable 元数据，并通过 import smoke test 验证 `xlsxwriter`、`rgc-backend-kit>=0.1.0,<0.2.0` 等运行依赖。workflow 还会传入 `CACHE_BUST` 构建参数，避免 `myapp_ref=develop` 这类分支引用因为 Docker 缓存而没有重新拉取。后续新增 Python 包时，应优先写入对应 app 的 `pyproject.toml`，而不是在服务器上手动 `pip install`。
+镜像实际构建时会在同一次 `pip install` 中安装 Frappe、ERPNext、`myapp` 和 `deploy/staging/requirements.staging.txt`。这样 resolver 会同时看到宿主框架约束与业务 app 依赖，避免 PyJWT 这类共享依赖被分段安装过程来回覆盖。这一步会读取 Frappe、ERPNext 与 `myapp` 的 `pyproject.toml`，强制刷新 app 的 editable 元数据，并通过 import smoke test 验证 `XlsxWriter`、`rgc-backend-kit>=0.1.1,<0.2.0` 等运行依赖。workflow 还会传入 `CACHE_BUST` 构建参数，避免 `myapp_ref=develop` 这类分支引用因为 Docker 缓存而没有重新拉取。后续新增 Python 包时，应优先写入对应 app 的 `pyproject.toml`；只有宿主运行环境必须统一约束的包，才放入 `deploy/staging/requirements.staging.txt`。
 
 staging 镜像部署不再挂载 `/home/frappe/frappe-bench/env` 持久卷；虚拟环境属于镜像内容，只持久化 `sites` 数据。这样每次切换镜像时都会使用镜像内经过验证的 Python 依赖，避免旧 `bench-env-vol` 覆盖新镜像中的依赖。
 

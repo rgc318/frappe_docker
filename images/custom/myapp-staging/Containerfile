@@ -12,6 +12,8 @@ ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
 
+COPY --chown=frappe:frappe deploy/staging/requirements.staging.txt /opt/frappe/requirements.staging.txt
+
 USER root
 
 RUN git config --global http.version HTTP/1.1 \
@@ -38,9 +40,7 @@ RUN export APP_INSTALL_ARGS="" && \
     --verbose \
     /home/frappe/frappe-bench && \
   cd /home/frappe/frappe-bench && \
-  ./env/bin/pip install --no-cache-dir -e apps/frappe && \
-  ./env/bin/pip install --no-cache-dir -e apps/erpnext && \
-  ./env/bin/pip install --no-cache-dir --force-reinstall -e apps/myapp && \
+  ./env/bin/pip install --no-cache-dir --force-reinstall -r /opt/frappe/requirements.staging.txt -e apps/frappe -e apps/erpnext -e apps/myapp && \
   ./env/bin/python -c "import importlib.metadata as md; import frappe, erpnext, jwt, rgc_backend_kit, xlsxwriter, myapp; print('frappe', md.version('frappe')); print('erpnext', md.version('erpnext')); print('PyJWT', jwt.__version__); print('rgc-backend-kit', md.version('rgc-backend-kit')); print('xlsxwriter', md.version('XlsxWriter')); print('myapp', md.version('myapp'))" && \
   ./env/bin/pip check && \
   echo "{}" > sites/common_site_config.json && \
