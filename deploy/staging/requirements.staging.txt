@@ -1,3 +1,0 @@
-# Host-owned runtime constraints for the staging image.
-PyJWT~=2.12.1
-XlsxWriter~=3.2.9

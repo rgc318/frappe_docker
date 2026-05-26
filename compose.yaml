@@ -19,7 +19,6 @@ x-backend-defaults: &backend_defaults
   volumes:
     - sites:/home/frappe/frappe-bench/sites
     - ./apps/myapp:/home/frappe/frappe-bench/apps/myapp
-    - bench-env-vol:/home/frappe/frappe-bench/env
     #    - ./.vscode:/home/frappe/frappe-bench/.vscode:cached
 
 services:
@@ -131,4 +130,3 @@ services:
 # ERPNext requires local assets access (Frappe does not)
 volumes:
   sites:
-  bench-env-vol:

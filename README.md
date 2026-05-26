@@ -51,7 +51,9 @@ docker compose \
   up -d
 ```
 
-`compose.yaml` bind-mounts `apps/myapp` and runs `./env/bin/pip install -e apps/myapp` for the backend, workers, scheduler, and configurator. This means Python dependencies declared by `apps/myapp/pyproject.toml`, including `rgc-backend-kit>=0.1.0,<0.2.0`, are installed automatically from PyPI when the app services start. Do not install `rgc-backend-kit` manually from `/tmp` or a host-local source checkout.
+`compose.yaml` bind-mounts `apps/myapp` and runs `./env/bin/pip install -e apps/myapp` for the backend, workers, scheduler, and configurator. This means Python dependencies declared by `apps/myapp/pyproject.toml`, including `rgc-backend-kit>=0.1.1,<0.2.0`, are installed automatically from PyPI when the app services start. Do not install `rgc-backend-kit` manually from `/tmp` or a host-local source checkout.
+
+The local development compose file intentionally does not persist `/home/frappe/frappe-bench/env` as a Docker volume. Each container uses the virtualenv from its image and refreshes `myapp` dependencies on startup, which keeps dependency behavior closer to staging builds.
 
 ## Documentation
 

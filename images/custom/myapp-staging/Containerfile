@@ -1,18 +1,16 @@
-ARG FRAPPE_BRANCH=v16.14.0
+ARG FRAPPE_BRANCH=v16.18.3
 
 FROM frappe/build:${FRAPPE_BRANCH} AS builder
 
-ARG FRAPPE_BRANCH=v16.14.0
+ARG FRAPPE_BRANCH=v16.18.3
 ARG FRAPPE_PATH=https://github.com/frappe/frappe
-ARG ERPNEXT_REF=v16.14.0
+ARG ERPNEXT_REF=v16.18.3
 ARG MYAPP_REF=main
 ARG APPS_JSON_BASE64
 ARG CACHE_BUST=manual
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
-
-COPY --chown=frappe:frappe deploy/staging/requirements.staging.txt /opt/frappe/requirements.staging.txt
 
 USER root
 
@@ -21,7 +19,7 @@ RUN git config --global http.version HTTP/1.1 \
     && if [ -n "${HTTPS_PROXY}" ]; then git config --global https.proxy "${HTTPS_PROXY}"; fi
 
 RUN if [ -n "${APPS_JSON_BASE64}" ]; then \
-    mkdir /opt/frappe && echo "${APPS_JSON_BASE64}" | base64 -d > /opt/frappe/apps.json; \
+    mkdir -p /opt/frappe && echo "${APPS_JSON_BASE64}" | base64 -d > /opt/frappe/apps.json; \
   fi
 
 USER frappe
@@ -40,7 +38,7 @@ RUN export APP_INSTALL_ARGS="" && \
     --verbose \
     /home/frappe/frappe-bench && \
   cd /home/frappe/frappe-bench && \
-  ./env/bin/pip install --no-cache-dir --force-reinstall -r /opt/frappe/requirements.staging.txt -e apps/frappe -e apps/erpnext -e apps/myapp && \
+  ./env/bin/pip install --no-cache-dir --force-reinstall -e apps/frappe -e apps/erpnext -e apps/myapp && \
   ./env/bin/python -c "import importlib.metadata as md; import frappe, erpnext, jwt, rgc_backend_kit, xlsxwriter, myapp; print('frappe', md.version('frappe')); print('erpnext', md.version('erpnext')); print('PyJWT', jwt.__version__); print('rgc-backend-kit', md.version('rgc-backend-kit')); print('xlsxwriter', md.version('XlsxWriter')); print('myapp', md.version('myapp'))" && \
   ./env/bin/pip check && \
   echo "{}" > sites/common_site_config.json && \
@@ -48,8 +46,8 @@ RUN export APP_INSTALL_ARGS="" && \
 
 FROM frappe/base:${FRAPPE_BRANCH} AS backend
 
-ARG FRAPPE_BRANCH=v16.14.0
-ARG ERPNEXT_REF=v16.14.0
+ARG FRAPPE_BRANCH=v16.18.3
+ARG ERPNEXT_REF=v16.18.3
 ARG MYAPP_REF=main
 ARG CACHE_BUST=manual
 

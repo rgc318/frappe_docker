@@ -11,12 +11,12 @@ on:
       frappe_ref:
         description: "frappe tag or commit to build from"
         required: true
-        default: "v16.14.0"
+        default: "v16.18.3"
         type: string
       erpnext_ref:
         description: "erpnext tag or commit to build into the image"
         required: true
-        default: "v16.14.0"
+        default: "v16.18.3"
         type: string
       image_tag:
         description: "image tag to publish"

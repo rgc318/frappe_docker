@@ -51,9 +51,9 @@ PY
 
 CUSTOM_IMAGE="$(read_env CUSTOM_IMAGE)"
 CUSTOM_TAG="$(read_env CUSTOM_TAG)"
-FRAPPE_BRANCH="${FRAPPE_BRANCH:-$(read_env FRAPPE_BRANCH || printf 'v16.14.0')}"
+FRAPPE_BRANCH="${FRAPPE_BRANCH:-$(read_env FRAPPE_BRANCH || printf 'v16.18.3')}"
 FRAPPE_PATH="${FRAPPE_PATH:-$(read_env FRAPPE_PATH || printf 'https://github.com/frappe/frappe')}"
-ERPNEXT_REF="${ERPNEXT_REF:-$(read_app_ref 'frappe/erpnext' || read_env ERPNEXT_BRANCH || printf 'v16.14.0')}"
+ERPNEXT_REF="${ERPNEXT_REF:-$(read_app_ref 'frappe/erpnext' || read_env ERPNEXT_BRANCH || printf 'v16.18.3')}"
 MYAPP_REF="${MYAPP_REF:-$(read_app_ref 'rgc318/myapp' || read_env MYAPP_BRANCH || printf 'main')}"
 CACHE_BUST="${CACHE_BUST:-local-$(date +%s)}"
 HTTP_PROXY_ARG="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-}}}}"
