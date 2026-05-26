@@ -93,11 +93,12 @@ feature/* -> develop -> main -> build/deploy/release
 
 ```bash
 ./env/bin/pip install -e apps/frappe
-./env/bin/pip install -e apps/myapp
+./env/bin/pip install --force-reinstall -e apps/myapp
+./env/bin/pip install -e apps/frappe "xlsxwriter~=3.2.9"
 ./env/bin/pip check
 ```
 
-这一步会读取 Frappe 与 `myapp` 的 `pyproject.toml`，安装 `xlsxwriter`、`rgc-backend-kit>=0.1.0,<0.2.0` 等运行依赖，并在镜像构建阶段提前发现依赖冲突。后续新增 Python 包时，应优先写入 `apps/myapp/pyproject.toml`，而不是在服务器上手动 `pip install`。
+这一步会读取 Frappe 与 `myapp` 的 `pyproject.toml`，强制刷新 `myapp` 的 editable 元数据，安装 `xlsxwriter`、`rgc-backend-kit>=0.1.0,<0.2.0` 等运行依赖，并在镜像构建阶段提前发现依赖冲突。workflow 还会传入 `CACHE_BUST` 构建参数，避免 `myapp_ref=develop` 这类分支引用因为 Docker 缓存而没有重新拉取。后续新增 Python 包时，应优先写入 `apps/myapp/pyproject.toml`，而不是在服务器上手动 `pip install`。
 
 ### staging 运行文件
 

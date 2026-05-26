@@ -98,3 +98,4 @@ jobs:
             FRAPPE_BRANCH=${{ env.FRAPPE_BRANCH }}
             FRAPPE_PATH=${{ env.FRAPPE_PATH }}
             APPS_JSON_BASE64=${{ steps.apps_json.outputs.value }}
+            CACHE_BUST=${{ github.run_id }}-${{ github.run_attempt }}

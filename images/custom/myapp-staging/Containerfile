@@ -5,6 +5,7 @@ FROM frappe/build:${FRAPPE_BRANCH} AS builder
 ARG FRAPPE_BRANCH=version-16
 ARG FRAPPE_PATH=https://github.com/frappe/frappe
 ARG APPS_JSON_BASE64
+ARG CACHE_BUST=manual
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
@@ -22,6 +23,7 @@ RUN if [ -n "${APPS_JSON_BASE64}" ]; then \
 USER frappe
 
 RUN export APP_INSTALL_ARGS="" && \
+  echo "Cache bust: ${CACHE_BUST}" && \
   if [ -n "${APPS_JSON_BASE64}" ]; then \
     export APP_INSTALL_ARGS="--apps_path=/opt/frappe/apps.json"; \
   fi && \
@@ -34,8 +36,9 @@ RUN export APP_INSTALL_ARGS="" && \
     --verbose \
     /home/frappe/frappe-bench && \
   cd /home/frappe/frappe-bench && \
-  ./env/bin/pip install -e apps/frappe && \
-  ./env/bin/pip install -e apps/myapp && \
+  ./env/bin/pip install --no-cache-dir -e apps/frappe && \
+  ./env/bin/pip install --no-cache-dir --force-reinstall -e apps/myapp && \
+  ./env/bin/pip install --no-cache-dir -e apps/frappe "xlsxwriter~=3.2.9" && \
   ./env/bin/pip check && \
   echo "{}" > sites/common_site_config.json && \
   find apps -mindepth 1 -path "*/.git" | xargs rm -fr
