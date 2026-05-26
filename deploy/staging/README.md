@@ -59,6 +59,10 @@ CUSTOM_TAG=staging-latest
 PULL_POLICY=always
 ```
 
+For release verification, prefer a unique `CUSTOM_TAG` such as `staging-20260526-bff502e`.
+The staging compose file intentionally persists only `sites`; the Python virtualenv comes
+from the image and is not mounted as a long-lived Docker volume.
+
 Mode switch:
 
 - `STAGING_MODE=internal`

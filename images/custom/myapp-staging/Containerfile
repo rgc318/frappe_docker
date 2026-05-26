@@ -1,9 +1,11 @@
-ARG FRAPPE_BRANCH=version-16
+ARG FRAPPE_BRANCH=v16.14.0
 
 FROM frappe/build:${FRAPPE_BRANCH} AS builder
 
-ARG FRAPPE_BRANCH=version-16
+ARG FRAPPE_BRANCH=v16.14.0
 ARG FRAPPE_PATH=https://github.com/frappe/frappe
+ARG ERPNEXT_REF=v16.14.0
+ARG MYAPP_REF=main
 ARG APPS_JSON_BASE64
 ARG CACHE_BUST=manual
 ARG HTTP_PROXY
@@ -37,13 +39,24 @@ RUN export APP_INSTALL_ARGS="" && \
     /home/frappe/frappe-bench && \
   cd /home/frappe/frappe-bench && \
   ./env/bin/pip install --no-cache-dir -e apps/frappe && \
+  ./env/bin/pip install --no-cache-dir -e apps/erpnext && \
   ./env/bin/pip install --no-cache-dir --force-reinstall -e apps/myapp && \
-  ./env/bin/pip install --no-cache-dir -e apps/frappe "xlsxwriter~=3.2.9" && \
+  ./env/bin/python -c "import importlib.metadata as md; import frappe, erpnext, jwt, rgc_backend_kit, xlsxwriter, myapp; print('frappe', md.version('frappe')); print('erpnext', md.version('erpnext')); print('PyJWT', jwt.__version__); print('rgc-backend-kit', md.version('rgc-backend-kit')); print('xlsxwriter', md.version('XlsxWriter')); print('myapp', md.version('myapp'))" && \
   ./env/bin/pip check && \
   echo "{}" > sites/common_site_config.json && \
   find apps -mindepth 1 -path "*/.git" | xargs rm -fr
 
 FROM frappe/base:${FRAPPE_BRANCH} AS backend
+
+ARG FRAPPE_BRANCH=v16.14.0
+ARG ERPNEXT_REF=v16.14.0
+ARG MYAPP_REF=main
+ARG CACHE_BUST=manual
+
+LABEL org.rgc.frappe_ref="${FRAPPE_BRANCH}" \
+  org.rgc.erpnext_ref="${ERPNEXT_REF}" \
+  org.rgc.myapp_ref="${MYAPP_REF}" \
+  org.rgc.cache_bust="${CACHE_BUST}"
 
 USER root
 

@@ -8,6 +8,16 @@ on:
         required: true
         default: "main"
         type: string
+      frappe_ref:
+        description: "frappe tag or commit to build from"
+        required: true
+        default: "v16.14.0"
+        type: string
+      erpnext_ref:
+        description: "erpnext tag or commit to build into the image"
+        required: true
+        default: "v16.14.0"
+        type: string
       image_tag:
         description: "image tag to publish"
         required: true
@@ -26,7 +36,6 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/myapp-erpnext
-  FRAPPE_BRANCH: version-16
   FRAPPE_PATH: https://github.com/frappe/frappe
 
 jobs:
@@ -44,7 +53,7 @@ jobs:
           [
             {
               "url": "https://github.com/frappe/erpnext",
-              "branch": "version-16"
+              "branch": "${{ inputs.erpnext_ref }}"
             },
             {
               "url": "https://github.com/rgc318/myapp.git",
@@ -84,6 +93,10 @@ jobs:
             org.opencontainers.image.title=myapp staging image
             org.opencontainers.image.description=ERPNext image with myapp baked in for staging deployment
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.rgc.frappe_docker_ref=${{ github.ref_name }}
+            org.rgc.frappe_ref=${{ inputs.frappe_ref }}
+            org.rgc.erpnext_ref=${{ inputs.erpnext_ref }}
+            org.rgc.myapp_ref=${{ inputs.myapp_ref }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -95,7 +108,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            FRAPPE_BRANCH=${{ env.FRAPPE_BRANCH }}
+            FRAPPE_BRANCH=${{ inputs.frappe_ref }}
             FRAPPE_PATH=${{ env.FRAPPE_PATH }}
+            ERPNEXT_REF=${{ inputs.erpnext_ref }}
+            MYAPP_REF=${{ inputs.myapp_ref }}
             APPS_JSON_BASE64=${{ steps.apps_json.outputs.value }}
             CACHE_BUST=${{ github.run_id }}-${{ github.run_attempt }}

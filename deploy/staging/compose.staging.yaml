@@ -12,7 +12,6 @@ x-backend-defaults: &backend_defaults
   <<: [*depends_on_configurator, *customizable_image]
   volumes:
     - sites:/home/frappe/frappe-bench/sites
-    - bench-env-vol:/home/frappe/frappe-bench/env
 
 services:
   configurator:
@@ -107,4 +106,3 @@ services:
 
 volumes:
   sites:
-  bench-env-vol:

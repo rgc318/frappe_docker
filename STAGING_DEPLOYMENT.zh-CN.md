@@ -75,6 +75,8 @@ feature/* -> develop -> main -> build/deploy/release
 - 需要正式测试包或 staging 镜像时，再把确认过的 `develop` 合入 `main`
 - 如果只是临时验证后端镜像或部署脚本，优先使用 `workflow_dispatch` 手动触发
 - `Build myapp staging image` 的 `myapp_ref` 应优先选择已验证的 `main`、tag 或明确 commit；只有调试时才建议填 `develop`
+- `Build myapp staging image` 的 `frappe_ref` 与 `erpnext_ref` 默认固定为 `v16.14.0`，不要在常规 staging 发布中使用浮动 `version-16`
+- `image_tag` 建议使用唯一 tag，例如 `staging-20260526-bff502e`，不要只依赖 `staging-latest` 判断部署内容
 - `Deploy staging stack` 与 `Init staging site` 会让服务器上的 `frappe_docker` 切换到当前 workflow 运行所选择的分支；例如在 Actions 页面选择 `develop` 运行，就会部署 `frappe_docker@develop` 的部署脚本
 
 ---
@@ -93,12 +95,21 @@ feature/* -> develop -> main -> build/deploy/release
 
 ```bash
 ./env/bin/pip install -e apps/frappe
+./env/bin/pip install -e apps/erpnext
 ./env/bin/pip install --force-reinstall -e apps/myapp
-./env/bin/pip install -e apps/frappe "xlsxwriter~=3.2.9"
+./env/bin/python - <<'PY'
+import frappe
+import erpnext
+import rgc_backend_kit
+import xlsxwriter
+import myapp
+PY
 ./env/bin/pip check
 ```
 
-这一步会读取 Frappe 与 `myapp` 的 `pyproject.toml`，强制刷新 `myapp` 的 editable 元数据，安装 `xlsxwriter`、`rgc-backend-kit>=0.1.0,<0.2.0` 等运行依赖，并在镜像构建阶段提前发现依赖冲突。workflow 还会传入 `CACHE_BUST` 构建参数，避免 `myapp_ref=develop` 这类分支引用因为 Docker 缓存而没有重新拉取。后续新增 Python 包时，应优先写入 `apps/myapp/pyproject.toml`，而不是在服务器上手动 `pip install`。
+这一步会读取 Frappe、ERPNext 与 `myapp` 的 `pyproject.toml`，强制刷新 app 的 editable 元数据，并通过 import smoke test 验证 `xlsxwriter`、`rgc-backend-kit>=0.1.0,<0.2.0` 等运行依赖。workflow 还会传入 `CACHE_BUST` 构建参数，避免 `myapp_ref=develop` 这类分支引用因为 Docker 缓存而没有重新拉取。后续新增 Python 包时，应优先写入对应 app 的 `pyproject.toml`，而不是在服务器上手动 `pip install`。
+
+staging 镜像部署不再挂载 `/home/frappe/frappe-bench/env` 持久卷；虚拟环境属于镜像内容，只持久化 `sites` 数据。这样每次切换镜像时都会使用镜像内经过验证的 Python 依赖，避免旧 `bench-env-vol` 覆盖新镜像中的依赖。
 
 ### staging 运行文件
 
@@ -235,6 +246,14 @@ ssh -i ~/.ssh/github_actions_staging_ci -p 10022 vivy@39.104.204.79
 - `erpnext`
 - `myapp`
 
+手动触发时建议显式确认这些输入：
+
+- `Use workflow from`: 与部署脚本版本一致，例如 `develop`
+- `myapp_ref`: 要烘焙进镜像的 `myapp` 分支、tag 或 commit
+- `frappe_ref`: 默认 `v16.14.0`
+- `erpnext_ref`: 默认 `v16.14.0`
+- `image_tag`: 唯一 tag，例如 `staging-20260526-bff502e`
+
 `myapp` 不是从测试服务器本地目录挂载进去，而是在构建阶段从远程仓库拉取并打包。
 
 ### 5.2 镜像建议命名
@@ -349,7 +368,7 @@ curl -sS -X OPTIONS -D - -o /dev/null \
 - 因此对长期使用的 Web 预览，依然更推荐同主域名访问，而不是公网 `IP:port`
 
 ```env
-ERPNEXT_VERSION=v16.7.3
+ERPNEXT_VERSION=v16.14.0
 
 STAGING_MODE=internal
 
@@ -379,7 +398,7 @@ UPSTREAM_REAL_IP_RECURSIVE=
 PROXY_READ_TIMEOUT=120
 CLIENT_MAX_BODY_SIZE=50m
 
-FRAPPE_BRANCH=version-16
+FRAPPE_BRANCH=v16.14.0
 FRAPPE_PATH=https://github.com/frappe/frappe
 ```
 
@@ -478,7 +497,7 @@ ADMIN_PASSWORD='<admin-password>' \
 后续每次更新的标准流程：
 
 1. 代码更新后，通过 `Build myapp staging image` 构建新镜像
-2. 通过 `Deploy staging stack` 部署到测试服务器
+2. 通过 `Deploy staging stack` 部署到测试服务器，`image_tag` 使用上一步构建出的同一个唯一 tag
 3. workflow 自动：
    - 切换服务器 `/srv/frappe_docker` 到当前 workflow 选择的分支
    - `git pull --ff-only origin <当前分支>`
