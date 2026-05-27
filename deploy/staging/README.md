@@ -167,6 +167,26 @@ Common post-deploy verification:
 ./deploy/staging/check-staging.sh
 ```
 
+Critical HTTP regression can be enabled after the basic health check:
+
+```bash
+RUN_STAGING_HTTP_REGRESSION=1 ./deploy/staging/check-staging.sh
+```
+
+It runs `deploy/staging/run-critical-http-regression.sh` inside the staging backend container and covers JWT lifecycle plus the most important idempotency replay, conflict, and concurrent same-key cases.
+
+This is a post-deploy acceptance check. GitHub Actions does not start a separate full stack on the runner for this step. Instead, the workflow SSHs into the staging server after deployment and runs the HTTP tests against the freshly deployed staging services, database, and image.
+
+Configure one authentication method before enabling it:
+
+- `STAGING_HTTP_BEARER_TOKEN`
+- or `STAGING_HTTP_API_KEY` + `STAGING_HTTP_API_SECRET`
+- or `STAGING_HTTP_USERNAME` + `STAGING_HTTP_PASSWORD`
+
+The `Deploy staging stack` GitHub Actions workflow exposes the same behavior through the `run_http_regression` input. Add the chosen credentials as GitHub Actions secrets, then enable the input for release verification. Keep it disabled for lightweight deploy checks.
+
+The critical regression suite is intentionally smaller than the full HTTP suite because it creates real staging business documents. Use it to catch high-risk deployment regressions; run the full local/devcontainer HTTP suite when validating broader business behavior.
+
 For local cleaned-data migration into staging, follow:
 
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/DATA_MIGRATION.zh-CN.md`

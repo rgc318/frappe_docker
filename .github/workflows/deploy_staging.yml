@@ -18,6 +18,11 @@ on:
         required: true
         default: true
         type: boolean
+      run_http_regression:
+        description: "Run critical JWT/idempotency HTTP regression after deploy"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -39,6 +44,12 @@ jobs:
           STAGING_SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          RUN_HTTP_REGRESSION: ${{ inputs.run_http_regression }}
+          STAGING_HTTP_USERNAME: ${{ secrets.STAGING_HTTP_USERNAME }}
+          STAGING_HTTP_PASSWORD: ${{ secrets.STAGING_HTTP_PASSWORD }}
+          STAGING_HTTP_API_KEY: ${{ secrets.STAGING_HTTP_API_KEY }}
+          STAGING_HTTP_API_SECRET: ${{ secrets.STAGING_HTTP_API_SECRET }}
+          STAGING_HTTP_BEARER_TOKEN: ${{ secrets.STAGING_HTTP_BEARER_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -59,6 +70,17 @@ jobs:
           if [ "${#missing[@]}" -gt 0 ]; then
             printf 'Missing required GitHub Actions secrets: %s\n' "${missing[*]}"
             exit 1
+          fi
+
+          if [ "${RUN_HTTP_REGRESSION}" = "true" ]; then
+            if [ -z "${STAGING_HTTP_BEARER_TOKEN:-}" ]; then
+              if [ -z "${STAGING_HTTP_API_KEY:-}" ] || [ -z "${STAGING_HTTP_API_SECRET:-}" ]; then
+                if [ -z "${STAGING_HTTP_USERNAME:-}" ] || [ -z "${STAGING_HTTP_PASSWORD:-}" ]; then
+                  echo "run_http_regression requires STAGING_HTTP_BEARER_TOKEN, or STAGING_HTTP_API_KEY/STAGING_HTTP_API_SECRET, or STAGING_HTTP_USERNAME/STAGING_HTTP_PASSWORD."
+                  exit 1
+                fi
+              fi
+            fi
           fi
 
           if ! printf '%s' "${STAGING_SSH_PORT}" | grep -Eq '^[0-9]+$'; then
@@ -121,11 +143,19 @@ jobs:
       - name: Run health check
         if: ${{ inputs.run_health_check }}
         uses: appleboy/ssh-action@v1.2.2
+        env:
+          RUN_STAGING_HTTP_REGRESSION: ${{ inputs.run_http_regression && '1' || '0' }}
+          STAGING_HTTP_USERNAME: ${{ secrets.STAGING_HTTP_USERNAME }}
+          STAGING_HTTP_PASSWORD: ${{ secrets.STAGING_HTTP_PASSWORD }}
+          STAGING_HTTP_API_KEY: ${{ secrets.STAGING_HTTP_API_KEY }}
+          STAGING_HTTP_API_SECRET: ${{ secrets.STAGING_HTTP_API_SECRET }}
+          STAGING_HTTP_BEARER_TOKEN: ${{ secrets.STAGING_HTTP_BEARER_TOKEN }}
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}
           port: ${{ secrets.STAGING_SSH_PORT }}
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          envs: RUN_STAGING_HTTP_REGRESSION,STAGING_HTTP_USERNAME,STAGING_HTTP_PASSWORD,STAGING_HTTP_API_KEY,STAGING_HTTP_API_SECRET,STAGING_HTTP_BEARER_TOKEN
           script: |
             set -euo pipefail
             cd /srv/frappe_docker

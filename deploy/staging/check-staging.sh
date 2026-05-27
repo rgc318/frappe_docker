@@ -92,5 +92,13 @@ else
   exit 1
 fi
 
+if [[ "${RUN_STAGING_HTTP_REGRESSION:-0}" == "1" ]]; then
+  echo
+  ./deploy/staging/run-critical-http-regression.sh
+else
+  echo
+  echo "Skipping critical HTTP regression. Set RUN_STAGING_HTTP_REGRESSION=1 to enable it."
+fi
+
 echo
 echo "Staging health check completed."
