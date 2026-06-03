@@ -5,6 +5,7 @@ set -e
 # 默认参数
 REMOVE_VOLUMES=false
 REMOVE_ORPHANS=false
+DEVCONTAINER=false
 
 # 解析参数
 while [[ $# -gt 0 ]]; do
@@ -17,9 +18,13 @@ while [[ $# -gt 0 ]]; do
     REMOVE_ORPHANS=true
     shift
     ;;
+  --devcontainer)
+    DEVCONTAINER=true
+    shift
+    ;;
   *)
     echo "Unknown option: $1"
-    echo "Usage: ./stop.sh [-v] [-r]"
+    echo "Usage: ./stop.sh [-v] [-r] [--devcontainer]"
     exit 1
     ;;
   esac
@@ -30,7 +35,13 @@ COMPOSE_FILES=(
   -f compose.yaml
   -f overrides/compose.redis.yaml
   -f overrides/compose.mariadb.yaml
+  -f overrides/compose.noproxy.yaml
 )
+
+if [ "$DEVCONTAINER" = true ]; then
+  COMPOSE_FILES+=(-f .devcontainer/docker-compose.yml)
+  REMOVE_ORPHANS=true
+fi
 
 # 构建命令
 CMD=(docker compose "${COMPOSE_FILES[@]}" down)

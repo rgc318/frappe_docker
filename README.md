@@ -55,6 +55,28 @@ docker compose \
 
 The local development compose file intentionally does not persist `/home/frappe/frappe-bench/env` as a Docker volume. Each container uses the virtualenv from its image and refreshes `myapp` dependencies on startup, which keeps dependency behavior closer to staging builds.
 
+### VS Code Dev Container Notes
+
+When the stack is started through VS Code Dev Containers, use the Dev Container compose override in `.devcontainer/docker-compose.yml`.
+
+- Stop Dev Container services with `./stop.sh --devcontainer`.
+- Do not use plain `./stop.sh` for a Dev Container session; it does not include Dev Container-only services such as `mobile-proxy`.
+- `./stop.sh --devcontainer` includes `.devcontainer/docker-compose.yml` and `--remove-orphans`, which prevents stale containers from referencing deleted Docker networks.
+- Do not add `-v` unless you intentionally want to delete Docker volumes.
+
+The Dev Container `backend` service is intentionally kept idle. It installs/refreshes `myapp`, ensures `debugpy` is available for VS Code debugging, and then keeps the container alive. It does not run `bench serve` automatically. Pressing F5 in VS Code starts `bench serve --port 8000` from `.vscode/launch.json`; this avoids the `Address already in use` error caused by starting a second server on port `8000`.
+
+`debugpy` is a development/debugging dependency. It should not be listed in `apps/myapp/pyproject.toml` under normal runtime `dependencies`, otherwise every service that runs `pip install -e apps/myapp` will try to install it on startup. Keep it in the app's dev dependency section or install it only from the Dev Container startup path.
+
+For Chinese PDF/font rendering in local Dev Containers, install Noto CJK fonts in WSL and mount them into the container:
+
+```bash
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y fontconfig fonts-noto-cjk
+```
+
+The Dev Container maps `/usr/share/fonts/opentype/noto` into `/home/frappe/.local/share/fonts/noto` and refreshes the font cache on start. Staging images already install `fontconfig` and `fonts-noto-cjk` in `images/custom/myapp-staging/Containerfile`, so the workflow does not need a separate change for local font mounting.
+
 ## Documentation
 
 **The official documentation for `frappe_docker` is maintained in the `docs/` folder in this repository.**

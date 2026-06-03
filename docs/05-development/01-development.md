@@ -64,19 +64,54 @@ Notes:
 - The `development` directory is ignored by git. It is mounted and available inside the container. Create all your benches (installations of bench, the tool that manages frappe) inside this directory.
 - Node v14 and v10 are installed. Check with `nvm ls`. Node v14 is used by default.
 
-### Local PDF Chinese Font Note
+### Project-Specific Dev Container Notes
 
-This project uses the VS Code Dev Container as the main local development environment.
+This workspace uses the VS Code Dev Container as the main local development environment. The local Dev Container still starts from the upstream ERPNext image instead of maintaining a separate local derivative image.
 
-- Local development still starts from the upstream ERPNext image instead of maintaining a separate local derivative image.
-- To keep PDF Chinese rendering available after container recreation, `.devcontainer/devcontainer.json` runs an idempotent `postStartCommand`.
-- The command checks whether `fonts-noto-cjk` is already installed.
-- If the font package is missing, it installs:
-  - `fontconfig`
-  - `fonts-noto-cjk`
-- Normal container restarts should not reinstall the package once it already exists.
+#### Stop Dev Container services
 
-This keeps local development lighter than rebuilding a custom ERPNext image for every upstream image update, while still making PDF Chinese rendering work in the Dev Container.
+If the stack was started by VS Code Dev Containers, stop it with:
+
+```shell
+./stop.sh --devcontainer
+```
+
+This includes `.devcontainer/docker-compose.yml` and uses `--remove-orphans`, so Dev Container-only services such as `mobile-proxy` are removed together with the main stack. Using plain `./stop.sh` for a Dev Container session can leave old containers behind, which may later cause Docker errors such as `network ... not found`.
+
+Do not add `-v` unless you intentionally want to delete Docker volumes.
+
+#### F5 debugging
+
+In Dev Container mode, the `backend` container is intentionally kept idle. It installs/refreshes `apps/myapp`, ensures `debugpy` is present in `/home/frappe/frappe-bench/env`, and then keeps the container alive. It does not run `bench serve` automatically.
+
+F5 uses `.vscode/launch.json` to start:
+
+```shell
+bench serve --port 8000 --noreload --nothreading
+```
+
+This avoids a second `bench serve` competing for port `8000`. If F5 reports an unsupported debug type after extension changes, run `Developer: Reload Window` in VS Code. The launch configuration uses the compatible `"type": "python"` debug type.
+
+`debugpy` is a development/debugging dependency. Do not put it in `apps/myapp/pyproject.toml` under normal runtime `dependencies`; otherwise every service that runs `pip install -e apps/myapp` will try to install it on startup. Keep it in the app's dev dependency section or install it only from the Dev Container startup path.
+
+#### Local PDF Chinese fonts
+
+Install the Noto CJK fonts in WSL:
+
+```shell
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y fontconfig fonts-noto-cjk
+```
+
+The Dev Container maps:
+
+```text
+/usr/share/fonts/opentype/noto -> /home/frappe/.local/share/fonts/noto
+```
+
+and refreshes the font cache on container start. This avoids installing packages with `sudo` inside the official ERPNext image, which does not necessarily include `sudo`.
+
+Staging images already install `fontconfig` and `fonts-noto-cjk` in `images/custom/myapp-staging/Containerfile`, so the staging workflow does not need to be changed for this local WSL font mount.
 
 ### Setup first bench
 

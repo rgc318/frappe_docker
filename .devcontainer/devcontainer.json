@@ -23,7 +23,7 @@
   ],
   "workspaceFolder": "/home/frappe/frappe-bench", // 容器内的真实代码路径
   "remoteUser": "frappe",
-  "postStartCommand": "sudo bash -lc 'if ! dpkg -s fonts-noto-cjk >/dev/null 2>&1; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y fontconfig fonts-noto-cjk && rm -rf /var/lib/apt/lists/*; fi'",
+  "postStartCommand": "bash -lc 'if command -v fc-cache >/dev/null 2>&1; then fc-cache -f /home/frappe/.local/share/fonts/noto; fi; ./env/bin/python -c \"import debugpy\" >/dev/null 2>&1 || ./env/bin/pip install \"debugpy>=1.8.20\"'",
   "forwardPorts": [8000, 9000, 5678, 18080],  // 转发业务、SocketIO、调试端口和移动端桥接
   "customizations": {
     "vscode": {
