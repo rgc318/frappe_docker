@@ -100,6 +100,10 @@ docker exec frappe_docker-backend-1 bash -lc '
 - Prefer extending existing service/domain layers before adding page-local business logic.
 - For master data features, consider bulk operations, import/export, governance, lifecycle, audit trail, and validation quality checks.
 - For transaction features, consider partial fulfillment, partial billing, partial payment, returns, refunds, rollback/cancel paths, and idempotency.
+- Unit display, unit selection, unit conversion, and stock quantity conversion are shared domain concerns. Do not hand-roll UOM labels or conversion math in page components or one-off services.
+- Backend code that handles product, order, inventory, return, invoice, receipt, delivery, or print data must use `myapp.utils.uom` and `myapp.utils.uom_display` for UOM conversion and display mapping.
+- Frontend code that displays or edits UOM values must use shared helpers/components such as `src/utils/display-uom.ts`, `src/utils/uom-conversion.ts`, order editor utilities, and `UomSelect`.
+- New product, order, inventory, return, printing, or reporting work must verify that `uom`, `uom_display`, `all_uoms`, and `conversion_factor` are carried through the API and UI where relevant.
 
 ## Verification
 

@@ -7,12 +7,13 @@
 ## 当前目标
 
 - Codex 新会话启动所需的项目规则、文档索引和交接机制已建立并提交。
-- 后端商品多条码能力已完成并提交，父仓库 `apps/myapp` 指针准备随本次交接提交。
+- 后端商品多条码能力已完成并提交，父仓库 `apps/myapp` 指针已提交。
 - Web 商品模块已完成多条码、CSV 导入导出和列表布局优化，已复核、验证并提交。
+- 单位展示/换算通用模块使用规则已补充到 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`，当前发现的单据链路 UOM 展示缺口已记录到 `docs/codex/KNOWN_ISSUES.zh-CN.md`。
 
 ## 仓库状态
 
-- 父仓库：`AGENTS.md` 和 `docs/codex/` 已提交；本次准备提交 `apps/myapp` 子模块指针和当前交接更新；`.codex` 是既有未跟踪目录，不处理。
+- 父仓库：UOM 文档规则更新准备随本次文档提交完成；`.codex` 是既有未跟踪目录，不处理。
 - 后端 `apps/myapp`：最后检查时工作区干净；后端商品多条码测试提交已完成。
 - Web `frontend/myapp-web`：商品模块相关改动已提交，工作区干净。
 
@@ -26,6 +27,10 @@
 - 新增 `docs/codex/HANDOFF_TEMPLATE.zh-CN.md`，提供交接文档模板。
 - 新增当前文件 `docs/codex/CURRENT_HANDOFF.zh-CN.md`，作为新会话交接入口。
 - Codex 文档已在父仓库提交：`9fb80bf3 docs: add codex project guidance`。
+- UOM 通用模块长期规则已补充：
+  - `AGENTS.md`：禁止在页面或单点服务手写单位展示/换算。
+  - `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`：后端必须使用 `myapp.utils.uom` / `myapp.utils.uom_display`，前端必须使用 display/conversion/order editor/UomSelect 等共享模块。
+  - `docs/codex/KNOWN_ISSUES.zh-CN.md`：记录当前单据链路 `uom_display` 缺口。
 
 ### 后端 `apps/myapp`
 
@@ -108,10 +113,16 @@ git diff --check
 
 ## 未完成事项
 
+- 待修复单据链路 UOM 展示缺口：
+  - 后端销售/采购单据行项目序列化补 `uom_display`。
+  - 退货来源上下文透传 `uom_display`。
+  - Web 退货页改用 `resolveDisplayUom(record.uom, record.uomDisplay)`。
+  - 编辑页商品详情加载失败的 fallback 行需要明确降级或补足单位上下文。
 - 父仓库当前提交完成后，仅剩本地提交尚未推送到远端。
 - `.codex` 是既有未跟踪目录，不处理。
 
 ## 下一步建议
 
-1. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。
-2. 后续若做大批量商品导入，再评估新增后端异步导入接口。
+1. 修复后端销售/采购/退货单据链路的 `uom_display` 返回契约，并补测试。
+2. 修复 Web 退货页和编辑页 fallback 的单位展示/换算降级路径。
+3. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。

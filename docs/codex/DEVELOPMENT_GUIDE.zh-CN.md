@@ -48,6 +48,27 @@ docker exec frappe_docker-backend-1 bash -lc '
 - 新增主数据接口时优先考虑引用保护、启停状态、批量维护、导入导出、审计和字段治理。
 - 不要直接绕过 ERPNext/Frappe 的正式单据和库存逻辑去改核心账务或库存字段，除非有明确设计和测试覆盖。
 
+### 2.1 单位与换算通用模块
+
+单位是商品、订单、库存、退货、发票、收货、发货、打印和报表的共享领域能力。不要在单个服务里手写单位展示名、单位换算或库存数量换算。
+
+后端统一使用：
+
+- `myapp.utils.uom.resolve_item_quantity_to_stock`
+- `myapp.utils.uom.build_item_uom_context_map`
+- `myapp.utils.uom_display.resolve_uom_display_name`
+- `myapp.utils.uom_display.build_uom_display_map`
+
+后端实现规则：
+
+- 创建或更新销售、采购、库存调整、退货等会影响库存的行项目时，必须通过 `resolve_item_quantity_to_stock` 解析 `uom`、`stock_uom`、`conversion_factor` 和 `stock_qty`。
+- 批量处理多商品时，先用 `build_item_uom_context_map` 批量加载单位上下文，避免每行重复查库。
+- API 返回商品、订单行、发货行、收货行、发票行、退货来源行、打印行或报表明细时，凡是返回 `uom`，都应同时返回 `uom_display`，由 `build_uom_display_map` 或 `resolve_uom_display_name` 生成。
+- 商品类 API 应尽量返回 `all_uoms[]`，且每个单位行包含 `uom`、`conversion_factor`、`uom_display`。销售/采购默认单位也应返回对应 display 字段。
+- 不要只依赖前端静态映射兜底；数据库 `UOM` 主数据里的 `display_name`、`uom_name`、`symbol` 才是长期展示依据。
+- 新增或修改单据序列化函数时，检查 `uom_display` 是否贯通到 Web 和 Mobile service 层。
+- 新增打印、PDF、报表导出时，默认展示 `uom_display`，只有系统内部字段、调试信息或明确要求时才直接展示 UOM 编码。
+
 ## 3. Web 前端开发规范
 
 Web 端基于 Ant Design Pro。新增或优化页面时，优先使用官方 Ant Design Pro 与 ProComponents 的结构和组件。
@@ -82,6 +103,24 @@ Web 端基于 Ant Design Pro。新增或优化页面时，优先使用官方 Ant
 - `api-client.ts` 负责响应包络和错误处理。
 - `sales.ts`、`purchase.ts`、`master-data.ts`、`reports.ts` 等领域 service 返回页面友好的 camelCase 对象。
 - 使用 `@umijs/max` 的 `useRequest` 调用领域 service 时，遵守 `REQUEST_RESULT_CONTRACT.zh-CN.md`，需要时设置 `formatResult: (result) => result`。
+
+### 3.1 前端单位与换算规则
+
+前端统一使用：
+
+- `src/utils/display-uom.ts`
+- `src/utils/uom-conversion.ts`
+- `src/utils/sales-order-editor.ts`
+- `src/utils/purchase-order-editor.ts`
+- `src/components/UomSelect.tsx`
+
+前端实现规则：
+
+- 展示单位时使用 `resolveDisplayUom` 或 `resolveUomDisplay`，不要直接渲染 `record.uom`，也不要在页面里新增临时中英文映射表。
+- 订单行、采购行、库存参考、退货行等需要把销售/采购单位换算为库存单位时，使用 `convertQtyToStockQty` 或订单 editor utilities，不要手写 `qty * conversionFactor`。
+- 单位选择器优先使用 `UomSelect` 或基于 `allUoms/allUomDisplays` 的选项，显示文本用统一 display helper。
+- 页面 service 映射后端行项目时，应保留 `uom`、`uomDisplay`、`allUoms`、`allUomDisplays`、`uomConversions` 等字段，不要在页面组件里临时补结构。
+- 如果后端暂时没有返回 `uom_display`，前端可以用 `formatDisplayUom` 兜底，但应同时记录后端契约缺口，不应把 fallback 当作长期方案。
 
 ## 4. 企业级功能设计检查
 
