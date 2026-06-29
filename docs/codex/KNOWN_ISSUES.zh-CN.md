@@ -182,26 +182,26 @@ ERPNext 原生支持 `Item Barcode` 子表，本项目后端也已围绕商品�
 - `set_primary_product_barcode_v2`
 - `delete_product_barcode_v2`
 
-## 8. 单据链路单位展示缺口
+## 8. 单据链路单位展示防回归
 
-现象：
+历史现象：
 
 - 商品详情、商品列表、新建销售/采购订单等路径可以正确使用 `uom_display`、`all_uoms` 和换算系数。
 - 但已保存单据详情、退货来源上下文、编辑页 fallback 行可能只拿到 `uom`，前端只能靠静态 fallback 显示单位。
 - 当数据库 `UOM` 主数据维护了新的中文展示名、`symbol` 或自定义单位时，这些页面可能显示不一致。
 
-已确认的缺口：
+已修复的缺口：
 
-- `apps/myapp/myapp/services/order_service.py` 的销售订单、发货单、销售发票行项目序列化只返回 `uom`，未统一返回 `uom_display`。
-- `apps/myapp/myapp/services/purchase_service.py` 的采购订单、采购收货、采购发票行项目序列化只返回 `uom`，未统一返回 `uom_display`。
-- `apps/myapp/myapp/services/return_service.py` 的退货来源上下文只透传 `uom`，未透传 `uom_display`。
-- `frontend/myapp-web/src/pages/Sales/Returns/New.tsx` 和 `frontend/myapp-web/src/pages/Purchase/Returns/New.tsx` 当前用 `formatDisplayUom(record.uom)`，没有消费后端 `uomDisplay`。
-- 销售/采购编辑页从已有单据 fallback 构造行项目时，`allUoms`、`allUomDisplays`、`uomConversions` 为空，商品详情加载失败时无法做完整单位选择和库存参考换算。
+- `apps/myapp/myapp/services/order_service.py` 的销售订单、发货单、销售发票行项目序列化已返回 `uom_display`。
+- `apps/myapp/myapp/services/purchase_service.py` 的采购订单、采购收货、采购发票行项目序列化已返回 `uom_display`。
+- `apps/myapp/myapp/services/return_service.py` 的退货来源上下文已透传 `uom_display`。
+- `frontend/myapp-web/src/pages/Sales/Returns/New.tsx` 和 `frontend/myapp-web/src/pages/Purchase/Returns/New.tsx` 已改为消费后端 `uomDisplay`。
+- 销售/采购编辑页从已有单据 fallback 构造行项目时，已保留当前行的 `uomDisplay`，并把当前单位作为 1:1 降级换算上下文。
 
 处理原则：
 
 - 后端单据序列化函数应使用 `myapp.utils.uom_display.build_uom_display_map`，凡是返回 `uom` 的行项目都同时返回 `uom_display`。
 - 退货上下文应从来源单据明细透传 `uom_display`。
 - 前端退货页应改为 `resolveDisplayUom(record.uom, record.uomDisplay)`。
-- 编辑页 fallback 行如果无法加载商品详情，应明确降级提示；能加载商品详情时必须使用商品接口返回的 `all_uoms` 和 `conversion_factor`。
-- 修复后应补充后端序列化测试和 Web service/page 映射测试，覆盖自定义单位展示名。
+- 编辑页 fallback 行如果无法加载商品详情，应保留单据行已有 `uomDisplay`，并只提供当前单位的降级选项；能加载商品详情时必须使用商品接口返回的 `all_uoms` 和 `conversion_factor`。
+- 相关改动必须保留后端序列化测试和 Web service 映射测试，覆盖自定义单位展示名。

@@ -9,13 +9,13 @@
 - Codex 新会话启动所需的项目规则、文档索引和交接机制已建立并提交。
 - 后端商品多条码能力已完成并提交，父仓库 `apps/myapp` 指针已提交。
 - Web 商品模块已完成多条码、CSV 导入导出和列表布局优化，已复核、验证并提交。
-- 单位展示/换算通用模块使用规则已补充到 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`，当前发现的单据链路 UOM 展示缺口已记录到 `docs/codex/KNOWN_ISSUES.zh-CN.md`。
+- 单位展示/换算通用模块使用规则已补充到 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`；单据链路 UOM 展示缺口已完成修复并记录为防回归事项。
 
 ## 仓库状态
 
-- 父仓库：UOM 文档规则更新准备随本次文档提交完成；`.codex` 是既有未跟踪目录，不处理。
-- 后端 `apps/myapp`：最后检查时工作区干净；后端商品多条码测试提交已完成。
-- Web `frontend/myapp-web`：商品模块相关改动已提交，工作区干净。
+- 父仓库：当前有 `apps/myapp` 指针和 `docs/codex/` 交接/已知问题更新待提交；`.codex` 是既有未跟踪目录，不处理。
+- 后端 `apps/myapp`：单据链路 `uom_display` 修复已提交，工作区干净。
+- Web `frontend/myapp-web`：退货页和订单编辑 fallback UOM 修复已提交，工作区干净。
 
 ## 已完成改动
 
@@ -43,6 +43,12 @@
   - `barcode` 保持为主条码兼容字段
 - 补充商品条码管理、商品主数据和 gateway wrapper 相关测试。
 - 后端已提交：`1a4cee6 test: cover product barcode management`。
+- 当前已完成单据链路 UOM 展示修复：
+  - 销售订单、发货单、销售发票行项目序列化返回 `uom_display`。
+  - 采购订单、采购收货、采购发票行项目序列化返回 `uom_display`。
+  - 退货来源上下文透传 `uom_display`。
+  - 补充后端序列化和退货上下文测试。
+- 后端 UOM 修复已提交：`7728f10 fix: include uom display in document rows`。
 
 ### Web `frontend/myapp-web`
 
@@ -67,6 +73,11 @@
   - 增加横向滚动，避免字段挤压
 - `WEB_DEVELOPMENT.zh-CN.md` 已同步补充商品导入和条码说明。
 - Web 已提交：`cd1a18c feat: enhance product barcode management`。
+- 当前已完成 Web UOM 修复：
+  - 销售/采购退货页改用 `resolveDisplayUom(record.uom, record.uomDisplay)`。
+  - 销售/采购订单编辑页 fallback 行保留来源单据 `uomDisplay`，并提供当前单位 1:1 降级换算上下文。
+  - Web return source context service 映射 `uomDisplay`。
+- Web UOM 修复已提交：`1783e57 fix: use uom display in return flows`。
 
 ## 已验证
 
@@ -111,18 +122,35 @@ git diff --check
 
 结果：TypeScript、Biome、Jest、空白检查均通过。Jest 输出仍有测试进程未立即退出的提示，但测试结果为 9 个 suites、66 个 tests 全部通过。
 
+UOM 修复最新验证：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest \
+    apps.myapp.myapp.tests.unit.test_order_service \
+    apps.myapp.myapp.tests.unit.test_return_service \
+    apps.myapp.myapp.tests.unit.test_purchase_service.TestPurchaseService.test_purchase_document_item_serializers_include_uom_display
+'
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：后端 60 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 66 个 tests、空白检查均通过。
+
 ## 未完成事项
 
-- 待修复单据链路 UOM 展示缺口：
-  - 后端销售/采购单据行项目序列化补 `uom_display`。
-  - 退货来源上下文透传 `uom_display`。
-  - Web 退货页改用 `resolveDisplayUom(record.uom, record.uomDisplay)`。
-  - 编辑页商品详情加载失败的 fallback 行需要明确降级或补足单位上下文。
 - 父仓库当前提交完成后，仅剩本地提交尚未推送到远端。
 - `.codex` 是既有未跟踪目录，不处理。
 
 ## 下一步建议
 
-1. 修复后端销售/采购/退货单据链路的 `uom_display` 返回契约，并补测试。
-2. 修复 Web 退货页和编辑页 fallback 的单位展示/换算降级路径。
-3. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。
+1. 在父仓库提交 `apps/myapp` 指针和交接文档更新。
+2. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。
