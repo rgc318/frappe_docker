@@ -10,12 +10,13 @@
 - 后端商品多条码能力已完成并提交，父仓库 `apps/myapp` 指针已提交。
 - Web 商品模块已完成多条码、CSV 导入导出和列表布局优化，已复核、验证并提交。
 - 单位展示/换算通用模块使用规则已补充到 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`；单据链路 UOM 展示缺口已完成修复并记录为防回归事项。
+- 库存写操作第一批已完成：后端新增库存转仓与单品单仓目标库存校准接口，Web 新增库存转仓页，并将库存调整页切到显式库存 API。
 
 ## 仓库状态
 
-- 父仓库：当前有 `apps/myapp` 指针和 `docs/codex/` 交接/已知问题更新待提交；`.codex` 是既有未跟踪目录，不处理。
-- 后端 `apps/myapp`：单据链路 `uom_display` 修复已提交，工作区干净。
-- Web `frontend/myapp-web`：退货页和订单编辑 fallback UOM 修复已提交，工作区干净。
+- 父仓库：库存后端子模块指针已提交；当前仅 `.codex` 是既有未跟踪目录，不处理。
+- 后端 `apps/myapp`：库存转仓与盘点校准 API 已提交，工作区干净。
+- Web `frontend/myapp-web`：库存转仓工作流已提交，工作区干净。
 
 ## 已完成改动
 
@@ -49,6 +50,12 @@
   - 退货来源上下文透传 `uom_display`。
   - 补充后端序列化和退货上下文测试。
 - 后端 UOM 修复已提交：`7728f10 fix: include uom display in document rows`。
+- 当前已完成库存写操作第一批后端能力：
+  - 新增 `transfer_inventory_stock_v1`，通过 ERPNext `Stock Entry` 创建并提交 `Material Transfer`。
+  - 新增 `reconcile_inventory_stock_v1`，按单品单仓目标库存差值创建并提交 `Material Receipt` / `Material Issue`；无差异时不创建单据。
+  - 两个接口均使用 `myapp.utils.uom.resolve_item_quantity_to_stock` 统一 UOM 换算，并走 `request_id` / `Idempotency-Key` 幂等链路。
+  - 补充 inventory service 和 gateway wrapper 单元测试。
+- 后端库存写操作已提交：`d9dc3ad feat: add inventory transfer and reconciliation APIs`。
 
 ### Web `frontend/myapp-web`
 
@@ -78,6 +85,14 @@
   - 销售/采购订单编辑页 fallback 行保留来源单据 `uomDisplay`，并提供当前单位 1:1 降级换算上下文。
   - Web return source context service 映射 `uomDisplay`。
 - Web UOM 修复已提交：`1783e57 fix: use uom display in return flows`。
+- 当前已完成 Web 库存写操作第一批：
+  - `/inventory/adjustments` 从间接调用 `update_product_v2` 改为调用 `reconcile_inventory_stock_v1`。
+  - 新增 `/inventory/transfers` 库存转仓页，支持公司、转出仓、转入仓、商品、数量、单位、过账日期和备注。
+  - 库存列表、库存详情、库存预警页增加库存转仓入口。
+  - `src/services/myapp/inventory.ts` 新增 `transferInventoryStock`，并映射库存写操作返回字段。
+  - Web 开发文档和开发计划已更新，完整批量盘点单仍列为后续项。
+- Web 库存转仓工作流已提交：`814b455 feat: add inventory transfer workflow`。
+- 父仓库后端子模块指针已提交：`42327897 chore: record inventory workflow backend`。
 
 ## 已验证
 
@@ -145,12 +160,38 @@ git diff --check
 
 结果：后端 60 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 66 个 tests、空白检查均通过。
 
+库存写操作最新验证：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_inventory_service apps.myapp.myapp.tests.unit.test_gateway_wrappers
+'
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+```
+
+结果：后端 90 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 67 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
+
+本地 Web 开发服务器：
+
+```text
+http://localhost:8003
+```
+
 ## 未完成事项
 
 - 父仓库当前提交完成后，仅剩本地提交尚未推送到远端。
 - `.codex` 是既有未跟踪目录，不处理。
+- 库存完整批量盘点单、盘点单生命周期和待处理确认仍未接入 Web。
 
 ## 下一步建议
 
-1. 在父仓库提交 `apps/myapp` 指针和交接文档更新。
-2. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。
+1. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。
+2. 后续库存模块可继续补批量盘点单、盘点单确认/作废生命周期和相关权限收口。
