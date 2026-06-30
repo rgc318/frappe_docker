@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-06-29
+更新时间：2026-06-30
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -11,12 +11,13 @@
 - Web 商品模块已完成多条码、CSV 导入导出和列表布局优化，已复核、验证并提交。
 - 单位展示/换算通用模块使用规则已补充到 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`；单据链路 UOM 展示缺口已完成修复并记录为防回归事项。
 - 库存写操作第一批已完成：后端新增库存转仓与单品单仓目标库存校准接口，Web 新增库存转仓页，并将库存调整页切到显式库存 API。
+- Web 待处理确认工作台已完成：聚合核心草稿业务单据，并通过后端 `confirm_pending_document` 提交确认。
 
 ## 仓库状态
 
 - 父仓库：库存后端子模块指针已提交；当前仅 `.codex` 是既有未跟踪目录，不处理。
 - 后端 `apps/myapp`：库存转仓与盘点校准 API 已提交，工作区干净。
-- Web `frontend/myapp-web`：库存转仓工作流已提交，工作区干净。
+- Web `frontend/myapp-web`：待处理确认工作台已提交，工作区干净。
 
 ## 已完成改动
 
@@ -92,6 +93,13 @@
   - `src/services/myapp/inventory.ts` 新增 `transferInventoryStock`，并映射库存写操作返回字段。
   - Web 开发文档和开发计划已更新，完整批量盘点单仍列为后续项。
 - Web 库存转仓工作流已提交：`814b455 feat: add inventory transfer workflow`。
+- 当前已完成 Web 待处理确认工作台：
+  - 新增 `/pending-confirmations`，聚合销售发货单、销售发票、采购收货单和采购发票的草稿单据。
+  - 新增 `services/myapp/pending-confirmations.ts`，封装草稿列表聚合和 `confirm_pending_document` 写操作。
+  - 新增 `canViewPendingConfirmations` 权限点和菜单入口。
+  - 补充 domain service 测试，覆盖草稿列表查询和确认 payload。
+  - Web 开发文档和开发计划已更新，待处理确认不再列为未接入项。
+- Web 待处理确认工作台已提交：`287af5b feat: add pending confirmation workbench`。
 - 父仓库后端子模块指针已提交：`42327897 chore: record inventory workflow backend`。
 
 ## 已验证
@@ -179,6 +187,18 @@ git -C frontend/myapp-web diff --check
 
 结果：后端 90 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 67 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
 
+待处理确认工作台最新验证：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+git -C frontend/myapp-web diff --check
+```
+
+结果：Web TypeScript、Biome、9 个 Jest suites / 69 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
+
 本地 Web 开发服务器：
 
 ```text
@@ -189,9 +209,11 @@ http://localhost:8003
 
 - 父仓库当前提交完成后，仅剩本地提交尚未推送到远端。
 - `.codex` 是既有未跟踪目录，不处理。
-- 库存完整批量盘点单、盘点单生命周期和待处理确认仍未接入 Web。
+- 库存完整批量盘点单和盘点单生命周期仍未接入 Web。
+- 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
 
 ## 下一步建议
 
 1. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。
 2. 后续库存模块可继续补批量盘点单、盘点单确认/作废生命周期和相关权限收口。
+3. 待处理确认后续可扩展工作流 action、更多单据类型和真实浏览器联调。
