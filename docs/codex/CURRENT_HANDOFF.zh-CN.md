@@ -12,12 +12,13 @@
 - 单位展示/换算通用模块使用规则已补充到 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`；单据链路 UOM 展示缺口已完成修复并记录为防回归事项。
 - 库存写操作第一批已完成：后端新增库存转仓与单品单仓目标库存校准接口，Web 新增库存转仓页，并将库存调整页切到显式库存 API。
 - Web 待处理确认工作台已完成：聚合核心草稿业务单据，并通过后端 `confirm_pending_document` 提交确认。
+- 仓库管理第一版已完成：后端新增仓库主数据 API，Web 新增 `/master-data/warehouses` 列表和基础维护页。
 
 ## 仓库状态
 
-- 父仓库：库存后端子模块指针已提交；当前仅 `.codex` 是既有未跟踪目录，不处理。
-- 后端 `apps/myapp`：库存转仓与盘点校准 API 已提交，工作区干净。
-- Web `frontend/myapp-web`：待处理确认工作台已提交，工作区干净。
+- 父仓库：待提交本轮 `apps/myapp` 子模块指针和当前交接文档；`.codex` 是既有未跟踪目录，不处理。
+- 后端 `apps/myapp`：仓库管理 API 已提交，工作区干净。
+- Web `frontend/myapp-web`：主数据缺口文档和仓库管理页面已提交，工作区干净。
 
 ## 已完成改动
 
@@ -57,6 +58,12 @@
   - 两个接口均使用 `myapp.utils.uom.resolve_item_quantity_to_stock` 统一 UOM 换算，并走 `request_id` / `Idempotency-Key` 幂等链路。
   - 补充 inventory service 和 gateway wrapper 单元测试。
 - 后端库存写操作已提交：`d9dc3ad feat: add inventory transfer and reconciliation APIs`。
+- 当前已完成仓库管理第一版后端能力：
+  - 新增 `list_warehouses_v2`、`get_warehouse_detail_v2`、`create_warehouse_v2`、`update_warehouse_v2`、`disable_warehouse_v2`。
+  - 创建 / 更新仓库时校验公司存在；父仓库必须存在、同公司且是分组仓库。
+  - 接口支持 `request_id` 幂等。
+  - 补充 warehouse service 和 gateway wrapper 单元测试。
+- 后端仓库管理 API 已提交：`166e62b feat: add warehouse management APIs`。
 
 ### Web `frontend/myapp-web`
 
@@ -100,6 +107,14 @@
   - 补充 domain service 测试，覆盖草稿列表查询和确认 payload。
   - Web 开发文档和开发计划已更新，待处理确认不再列为未接入项。
 - Web 待处理确认工作台已提交：`287af5b feat: add pending confirmation workbench`。
+- Web 已补主数据缺口文档：`e948afc docs: record master data gaps`。
+- 当前已完成 Web 仓库管理第一版：
+  - 新增 `/master-data/warehouses`，支持关键词、公司、状态、类型筛选。
+  - 支持新增、编辑、启用和停用仓库。
+  - 覆盖仓库名称、公司、父仓库、是否分组、停用和基础地址字段。
+  - `master-data.ts` 新增仓库列表和写操作封装，页面不直接拼 gateway payload。
+  - 补充 domain service 测试，覆盖仓库列表和新增 / 编辑 / 启停 payload。
+- Web 仓库管理页面已提交：`790e54c feat: add warehouse management page`。
 - 父仓库后端子模块指针已提交：`42327897 chore: record inventory workflow backend`。
 
 ## 已验证
@@ -199,6 +214,25 @@ git -C frontend/myapp-web diff --check
 
 结果：Web TypeScript、Biome、9 个 Jest suites / 69 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
 
+仓库管理最新验证：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_warehouse_service apps.myapp.myapp.tests.unit.test_gateway_wrappers
+'
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+```
+
+结果：后端 94 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
+
 本地 Web 开发服务器：
 
 ```text
@@ -211,6 +245,7 @@ http://localhost:8003
 - `.codex` 是既有未跟踪目录，不处理。
 - 库存完整批量盘点单和盘点单生命周期仍未接入 Web。
 - 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
+- 仓库管理当前是基础主数据维护；库位 / 容量、负责人、默认成本中心、仓库权限和更细粒度治理字段仍未接入。
 
 ## 下一步建议
 
