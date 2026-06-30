@@ -127,6 +127,12 @@
   - Web domain service 已映射新增字段，并覆盖创建 / 更新 payload 测试。
   - `WEB_DEVELOPMENT.zh-CN.md` 和 `DEVELOPMENT_PLAN.zh-CN.md` 已同步当前完成范围与剩余缺口。
 - Web 仓库治理字段扩展已提交：`acf4889 feat: expand warehouse management fields`。
+- 当前已完成 Web 仓库 CSV 导入导出：
+  - `/master-data/warehouses` 支持按当前筛选结果导出 CSV，导出字段覆盖仓库编码、名称、公司、父仓库、状态、仓库类型、会计科目、默认在途仓库、拒收仓、客户归属、联系方式和地址。
+  - 支持 CSV 批量导入，`create` 创建仓库，`update` 按仓库编码更新仓库；导入前展示预览表，导入后逐行展示成功 / 失败。
+  - 导入模板覆盖中英文字段别名，布尔字段支持 `1/0`、`true/false`、`yes/no`、`是/否` 等常见值。
+  - `WEB_DEVELOPMENT.zh-CN.md` 和 `DEVELOPMENT_PLAN.zh-CN.md` 已同步 CSV 导入导出状态。
+- Web 仓库 CSV 导入导出已提交：`43cf3e8 feat: add warehouse csv import export`。
 - 父仓库后端子模块指针已提交：`42327897 chore: record inventory workflow backend`。
 
 ## 已验证
@@ -265,6 +271,19 @@ git -C frontend/myapp-web diff --check
 
 结果：后端 103 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
 
+仓库 CSV 导入导出最新验证：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。
+
 本地 Web 开发服务器：
 
 ```text
@@ -277,7 +296,7 @@ http://localhost:8003
 - `.codex` 是既有未跟踪目录，不处理。
 - 库存完整批量盘点单和盘点单生命周期仍未接入 Web。
 - 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
-- 仓库管理已覆盖 ERPNext 原生基础治理字段；库位 / 容量、负责人、默认成本中心、仓库权限、导入导出、审计记录和更细粒度治理仍未接入。
+- 仓库管理已覆盖 ERPNext 原生基础治理字段和 CSV 导入导出；库位 / 容量、负责人、默认成本中心、仓库权限、审计记录和更细粒度治理仍未接入。
 
 ## 下一步建议
 
