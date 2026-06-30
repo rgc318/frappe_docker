@@ -12,13 +12,13 @@
 - 单位展示/换算通用模块使用规则已补充到 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`；单据链路 UOM 展示缺口已完成修复并记录为防回归事项。
 - 库存写操作第一批已完成：后端新增库存转仓与单品单仓目标库存校准接口，Web 新增库存转仓页，并将库存调整页切到显式库存 API。
 - Web 待处理确认工作台已完成：聚合核心草稿业务单据，并通过后端 `confirm_pending_document` 提交确认。
-- 仓库管理第一版已完成：后端新增仓库主数据 API，Web 新增 `/master-data/warehouses` 列表和基础维护页。
+- 仓库管理第一版和原生治理字段扩展已完成：后端新增仓库主数据 API，Web 新增 `/master-data/warehouses` 列表和维护页，并补齐 ERPNext 原生仓库治理字段。
 
 ## 仓库状态
 
 - 父仓库：待提交本轮 `apps/myapp` 子模块指针和当前交接文档；`.codex` 是既有未跟踪目录，不处理。
-- 后端 `apps/myapp`：仓库管理 API 已提交，工作区干净。
-- Web `frontend/myapp-web`：主数据缺口文档和仓库管理页面已提交，工作区干净。
+- 后端 `apps/myapp`：仓库管理 API 和原生治理字段扩展已提交，工作区干净。
+- Web `frontend/myapp-web`：主数据缺口文档、仓库管理页面和原生治理字段扩展已提交，工作区干净。
 
 ## 已完成改动
 
@@ -64,6 +64,12 @@
   - 接口支持 `request_id` 幂等。
   - 补充 warehouse service 和 gateway wrapper 单元测试。
 - 后端仓库管理 API 已提交：`166e62b feat: add warehouse management APIs`。
+- 当前已完成仓库原生治理字段扩展：
+  - `Warehouse` 列表、详情、创建和更新返回 / 接收 `account`、`warehouse_type`、`default_in_transit_warehouse`、`is_rejected_warehouse`、`customer`、`email_id`、`phone_no`、`mobile_no`。
+  - `account`、`warehouse_type`、`default_in_transit_warehouse`、`customer` 使用 Link 存在性校验。
+  - `search_link_options_v1` 白名单新增 `Account` 和 `Warehouse Type`，并允许 `Account` 按 `company`、`is_group` 过滤。
+  - `API_GATEWAY.zh-CN.md` 已同步仓库字段和 Link 白名单契约。
+- 后端仓库治理字段扩展已提交：`c687d7f feat: expand warehouse governance fields`。
 
 ### Web `frontend/myapp-web`
 
@@ -115,6 +121,12 @@
   - `master-data.ts` 新增仓库列表和写操作封装，页面不直接拼 gateway payload。
   - 补充 domain service 测试，覆盖仓库列表和新增 / 编辑 / 启停 payload。
 - Web 仓库管理页面已提交：`790e54c feat: add warehouse management page`。
+- 当前已完成 Web 仓库治理字段扩展：
+  - `/master-data/warehouses` 列表展示仓库类型、会计科目、联系信息和拒收仓标记。
+  - 新增 / 编辑表单接入仓库类型、会计科目、默认在途仓库、客户归属、拒收仓标记、电话、手机和邮箱。
+  - Web domain service 已映射新增字段，并覆盖创建 / 更新 payload 测试。
+  - `WEB_DEVELOPMENT.zh-CN.md` 和 `DEVELOPMENT_PLAN.zh-CN.md` 已同步当前完成范围与剩余缺口。
+- Web 仓库治理字段扩展已提交：`acf4889 feat: expand warehouse management fields`。
 - 父仓库后端子模块指针已提交：`42327897 chore: record inventory workflow backend`。
 
 ## 已验证
@@ -233,6 +245,26 @@ git -C frontend/myapp-web diff --check
 
 结果：后端 94 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
 
+仓库治理字段扩展最新验证：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_warehouse_service apps.myapp.myapp.tests.unit.test_link_options_service apps.myapp.myapp.tests.unit.test_gateway_wrappers
+'
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+
+git diff --check
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+```
+
+结果：后端 103 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
+
 本地 Web 开发服务器：
 
 ```text
@@ -245,7 +277,7 @@ http://localhost:8003
 - `.codex` 是既有未跟踪目录，不处理。
 - 库存完整批量盘点单和盘点单生命周期仍未接入 Web。
 - 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
-- 仓库管理当前是基础主数据维护；库位 / 容量、负责人、默认成本中心、仓库权限和更细粒度治理字段仍未接入。
+- 仓库管理已覆盖 ERPNext 原生基础治理字段；库位 / 容量、负责人、默认成本中心、仓库权限、导入导出、审计记录和更细粒度治理仍未接入。
 
 ## 下一步建议
 
