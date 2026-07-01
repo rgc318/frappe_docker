@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-01 20:24 CST
+更新时间：2026-07-01 22:46 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -18,12 +18,13 @@
 - 库存批量盘点最小闭环已完成并提交：后端新增 `submit_inventory_stock_count_v1` 直接提交 ERPNext `Stock Reconciliation`，Web 新增 `/inventory/counts` 批量盘点页；盘点草稿 / 复核确认 / 作废生命周期暂不继续扩展，下一步回到核心交易 / 移动作业链路。
 - 销售模块联调问题已修复并提交：Web 已修复新建销售订单必填项聚合提示、销售发票收款明细误渲染表头行、发货单开票提示文案、库存转仓菜单国际化缺失、Select 下拉弃用属性、全局 AntD `Space direction` 弃用属性，以及本次涉及销售详情页的 Alert `message` 弃用属性。
 - 商品图片显示修复已提交：开发代理新增 `/files/` 到 Frappe，商品图片 URL 使用 `modified` 追加版本参数，图片上传 / 替换返回的预览 URL 使用 `file_id` 追加版本参数，上传组件会随外部 `value` 变化同步预览。
+- 销售收款 / 退货退款联调修复已提交：Web 收款弹窗改为受控 Modal，修复发票未结金额循环请求；销售文案统一为“登记客户收款 / 取消原客户收款”；后端修复销售退货发票正式退款 `Payment Entry` 引用行金额符号。
 
 ## 仓库状态
 
-- 父仓库：`docs/codex/CURRENT_HANDOFF.zh-CN.md` 有本次交接更新，`.codex` 是既有未跟踪目录，不处理；本地 `develop` 当前领先远端若干提交。
-- 后端 `apps/myapp`：工作区干净；本地 `develop` 当前领先远端 29 个提交。
-- Web `frontend/myapp-web`：工作区干净；本轮销售联调修复、商品图片显示修复和 Web 文档更新已提交：`8c63293 fix: polish sales flows and product media`。
+- 父仓库：本轮已记录 `apps/myapp` 子模块指针和 `docs/codex/CURRENT_HANDOFF.zh-CN.md`；提交后除既有未跟踪 `.codex` 外应保持干净；本地 `develop` 当前领先远端若干提交。
+- 后端 `apps/myapp`：工作区干净；本轮销售退货发票退款金额符号修复和 API 文档已提交：`04d0e91 fix: handle return invoice refund allocation`。
+- Web `frontend/myapp-web`：工作区干净；本轮销售收款弹窗、收款 / 退款文案和 Web 文档已提交：`11fd837 fix: clarify sales payment and refund actions`。
 
 ## 已完成改动
 
@@ -161,8 +162,36 @@
   - `API_GATEWAY.zh-CN.md`、`WEB_DEVELOPMENT.zh-CN.md`、`DEVELOPMENT_PLAN.zh-CN.md` 已同步接口与当前范围。
 - 后端已提交：`ad98091 feat: add inventory stock count API`。
 - Web 已提交：`f9e8298 feat: add inventory stock count page`。
+- 当前已提交的销售收款 / 退货退款联调修复：
+  - 后端 `create_customer_refund` 和 `create_supplier_refund` 在基于退货发票创建 `Payment Entry` 时，会按退货发票负数 `outstanding_amount` 规范化引用行 `total_amount`、`outstanding_amount` 和 `allocated_amount`，修复“已分配金额不能大于未付金额”校验失败。
+  - 后端 `API_GATEWAY.zh-CN.md` 已补充销售退货发票正式退款的 ERPNext 符号口径说明。
+  - Web `InvoicePaymentForm` 使用 ref 固定 `loadOutstandingAmount` / `onChange` 回调，修复打开收款弹窗后循环请求 `get_sales_invoice_detail_v2`。
+  - Web 销售订单、销售发票、销售退货和销售退款核对页文案统一为“登记客户收款”“取消原客户收款”“登记客户退款”，并在订单已结清或退款已完成时禁用易误操作入口。
+  - `WEB_DEVELOPMENT.zh-CN.md` 已同步销售收款、退款核对和原收款处理口径。
+- 后端已提交：`04d0e91 fix: handle return invoice refund allocation`。
+- Web 已提交：`11fd837 fix: clarify sales payment and refund actions`。
 
 ## 已验证
+
+销售收款 / 退货退款联调修复验证（2026-07-01 22:46 CST）：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_settlement_service
+'
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：后端 settlement service 26 个测试通过；Web TypeScript、Biome、9 个 Jest suites / 72 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
 
 销售模块联调和商品图片修复 Web 验证（2026-07-01 20:24 CST）：
 
@@ -383,7 +412,7 @@ git -C frontend/myapp-web diff --check
 本地 Web 开发服务器：
 
 ```text
-http://localhost:8003
+http://localhost:8001
 ```
 
 ## 未完成事项
@@ -398,6 +427,5 @@ http://localhost:8003
 ## 下一步建议
 
 1. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。
-2. 父仓库提交 `apps/myapp` 子模块指针与当前交接文件。
-3. 下一步回到核心业务：优先做销售退货 / 退款核对真实浏览器联调、采购收货 / 开票 / 付款链路对齐，或移动作业端扫码收货 / 发货 / 打印预览。
-4. 待处理确认后续可扩展工作流 action、更多单据类型和真实浏览器联调。
+2. 下一步回到核心业务：优先做采购收货 / 开票 / 付款链路对齐，或移动作业端扫码收货 / 发货 / 打印预览。
+3. 待处理确认后续可扩展工作流 action、更多单据类型和真实浏览器联调。
