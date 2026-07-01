@@ -133,6 +133,13 @@
   - 导入模板覆盖中英文字段别名，布尔字段支持 `1/0`、`true/false`、`yes/no`、`是/否` 等常见值。
   - `WEB_DEVELOPMENT.zh-CN.md` 和 `DEVELOPMENT_PLAN.zh-CN.md` 已同步 CSV 导入导出状态。
 - Web 仓库 CSV 导入导出已提交：`43cf3e8 feat: add warehouse csv import export`。
+- 当前已完成 Web 客户 / 供应商企业级第一版：
+  - 客户和供应商继续共用 `PartyManagementPage`，按同一类“往来单位治理”维护。
+  - `/master-data/customers` 和 `/master-data/suppliers` 支持关键词 / 状态 / 分组筛选、新增、编辑、启用、停用、详情抽屉、主联系人 / 主地址维护、最近使用地址展示、当前筛选结果 CSV 导出和 CSV 批量导入。
+  - `master-data.ts` 已映射 `default_contact`、`default_address`、`recent_addresses`、`creation`、`modified`，写操作会向现有后端接口发送 `default_contact` / `default_address`。
+  - 补充 domain service 测试，覆盖客户 / 供应商创建和更新时的主联系人 payload。
+  - `WEB_DEVELOPMENT.zh-CN.md` 和 `DEVELOPMENT_PLAN.zh-CN.md` 已同步客户 / 供应商治理状态和剩余缺口。
+- Web 客户 / 供应商企业级第一版已提交：`4ae0d30 feat: upgrade party management workflows`。
 - 父仓库后端子模块指针已提交：`42327897 chore: record inventory workflow backend`。
 
 ## 已验证
@@ -284,6 +291,19 @@ git diff --check
 
 结果：Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。
 
+客户 / 供应商企业级第一版最新验证：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
+
 本地 Web 开发服务器：
 
 ```text
@@ -296,6 +316,7 @@ http://localhost:8003
 - `.codex` 是既有未跟踪目录，不处理。
 - 库存完整批量盘点单和盘点单生命周期仍未接入 Web。
 - 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
+- 客户 / 供应商已覆盖企业级第一版；联系人 / 地址多条独立维护、信用 / 账期 / 付款条款 / 税务 / 交易历史聚合、应收应付钻取、标签归属和审计记录仍未接入。
 - 仓库管理已覆盖 ERPNext 原生基础治理字段和 CSV 导入导出；库位 / 容量、负责人、默认成本中心、仓库权限、审计记录和更细粒度治理仍未接入。
 
 ## 下一步建议
