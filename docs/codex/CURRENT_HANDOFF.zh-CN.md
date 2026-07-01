@@ -15,12 +15,13 @@
 - 仓库管理第一版、原生治理字段扩展和 CSV 导入导出已完成：后端新增仓库主数据 API，Web 新增 `/master-data/warehouses` 列表和维护页，并补齐 ERPNext 原生仓库治理字段。
 - 客户 / 供应商已升级为企业级第一版：共用往来单位治理页面，支持详情抽屉、主联系人 / 主地址、最近地址、CSV 导入导出和基础治理字段维护。
 - 客户 / 供应商常规治理字段扩展已完成并提交：后端和 Web 已补默认价格表、付款条款、税号、税务类别；客户公司维度信用额度子表仍未接入。
+- 库存批量盘点最小闭环已完成并提交：后端新增 `submit_inventory_stock_count_v1` 直接提交 ERPNext `Stock Reconciliation`，Web 新增 `/inventory/counts` 批量盘点页；盘点草稿 / 复核确认 / 作废生命周期暂不继续扩展，下一步回到核心交易 / 移动作业链路。
 
 ## 仓库状态
 
-- 父仓库：工作区干净，仅 `.codex` 是既有未跟踪目录，不处理；本地 `develop` 当前领先远端 32 个提交。
-- 后端 `apps/myapp`：工作区干净；本地 `develop` 当前领先远端 28 个提交。
-- Web `frontend/myapp-web`：工作区干净；本地 `main` 当前领先远端 50 个提交。
+- 父仓库：`apps/myapp` 子模块指针待提交，`.codex` 是既有未跟踪目录，不处理；本地 `develop` 当前领先远端 32 个提交。
+- 后端 `apps/myapp`：工作区干净；本地 `develop` 当前领先远端 29 个提交。
+- Web `frontend/myapp-web`：工作区干净；本地 `main` 当前领先远端 51 个提交。
 
 ## 已完成改动
 
@@ -150,6 +151,14 @@
   - 补充后端 customer / purchase service 单测和 Web domain service Jest 断言。
 - 后端已提交：`056a71d feat: expand party governance fields`。
 - Web 已提交：`a6c8c7d feat: expand party management fields`。
+- 当前已提交的库存批量盘点最小闭环：
+  - 后端新增 `submit_inventory_stock_count_v1`，接收多行商品 / 仓库 / 实盘数量 / 单位 / 估值价，校验同公司、重复行和负数数量。
+  - 后端使用 `resolve_item_quantity_to_stock` 做单位换算，通过 ERPNext `Stock Reconciliation` 创建并提交正式盘点单；无差异行不写入单据，全部无差异时不创建单据。
+  - Web 新增 `/inventory/counts`，支持按公司 / 仓库 / 过账日期添加商品盘点行、录入实盘数量 / 单位 / 估值价、提交并查看差异结果。
+  - 库存列表、库存详情、库存预警、库存调整和库存转仓页已增加批量盘点入口；库存流水支持 `voucherType` / `voucherNo` URL 初始筛选。
+  - `API_GATEWAY.zh-CN.md`、`WEB_DEVELOPMENT.zh-CN.md`、`DEVELOPMENT_PLAN.zh-CN.md` 已同步接口与当前范围。
+- 后端已提交：`ad98091 feat: add inventory stock count API`。
+- Web 已提交：`f9e8298 feat: add inventory stock count page`。
 
 ## 已验证
 
@@ -336,6 +345,26 @@ git diff --check
 
 结果：后端 140 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
 
+库存批量盘点最小闭环最新验证：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_inventory_service apps.myapp.myapp.tests.unit.test_gateway_wrappers
+'
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+
+git diff --check
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+```
+
+结果：后端 98 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 71 个 tests、空白检查均通过。
+
 本地 Web 开发服务器：
 
 ```text
@@ -346,7 +375,7 @@ http://localhost:8003
 
 - 父仓库、后端和 Web 当前仅剩本地提交尚未推送到远端。
 - `.codex` 是既有未跟踪目录，不处理。
-- 库存完整批量盘点单和盘点单生命周期仍未接入 Web。
+- 库存批量盘点直接提交式工作流已接入；盘点草稿、复核确认、作废 / 取消和审计生命周期仍未接入，当前阶段暂不继续深挖。
 - 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
 - 客户 / 供应商已覆盖企业级第一版；默认价格表、常规付款条款和税务字段已接入；联系人 / 地址多条独立维护、客户公司维度信用额度子表、交易历史聚合、应收应付钻取、标签归属和审计记录仍未接入。
 - 仓库管理已覆盖 ERPNext 原生基础治理字段和 CSV 导入导出；库位 / 容量、负责人、默认成本中心、仓库权限、审计记录和更细粒度治理仍未接入。
@@ -354,5 +383,6 @@ http://localhost:8003
 ## 下一步建议
 
 1. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。
-2. 后续库存模块可继续补批量盘点单、盘点单确认/作废生命周期和相关权限收口。
-3. 待处理确认后续可扩展工作流 action、更多单据类型和真实浏览器联调。
+2. 父仓库提交 `apps/myapp` 子模块指针与当前交接文件。
+3. 下一步回到核心业务：优先做销售退货 / 退款核对真实浏览器联调、采购收货 / 开票 / 付款链路对齐，或移动作业端扫码收货 / 发货 / 打印预览。
+4. 待处理确认后续可扩展工作流 action、更多单据类型和真实浏览器联调。
