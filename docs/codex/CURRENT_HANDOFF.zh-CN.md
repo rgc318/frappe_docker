@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-01
+更新时间：2026-07-01 20:24 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -16,12 +16,14 @@
 - 客户 / 供应商已升级为企业级第一版：共用往来单位治理页面，支持详情抽屉、主联系人 / 主地址、最近地址、CSV 导入导出和基础治理字段维护。
 - 客户 / 供应商常规治理字段扩展已完成并提交：后端和 Web 已补默认价格表、付款条款、税号、税务类别；客户公司维度信用额度子表仍未接入。
 - 库存批量盘点最小闭环已完成并提交：后端新增 `submit_inventory_stock_count_v1` 直接提交 ERPNext `Stock Reconciliation`，Web 新增 `/inventory/counts` 批量盘点页；盘点草稿 / 复核确认 / 作废生命周期暂不继续扩展，下一步回到核心交易 / 移动作业链路。
+- 销售模块联调问题已修复并提交：Web 已修复新建销售订单必填项聚合提示、销售发票收款明细误渲染表头行、发货单开票提示文案、库存转仓菜单国际化缺失、Select 下拉弃用属性、全局 AntD `Space direction` 弃用属性，以及本次涉及销售详情页的 Alert `message` 弃用属性。
+- 商品图片显示修复已提交：开发代理新增 `/files/` 到 Frappe，商品图片 URL 使用 `modified` 追加版本参数，图片上传 / 替换返回的预览 URL 使用 `file_id` 追加版本参数，上传组件会随外部 `value` 变化同步预览。
 
 ## 仓库状态
 
-- 父仓库：`apps/myapp` 子模块指针待提交，`.codex` 是既有未跟踪目录，不处理；本地 `develop` 当前领先远端 32 个提交。
+- 父仓库：`docs/codex/CURRENT_HANDOFF.zh-CN.md` 有本次交接更新，`.codex` 是既有未跟踪目录，不处理；本地 `develop` 当前领先远端若干提交。
 - 后端 `apps/myapp`：工作区干净；本地 `develop` 当前领先远端 29 个提交。
-- Web `frontend/myapp-web`：工作区干净；本地 `main` 当前领先远端 51 个提交。
+- Web `frontend/myapp-web`：工作区干净；本轮销售联调修复、商品图片显示修复和 Web 文档更新已提交：`8c63293 fix: polish sales flows and product media`。
 
 ## 已完成改动
 
@@ -161,6 +163,19 @@
 - Web 已提交：`f9e8298 feat: add inventory stock count page`。
 
 ## 已验证
+
+销售模块联调和商品图片修复 Web 验证（2026-07-01 20:24 CST）：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：TypeScript、Biome、Jest、空白检查均通过；Jest 结果为 9 个 suites、72 个 tests 全部通过，仍输出测试进程未立即退出的既有提示。
 
 Codex 文档空白检查：
 
