@@ -14,12 +14,13 @@
 - Web 待处理确认工作台已完成：聚合核心草稿业务单据，并通过后端 `confirm_pending_document` 提交确认。
 - 仓库管理第一版、原生治理字段扩展和 CSV 导入导出已完成：后端新增仓库主数据 API，Web 新增 `/master-data/warehouses` 列表和维护页，并补齐 ERPNext 原生仓库治理字段。
 - 客户 / 供应商已升级为企业级第一版：共用往来单位治理页面，支持详情抽屉、主联系人 / 主地址、最近地址、CSV 导入导出和基础治理字段维护。
+- 客户 / 供应商常规治理字段扩展已完成并提交：后端和 Web 已补默认价格表、付款条款、税号、税务类别；客户公司维度信用额度子表仍未接入。
 
 ## 仓库状态
 
-- 父仓库：工作区干净，仅 `.codex` 是既有未跟踪目录，不处理；本地 `develop` 当前领先远端 30 个提交。
-- 后端 `apps/myapp`：工作区干净；本地 `develop` 当前领先远端 27 个提交。
-- Web `frontend/myapp-web`：工作区干净；本地 `main` 当前领先远端 49 个提交。
+- 父仓库：工作区干净，仅 `.codex` 是既有未跟踪目录，不处理；本地 `develop` 当前领先远端 32 个提交。
+- 后端 `apps/myapp`：工作区干净；本地 `develop` 当前领先远端 28 个提交。
+- Web `frontend/myapp-web`：工作区干净；本地 `main` 当前领先远端 50 个提交。
 
 ## 已完成改动
 
@@ -142,6 +143,13 @@
   - `WEB_DEVELOPMENT.zh-CN.md` 和 `DEVELOPMENT_PLAN.zh-CN.md` 已同步客户 / 供应商治理状态和剩余缺口。
 - Web 客户 / 供应商企业级第一版已提交：`4ae0d30 feat: upgrade party management workflows`。
 - 父仓库后端子模块指针已提交：`42327897 chore: record inventory workflow backend`。
+- 当前已提交的客户 / 供应商治理字段扩展：
+  - 后端 `list/get/create/update` 客户和供应商 API 已读写 `default_price_list`、`payment_terms`、`tax_id`、`tax_category`，并更新 `API_GATEWAY.zh-CN.md`。
+  - Web `PartyManagementPage` 已在列表、详情、表单、CSV 导入导出中接入默认价格表、付款条款、税号、税务类别。
+  - Web `master-data.ts` 已映射新增字段并在客户 / 供应商创建和更新 payload 中传递。
+  - 补充后端 customer / purchase service 单测和 Web domain service Jest 断言。
+- 后端已提交：`056a71d feat: expand party governance fields`。
+- Web 已提交：`a6c8c7d feat: expand party management fields`。
 
 ## 已验证
 
@@ -305,6 +313,29 @@ git diff --check
 
 结果：Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
 
+客户 / 供应商治理字段扩展最新验证：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest \
+    apps.myapp.myapp.tests.unit.test_customer_service \
+    apps.myapp.myapp.tests.unit.test_purchase_service \
+    apps.myapp.myapp.tests.unit.test_gateway_wrappers
+'
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：后端 140 个相关测试通过；Web TypeScript、Biome、9 个 Jest suites / 70 个 tests、空白检查均通过。Jest 仍提示测试进程未立即退出，但退出码为 0。
+
 本地 Web 开发服务器：
 
 ```text
@@ -317,7 +348,7 @@ http://localhost:8003
 - `.codex` 是既有未跟踪目录，不处理。
 - 库存完整批量盘点单和盘点单生命周期仍未接入 Web。
 - 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
-- 客户 / 供应商已覆盖企业级第一版；联系人 / 地址多条独立维护、信用 / 账期 / 付款条款 / 税务 / 交易历史聚合、应收应付钻取、标签归属和审计记录仍未接入。
+- 客户 / 供应商已覆盖企业级第一版；默认价格表、常规付款条款和税务字段已接入；联系人 / 地址多条独立维护、客户公司维度信用额度子表、交易历史聚合、应收应付钻取、标签归属和审计记录仍未接入。
 - 仓库管理已覆盖 ERPNext 原生基础治理字段和 CSV 导入导出；库位 / 容量、负责人、默认成本中心、仓库权限、审计记录和更细粒度治理仍未接入。
 
 ## 下一步建议
