@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-01 22:46 CST
+更新时间：2026-07-02 11:36 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -19,11 +19,12 @@
 - 销售模块联调问题已修复并提交：Web 已修复新建销售订单必填项聚合提示、销售发票收款明细误渲染表头行、发货单开票提示文案、库存转仓菜单国际化缺失、Select 下拉弃用属性、全局 AntD `Space direction` 弃用属性，以及本次涉及销售详情页的 Alert `message` 弃用属性。
 - 商品图片显示修复已提交：开发代理新增 `/files/` 到 Frappe，商品图片 URL 使用 `modified` 追加版本参数，图片上传 / 替换返回的预览 URL 使用 `file_id` 追加版本参数，上传组件会随外部 `value` 变化同步预览。
 - 销售收款 / 退货退款联调修复已提交：Web 收款弹窗改为受控 Modal，修复发票未结金额循环请求；销售文案统一为“登记客户收款 / 取消原客户收款”；后端修复销售退货发票正式退款 `Payment Entry` 引用行金额符号。
+- 销售订单详情退货聚合修复已提交：后端 `get_sales_order_detail.references.sales_invoices` 排除 `is_return=1` 的退货发票，时间线不再把退货发票重复显示为“销售开票”。
 
 ## 仓库状态
 
 - 父仓库：本轮已记录 `apps/myapp` 子模块指针和 `docs/codex/CURRENT_HANDOFF.zh-CN.md`；提交后除既有未跟踪 `.codex` 外应保持干净；本地 `develop` 当前领先远端若干提交。
-- 后端 `apps/myapp`：工作区干净；本轮销售退货发票退款金额符号修复和 API 文档已提交：`04d0e91 fix: handle return invoice refund allocation`。
+- 后端 `apps/myapp`：工作区干净；本轮销售退货发票退款金额符号修复已提交：`04d0e91 fix: handle return invoice refund allocation`；销售订单详情退货聚合修复已提交：`93e822c fix: exclude return invoices from sales order invoices`。
 - Web `frontend/myapp-web`：工作区干净；本轮销售收款弹窗、收款 / 退款文案和 Web 文档已提交：`11fd837 fix: clarify sales payment and refund actions`。
 
 ## 已完成改动
@@ -170,8 +171,46 @@
   - `WEB_DEVELOPMENT.zh-CN.md` 已同步销售收款、退款核对和原收款处理口径。
 - 后端已提交：`04d0e91 fix: handle return invoice refund allocation`。
 - Web 已提交：`11fd837 fix: clarify sales payment and refund actions`。
+- 当前已提交的销售订单详情退货聚合修复：
+  - 后端 `_collect_sales_order_reference_names` 会在收集销售订单关联发票时二次查询 `Sales Invoice` 主表，只返回 `docstatus = 1` 且 `is_return = 0` 的正向销售发票。
+  - 订单详情 `references.sales_invoices` 不再混入销售退货发票；退货发票只通过 `timeline[].type = "sales_return"`、退货 / 退款核对入口和退款历史展示。
+  - 时间线构建对 `is_return = 1` 的发票做防御性跳过，避免调用方误传退货发票时重复生成“销售开票”事件。
+  - `API_GATEWAY.zh-CN.md` 已同步 `get_sales_order_detail.references.sales_invoices` 字段语义。
+- 后端已提交：`93e822c fix: exclude return invoices from sales order invoices`。
 
 ## 已验证
+
+销售订单详情退货聚合修复验证（2026-07-02 11:36 CST）：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest \
+    apps.myapp.myapp.tests.unit.test_order_service \
+    apps.myapp.myapp.tests.unit.test_settlement_service
+'
+
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python - <<PY
+import json, frappe
+frappe.init(site="localhost", sites_path="/home/frappe/frappe-bench/sites")
+frappe.connect()
+try:
+    from myapp.services.order_service import get_sales_order_detail
+    data = get_sales_order_detail("SAL-ORD-2026-01366-1").get("data", {})
+    print(json.dumps(data.get("references"), ensure_ascii=False, default=str))
+    print([(row.get("type"), row.get("docname"), row.get("title")) for row in data.get("timeline") or []])
+finally:
+    frappe.destroy()
+PY
+'
+
+git -C apps/myapp diff --check
+git diff --check
+```
+
+结果：后端 order/settlement service 83 个测试通过；真实订单 `SAL-ORD-2026-01366-1` 复核显示 `references.sales_invoices` 只包含正向发票 `ACC-SINV-2026-00695`，退货发票 `ACC-SINV-2026-00696` 只作为 `sales_return` 时间线事件出现；空白检查通过。
 
 销售收款 / 退货退款联调修复验证（2026-07-01 22:46 CST）：
 
