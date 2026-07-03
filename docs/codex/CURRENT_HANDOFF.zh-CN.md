@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-02 11:36 CST
+更新时间：2026-07-03 14:22 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -20,12 +20,13 @@
 - 商品图片显示修复已提交：开发代理新增 `/files/` 到 Frappe，商品图片 URL 使用 `modified` 追加版本参数，图片上传 / 替换返回的预览 URL 使用 `file_id` 追加版本参数，上传组件会随外部 `value` 变化同步预览。
 - 销售收款 / 退货退款联调修复已提交：Web 收款弹窗改为受控 Modal，修复发票未结金额循环请求；销售文案统一为“登记客户收款 / 取消原客户收款”；后端修复销售退货发票正式退款 `Payment Entry` 引用行金额符号。
 - 销售订单详情退货聚合修复已提交：后端 `get_sales_order_detail.references.sales_invoices` 排除 `is_return=1` 的退货发票，时间线不再把退货发票重复显示为“销售开票”。
+- 当前正在完善销售收款 / 退货退款 / 取消收款冲突链路：后端已按退货净额口径限制继续收款和可退金额，取消原客户收款会在存在有效客户退款时拦截；Web 端暂停直接发起销售退货入口，保留历史退货发票查看、退款核对和按客户退款单 -> 退货发票 -> 原收款 -> 来源发票 -> 发货单顺序回退。
 
 ## 仓库状态
 
-- 父仓库：本轮已记录 `apps/myapp` 子模块指针和 `docs/codex/CURRENT_HANDOFF.zh-CN.md`；提交后除既有未跟踪 `.codex` 外应保持干净；本地 `develop` 当前领先远端若干提交。
-- 后端 `apps/myapp`：工作区干净；本轮销售退货发票退款金额符号修复已提交：`04d0e91 fix: handle return invoice refund allocation`；销售订单详情退货聚合修复已提交：`93e822c fix: exclude return invoices from sales order invoices`。
-- Web `frontend/myapp-web`：工作区干净；本轮销售收款弹窗、收款 / 退款文案和 Web 文档已提交：`11fd837 fix: clarify sales payment and refund actions`。
+- 父仓库：当前显示 `apps/myapp` 子模块有未提交改动，另有既有未跟踪 `.codex` 和本交接文档改动。
+- 后端 `apps/myapp`：未提交改动包括 `API_GATEWAY.zh-CN.md`、`myapp/services/order_service.py`、`myapp/services/settlement_service.py`、`myapp/tests/unit/test_order_service.py`、`myapp/tests/unit/test_settlement_service.py`。
+- Web `frontend/myapp-web`：未提交改动包括 `WEB_DEVELOPMENT.zh-CN.md`、`src/components/DownstreamRollbackGuide.tsx`、销售订单 / 发货单 / 发票 / 退货 / 退款页面和 `src/services/myapp/sales.ts`。
 
 ## 已完成改动
 
@@ -179,6 +180,49 @@
 - 后端已提交：`93e822c fix: exclude return invoices from sales order invoices`。
 
 ## 已验证
+
+销售收款 / 退货退款 / 取消收款冲突链路验证（2026-07-03 14:22 CST）：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest \
+    apps.myapp.myapp.tests.unit.test_order_service \
+    apps.myapp.myapp.tests.unit.test_settlement_service \
+    apps.myapp.myapp.tests.unit.test_gateway_wrappers
+'
+
+cd frontend/myapp-web && npm run tsc
+cd frontend/myapp-web && npm run biome:lint
+cd frontend/myapp-web && npm test -- Sales/Orders/Detail.test.tsx --runInBand
+
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+git diff --check
+
+docker restart frappe_docker-backend-1
+```
+
+结果：后端 192 个单元测试通过；Web 类型检查和 Biome lint 通过；订单详情 Jest 3 个用例通过，但仍输出既有 jsdom `window.getComputedStyle` not implemented 噪声和 open handle 提示；空白检查通过；backend 容器已重启。
+
+HTTP 仿真补充验证（2026-07-03 14:25 CST）：
+
+```bash
+MYAPP_HTTP_ENABLE_CHAIN_TESTS=1 MYAPP_HTTP_ENV_FILE=apps/myapp/.env.http-test python3 -m unittest \
+  apps.myapp.myapp.tests.http.test_gateway_http.GatewayHttpTestCase.test_update_payment_status_success \
+  apps.myapp.myapp.tests.http.test_gateway_http.GatewayHttpTestCase.test_update_payment_status_idempotent_replay \
+  apps.myapp.myapp.tests.http.test_gateway_http.GatewayHttpTestCase.test_update_payment_status_writeoff_success \
+  apps.myapp.myapp.tests.http.test_gateway_http.GatewayHttpTestCase.test_update_payment_status_overpayment_success \
+  apps.myapp.myapp.tests.http.test_gateway_http.GatewayHttpTestCase.test_process_sales_return_success \
+  apps.myapp.myapp.tests.http.test_gateway_http.GatewayHttpTestCase.test_process_sales_return_after_paid_invoice_requires_followup_refund \
+  apps.myapp.myapp.tests.http.test_gateway_http.GatewayHttpTestCase.test_process_sales_return_idempotent_replay
+```
+
+结果：7 个既有 HTTP 链路用例通过。另用临时 Python HTTP 仿真脚本验证：
+
+- 先开票、部分收款、部分退货后继续收款：来源发票 `ACC-SINV-2026-00714` 只按退货净未收额核销，超出部分进入 `unallocated_amount = 500.0`。
+- 已收款发票退货并登记客户退款后：取消原收款 `ACC-PAY-2026-00735` 返回 HTTP 422，提示已存在客户退款。
+- 先发货后开票、收款、退货、退款：原收款在客户退款存在时被 HTTP 422 拦截；先取消客户退款 `ACC-PAY-2026-00740` 后，再取消原收款 `ACC-PAY-2026-00739` 成功；之后退款上下文 `refundable_amount = 0`。
 
 销售订单详情退货聚合修复验证（2026-07-02 11:36 CST）：
 
