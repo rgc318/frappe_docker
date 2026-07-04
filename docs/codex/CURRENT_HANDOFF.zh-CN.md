@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-04 00:10 CST
+更新时间：2026-07-05 00:00 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -25,12 +25,13 @@
 - Web 销售订单详情关联单据已补充跟随退货退款 feature flag：退货退款入口暂停时，订单右侧关联单据不再展示“退货发票”和“退款单”两项，只保留发货单、销售发票和收款单；目标测试已覆盖隐藏行为。Web 已提交：`0fd376d fix: hide return refs when disabled`。
 - Web 销售发票作废单笔收款快捷处理已补齐并提交：发票详情作废弹框现在与订单回退一致，一笔客户收款时允许在额外二次确认后同步取消收款并作废发票，多笔客户收款仍要求逐笔取消后再作废发票。Web 已提交：`5d53a6c fix: allow single-payment invoice void`。二次确认已从静态 `Modal.confirm` 改为受控 Modal，避免点击“取消收款并作废发票”看起来没反应；所有按钮文案统一使用“取消收款”，不再出现“作废收款”。Web 已提交：`a9f3c88 fix: show invoice void payment confirmation`。
 - Web 销售发票详情顶部“返回销售订单”已修正为优先返回当前发票所属销售订单详情，没有来源订单时才回销售订单列表。Web 已提交：`7e41e0c fix: link invoice back to source order`。
+- Web 销售 / 采购订单交易选品第一阶段已在本地未提交状态落地：共用 `ProductSelect` 在销售 / 采购上下文中使用右侧交易选品 Drawer，打开后自动加载商品列表，点击加入后保持面板打开并让订单明细即时反馈。列表固定商品列和操作列，默认展示系统带入的选品参数摘要，需要时通过“调整”抽屉修改单位 / 仓库 / 价格 / 销售模式 / 本次数量；右侧常驻展示“本单已加入”和“本次暂存”，本单已加入解释订单当前业务行，本次暂存支持批量勾选后改数量、移除和统一加入。最新优化已去掉搜索区重复的“商品”输入，只保留“关键词”统一搜索名称 / 编码 / 条码；右侧列表取消过小固定高度，业务行改为展示数量 + 单位、库存单位约算、金额、仓库、模式和单价；打开交易选品 Drawer 时通过 ProTable `actionRef.reloadAndRest()` 主动拉取第一页，避免进入选择页后没有自动搜索数据。销售 / 采购新建和编辑页已通过结构化 `onSelectLines` 接入。重复选品规则为同 SKU 但单位、仓库、销售模式或价格不同允许分行，完全相同业务维度自动合并数量。库存类页面仍保持轻量弹窗商品选择，不启用交易业务行编辑。
 
 ## 仓库状态
 
 - 父仓库：当前有本交接文档改动待提交，另有既有未跟踪 `.codex`。
 - 后端 `apps/myapp`：当前工作区干净。
-- Web `frontend/myapp-web`：当前工作区干净，最新提交 `0fd376d fix: hide return refs when disabled`。
+- Web `frontend/myapp-web`：当前有销售 / 采购订单选品增强相关未提交改动，包含 `ProductSelect`、销售 / 采购订单新建和编辑页、订单 editor 工具、工具测试和 `WEB_DEVELOPMENT.zh-CN.md`。最新已提交基线为 `59a16f0 fix: harden sales document edit flow`。
 
 ## 已完成改动
 
@@ -575,9 +576,49 @@ git -C frontend/myapp-web diff --check
 http://localhost:8001
 ```
 
+销售 / 采购订单交易选品第一阶段本地验证（2026-07-05 00:00 CST）：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- src/utils/__tests__/sales-order-editor.test.ts src/utils/__tests__/purchase-order-editor.test.ts --runInBand
+npm test -- Sales/Orders/Detail.test.tsx --runInBand
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：Web TypeScript、Biome、销售和采购订单 editor 工具测试、销售订单详情回归测试、Web 和父仓库 diff 空白检查均通过。销售订单详情测试仍输出既有 jsdom `window.getComputedStyle` not implemented、AntD Timeline / Alert deprecated 警告和 Jest open handle 提示，但退出码为 0。
+
+销售 / 采购订单交易选品右侧常驻摘要优化验证（2026-07-05 CST）：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- src/utils/__tests__/sales-order-editor.test.ts src/utils/__tests__/purchase-order-editor.test.ts --runInBand
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：Web TypeScript、Biome、销售和采购订单 editor 工具测试、Web 和父仓库 diff 空白检查均通过。
+
+销售 / 采购订单交易选品信息密度与共享换算工具优化验证（2026-07-05 CST）：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- src/utils/__tests__/sales-order-editor.test.ts src/utils/__tests__/purchase-order-editor.test.ts src/utils/__tests__/myapp-display.test.tsx --runInBand
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：Web TypeScript、Biome、销售 / 采购订单 editor 工具测试、展示工具测试、Web 和父仓库 diff 空白检查均通过。Jest 仍提示既有 open handle，但退出码为 0。
+
 ## 未完成事项
 
-- 父仓库、后端和 Web 当前仅剩本地提交尚未推送到远端。
+- 当前销售 / 采购订单交易选品第一阶段尚未提交；Web 有未提交改动，父仓库有本交接文档改动。
 - `.codex` 是既有未跟踪目录，不处理。
 - 库存批量盘点直接提交式工作流已接入；盘点草稿、复核确认、作废 / 取消和审计生命周期仍未接入，当前阶段暂不继续深挖。
 - 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
@@ -586,6 +627,6 @@ http://localhost:8001
 
 ## 下一步建议
 
-1. 如需交付远端，分别推送父仓库、后端 `apps/myapp` 和 Web `frontend/myapp-web` 的本地提交。
-2. 下一步回到核心业务：优先做采购收货 / 开票 / 付款链路对齐，或移动作业端扫码收货 / 发货 / 打印预览。
-3. 待处理确认后续可扩展工作流 action、更多单据类型和真实浏览器联调。
+1. 如用户要求提交，先在 `frontend/myapp-web` 提交当前交易选品增强，再按需提交父仓库 handoff 改动；不要提交既有 `.codex`。
+2. 可继续补真实浏览器回归：销售 / 采购新建和编辑页打开右侧交易选品 Drawer，确认自动加载、加入后不关闭、订单明细即时更新、业务维度调整、批量暂存、已选明细抽屉和重复业务行合并。
+3. 下一步可做条码输入回车快速加入及异常提示：唯一命中直接加入、多结果保留确认、被筛选隐藏提示查看全部、未命中引导新建商品。
