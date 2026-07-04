@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-03 14:22 CST
+更新时间：2026-07-04 00:10 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -21,12 +21,13 @@
 - 销售收款 / 退货退款联调修复已提交：Web 收款弹窗改为受控 Modal，修复发票未结金额循环请求；销售文案统一为“登记客户收款 / 取消原客户收款”；后端修复销售退货发票正式退款 `Payment Entry` 引用行金额符号。
 - 销售订单详情退货聚合修复已提交：后端 `get_sales_order_detail.references.sales_invoices` 排除 `is_return=1` 的退货发票，时间线不再把退货发票重复显示为“销售开票”。
 - 当前正在完善销售收款 / 退货退款 / 取消收款冲突链路：后端已按退货净额口径限制继续收款和可退金额，取消原客户收款会在存在有效客户退款时拦截；Web 端暂停直接发起销售退货入口，保留历史退货发票查看、退款核对和按客户退款单 -> 退货发票 -> 原收款 -> 来源发票 -> 发货单顺序回退。
+- Web 销售退货 / 退款入口隐藏、已收款订单回退安全确认、通用 `Payment Entry` 作废入口和销售订单详情“一键开单”已完成并提交：订单 / 发货单 / 发票详情不再渲染新建退货 / 退款核对按钮，`/sales/returns/new` 保留暂停页；销售订单“回退并修改订单”只要检测到客户收款，就在回退弹框展示收款列表和“取消收款”入口；一笔收款可手动取消或二次确认后一键同步取消，多笔收款要求逐笔取消；`/payments/:name` 支持从收付款详情作废 `Payment Entry`；订单详情“一键开单”会确认后按状态串行创建发货单和发票，库存不足需二次确认强制发货并开票。Web 已提交：`3e9ad38 feat: harden sales rollback workflows`。
 
 ## 仓库状态
 
-- 父仓库：当前显示 `apps/myapp` 子模块有未提交改动，另有既有未跟踪 `.codex` 和本交接文档改动。
-- 后端 `apps/myapp`：未提交改动包括 `API_GATEWAY.zh-CN.md`、`myapp/services/order_service.py`、`myapp/services/settlement_service.py`、`myapp/tests/unit/test_order_service.py`、`myapp/tests/unit/test_settlement_service.py`。
-- Web `frontend/myapp-web`：未提交改动包括 `WEB_DEVELOPMENT.zh-CN.md`、`src/components/DownstreamRollbackGuide.tsx`、销售订单 / 发货单 / 发票 / 退货 / 退款页面和 `src/services/myapp/sales.ts`。
+- 父仓库：当前有本交接文档改动待提交，另有既有未跟踪 `.codex`。
+- 后端 `apps/myapp`：当前工作区干净。
+- Web `frontend/myapp-web`：当前工作区干净，最新提交 `3e9ad38 feat: harden sales rollback workflows`。
 
 ## 已完成改动
 
@@ -205,6 +206,18 @@ docker restart frappe_docker-backend-1
 
 结果：后端 192 个单元测试通过；Web 类型检查和 Biome lint 通过；订单详情 Jest 3 个用例通过，但仍输出既有 jsdom `window.getComputedStyle` not implemented 噪声和 open handle 提示；空白检查通过；backend 容器已重启。
 
+Web 销售订单详情一键开单验证（2026-07-04 00:08 CST）：
+
+```bash
+cd frontend/myapp-web && npm test -- Sales/Orders/Detail.test.tsx --runInBand
+cd frontend/myapp-web && npm run tsc
+cd frontend/myapp-web && npm run biome:lint
+cd frontend/myapp-web && git diff --check
+git diff --check
+```
+
+结果：订单详情 Jest 7 个用例通过；新增用例覆盖“一键开单”确认后先调用发货再调用开票；类型检查、Biome lint 和空白检查通过。Jest 仍输出既有 jsdom `window.getComputedStyle` not implemented、AntD Timeline / Alert 弃用告警和 open handle 提示。
+
 HTTP 仿真补充验证（2026-07-03 14:25 CST）：
 
 ```bash
@@ -217,6 +230,67 @@ MYAPP_HTTP_ENABLE_CHAIN_TESTS=1 MYAPP_HTTP_ENV_FILE=apps/myapp/.env.http-test py
   apps.myapp.myapp.tests.http.test_gateway_http.GatewayHttpTestCase.test_process_sales_return_after_paid_invoice_requires_followup_refund \
   apps.myapp.myapp.tests.http.test_gateway_http.GatewayHttpTestCase.test_process_sales_return_idempotent_replay
 ```
+
+Web 销售退货 / 退款入口隐藏验证（2026-07-03 14:49 CST）：
+
+```bash
+cd frontend/myapp-web && npm run tsc
+cd frontend/myapp-web && npm run biome:lint
+cd frontend/myapp-web && npm test -- Sales/Orders/Detail.test.tsx --runInBand
+git -C frontend/myapp-web diff --check
+```
+
+结果：类型检查、Biome lint、订单详情 Jest 4 个用例和 Web 空白检查通过；Jest 仍输出既有 jsdom `window.getComputedStyle` not implemented、AntD Timeline `items.children` 弃用告警和 open handle 提示。
+
+Web 已收款订单回退二次确认验证（2026-07-03 15:04 CST）：
+
+```bash
+cd frontend/myapp-web && npm run tsc
+cd frontend/myapp-web && npm run biome:lint
+cd frontend/myapp-web && npm test -- Sales/Orders/Detail.test.tsx --runInBand
+cd frontend/myapp-web && npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand
+git -C frontend/myapp-web diff --check
+```
+
+结果：类型检查、Biome lint、订单详情 Jest 5 个用例、domain service Jest 52 个用例和 Web 空白检查通过；Jest 仍输出既有 jsdom `window.getComputedStyle` not implemented、AntD Timeline / Alert 弃用告警和 open handle 提示。
+
+Web 多笔收款回退弹框内逐笔取消验证（2026-07-03 15:36 CST）：
+
+```bash
+cd frontend/myapp-web && npm run tsc
+cd frontend/myapp-web && npm run biome:lint
+cd frontend/myapp-web && npm test -- Sales/Orders/Detail.test.tsx --runInBand
+cd frontend/myapp-web && npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand
+git -C frontend/myapp-web diff --check
+```
+
+结果：类型检查、Biome lint、订单详情 Jest 6 个用例、domain service Jest 52 个用例和 Web 空白检查通过；Jest 仍输出既有 jsdom `window.getComputedStyle` not implemented、AntD Timeline / Alert 弃用告警和 open handle 提示。
+
+Web 回退弹框一笔 / 多笔收款统一列表验证（2026-07-03 18:45 CST）：
+
+```bash
+cd frontend/myapp-web && npm run tsc
+cd frontend/myapp-web && npm run biome:lint
+cd frontend/myapp-web && npm test -- Sales/Orders/Detail.test.tsx --runInBand
+cd frontend/myapp-web && npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：类型检查、Biome lint、订单详情 Jest 6 个用例、domain service Jest 52 个用例、Web 空白检查和父仓库空白检查通过。订单详情 Jest 首次与其他命令并发运行时曾因 Umi `src/.umi-test/exports` 尚未就绪失败，重跑通过；Jest 仍输出既有 jsdom `window.getComputedStyle` not implemented、AntD Timeline / Alert 弃用告警和 open handle 提示。
+
+Web 收付款详情页通用作废入口验证（2026-07-03 19:25 CST）：
+
+```bash
+cd frontend/myapp-web && npm run tsc
+cd frontend/myapp-web && npm run biome:lint
+cd frontend/myapp-web && npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand
+cd frontend/myapp-web && npm test -- Sales/Orders/Detail.test.tsx --runInBand
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：类型检查、Biome lint、domain service Jest 53 个用例、订单详情 Jest 6 个用例、Web 空白检查和父仓库空白检查通过；Jest 仍输出既有 jsdom `window.getComputedStyle` not implemented、AntD Timeline / Alert 弃用告警和 open handle 提示。
 
 结果：7 个既有 HTTP 链路用例通过。另用临时 Python HTTP 仿真脚本验证：
 
