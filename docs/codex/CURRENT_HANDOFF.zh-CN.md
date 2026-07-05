@@ -26,6 +26,7 @@
 - Web 销售发票作废单笔收款快捷处理已补齐并提交：发票详情作废弹框现在与订单回退一致，一笔客户收款时允许在额外二次确认后同步取消收款并作废发票，多笔客户收款仍要求逐笔取消后再作废发票。Web 已提交：`5d53a6c fix: allow single-payment invoice void`。二次确认已从静态 `Modal.confirm` 改为受控 Modal，避免点击“取消收款并作废发票”看起来没反应；所有按钮文案统一使用“取消收款”，不再出现“作废收款”。Web 已提交：`a9f3c88 fix: show invoice void payment confirmation`。
 - Web 销售发票详情顶部“返回销售订单”已修正为优先返回当前发票所属销售订单详情，没有来源订单时才回销售订单列表。Web 已提交：`7e41e0c fix: link invoice back to source order`。
 - Web 销售 / 采购订单交易选品第一阶段已在本地未提交状态落地：共用 `ProductSelect` 在销售 / 采购上下文中使用右侧交易选品 Drawer，打开后自动加载商品列表，点击加入后保持面板打开并让订单明细即时反馈。列表固定商品列和操作列，默认展示系统带入的选品参数摘要，需要时通过“调整”抽屉修改单位 / 仓库 / 价格 / 销售模式 / 本次数量；右侧常驻展示“本单已加入”和“本次暂存”，本单已加入解释订单当前业务行，本次暂存支持批量勾选后改数量、移除和统一加入。最新优化已去掉搜索区重复的“商品”输入，只保留“关键词”统一搜索名称 / 编码 / 条码；右侧列表取消过小固定高度，业务行改为展示数量 + 单位、库存单位约算、金额、仓库、模式和单价；打开交易选品 Drawer 时通过 ProTable `actionRef.reloadAndRest()` 主动拉取第一页，避免进入选择页后没有自动搜索数据。销售 / 采购新建和编辑页已通过结构化 `onSelectLines` 接入。重复选品规则为同 SKU 但单位、仓库、销售模式或价格不同允许分行，完全相同业务维度自动合并数量。库存类页面仍保持轻量弹窗商品选择，不启用交易业务行编辑。
+- 当前正在修复交易选品自动加载空结果问题：对照 mobile 采购选品实现后，Web 已采用同样策略：空关键词自动加载走 `list_products_v2` 获取候选列表，再按 `item_context` 在前端兜底过滤可销售 / 可采购商品；有关键词或分类 / 品牌筛选时继续走 `search_product_v2`。Web `searchProducts` 已显式保留空 `search_key: ''`，避免旧后端或网关 wrapper 必填参数缺失；后端 `search_product_v2` wrapper 已把 `search_key` 默认值改为空字符串，服务层也支持空关键词按上下文返回候选商品第一页。Web 交易选品搜索区新增“库存仓库”筛选，默认订单当前仓库，可清空查看全部仓库；该筛选只影响库存查看、库存过滤和候选范围，不决定最终明细行仓库。库存范围已改为“全部商品 / 仅有库存”下拉，避免搜索表单内开关难点击。后端 `API_GATEWAY.zh-CN.md`、`WHOLESALE_TECH_DESIGN.zh-CN.md` 和 Web `WEB_DEVELOPMENT.zh-CN.md` 已同步接口语义。该修复当前未提交。
 
 ## 仓库状态
 
@@ -615,6 +616,26 @@ git diff --check
 ```
 
 结果：Web TypeScript、Biome、销售 / 采购订单 editor 工具测试、展示工具测试、Web 和父仓库 diff 空白检查均通过。Jest 仍提示既有 open handle，但退出码为 0。
+
+交易选品空关键词自动加载修复验证（2026-07-05 CST）：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_wholesale_service apps.myapp.myapp.tests.unit.test_gateway_wrappers
+'
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand
+
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：后端 wholesale service 和 gateway wrappers 共 120 个测试通过；Web TypeScript、Biome、domain service 56 个测试通过；空白检查通过。Jest 仍提示既有 open handle，但退出码为 0。
 
 ## 未完成事项
 
