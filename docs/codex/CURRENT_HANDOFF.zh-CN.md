@@ -1,8 +1,58 @@
 # 当前交接状态
 
-更新时间：2026-07-05 00:00 CST
+更新时间：2026-07-06 06:35 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
+
+## 本轮工作总结
+
+本轮围绕销售订单主链路完成收口检查、数据整理、代码修复、验证和提交。当前销售模块主流程已可作为后续采购链路优化的稳定参照，通用选品、电话校验、UOM / 金额工具和回退指引组件可继续复用。
+
+### 已解决问题
+
+- 后端修复销售订单显式成交价被 ERPNext 价目表回填的问题，`price = 0` 现在是有效价格；销售订单、发货单、销售发票一键链路均保持显式 0 价。
+- 后端 `get_customer_sales_context` 的默认地址序列化增加 fallback：站点没有 `Address.address_display` 字段时，会用地址行拼出可显示地址，保证 Web 选择客户后能自动带出地址。
+- 后端补充销售开票 / 收款 / 取消收款 / 取消发票 / 取消订单生命周期集成测试，验证订单状态聚合和回退链路。
+- Web 销售订单详情页、收款表单和回退指引清理 Ant Design 旧 API：`Timeline items.children` 改为 `items.content`，`Alert message` 改为 `title`，减少控制台和 Jest 噪音。
+- 开发库客户主数据已整理：删除无交易引用的空测试客户，保留并补全有效 Demo 客户的联系人、联系电话、邮箱和收货地址；当前 14 个启用客户均有主联系人和主地址。
+- 复核确认 `ProductSelect`、`RemoteLinkSelect`、`phone-validation`、UOM / 金额工具和回退指引均可作为采购链路优化时的通用基础；采购特有逻辑应继续放在采购 domain/service 层。
+
+### 关键改动文件
+
+- 后端销售与生命周期：
+  - `apps/myapp/myapp/services/order_service.py`
+  - `apps/myapp/myapp/tests/integration/test_sales_billing_payment_lifecycle.py`
+  - `apps/myapp/myapp/tests/integration/test_sales_uom_stock_chain.py`
+  - `apps/myapp/myapp/tests/unit/test_order_service.py`
+  - `apps/myapp/myapp/tests/http/test_gateway_http.py`
+  - `apps/myapp/myapp/tests/http/test_gateway_v2_http.py`
+  - `apps/myapp/API_GATEWAY.zh-CN.md`
+- Web 销售详情兼容清理：
+  - `frontend/myapp-web/src/pages/Sales/Orders/Detail.tsx`
+  - `frontend/myapp-web/src/components/DownstreamRollbackGuide.tsx`
+  - `frontend/myapp-web/src/components/InvoicePaymentForm.tsx`
+
+### 已验证命令
+
+- 后端已运行销售订单服务、HTTP gateway、销售 UOM 库存链路、销售开票 / 收款 / 取消生命周期测试和真实 0 价一键下单 / 发货 / 开票冒烟。
+- Web 已运行：
+  - `npm run tsc`
+  - `npm run biome:lint`
+  - `npm test -- src/services/myapp/__tests__/domain-services.test.ts src/utils/__tests__/sales-order-editor.test.ts src/utils/__tests__/phone-validation.test.ts --runInBand`
+  - `npm test -- src/pages/Sales/Orders/Detail.test.tsx --runInBand`
+- 空白检查已运行：
+  - `git -C apps/myapp diff --check`
+  - `git -C frontend/myapp-web diff --check`
+  - `git diff --check`
+
+### 当前注意事项
+
+- 后端已提交：`cc64198 fix: preserve explicit sales prices`。
+- Web 已提交：`6eb6494 fix: clean sales detail warnings`。
+- Web 销售订单电话校验 / 客户选择自动填充已在前一提交完成：`f7625da fix: validate sales order contact phone`。
+- Web 商品选择器增强已在前一提交完成：`e74ac07 feat: enhance order product picker`。
+- `.codex` 是既有未跟踪本地目录，不应提交。
+- Web Jest 详情页测试仍输出 jsdom `window.getComputedStyle` not implemented 和既有 open handle 提示，但测试退出码为 0；AntD 旧 API 告警已清理。
 
 ## 当前目标
 
@@ -25,14 +75,15 @@
 - Web 销售订单详情关联单据已补充跟随退货退款 feature flag：退货退款入口暂停时，订单右侧关联单据不再展示“退货发票”和“退款单”两项，只保留发货单、销售发票和收款单；目标测试已覆盖隐藏行为。Web 已提交：`0fd376d fix: hide return refs when disabled`。
 - Web 销售发票作废单笔收款快捷处理已补齐并提交：发票详情作废弹框现在与订单回退一致，一笔客户收款时允许在额外二次确认后同步取消收款并作废发票，多笔客户收款仍要求逐笔取消后再作废发票。Web 已提交：`5d53a6c fix: allow single-payment invoice void`。二次确认已从静态 `Modal.confirm` 改为受控 Modal，避免点击“取消收款并作废发票”看起来没反应；所有按钮文案统一使用“取消收款”，不再出现“作废收款”。Web 已提交：`a9f3c88 fix: show invoice void payment confirmation`。
 - Web 销售发票详情顶部“返回销售订单”已修正为优先返回当前发票所属销售订单详情，没有来源订单时才回销售订单列表。Web 已提交：`7e41e0c fix: link invoice back to source order`。
-- Web 销售 / 采购订单交易选品第一阶段已在本地未提交状态落地：共用 `ProductSelect` 在销售 / 采购上下文中使用右侧交易选品 Drawer，打开后自动加载商品列表，点击加入后保持面板打开并让订单明细即时反馈。列表固定商品列和操作列，默认展示系统带入的选品参数摘要，需要时通过“调整”抽屉修改单位 / 仓库 / 价格 / 销售模式 / 本次数量；右侧常驻展示“本单已加入”和“本次暂存”，本单已加入解释订单当前业务行，本次暂存支持批量勾选后改数量、移除和统一加入。最新优化已去掉搜索区重复的“商品”输入，只保留“关键词”统一搜索名称 / 编码 / 条码；右侧列表取消过小固定高度，业务行改为展示数量 + 单位、库存单位约算、金额、仓库、模式和单价；打开交易选品 Drawer 时通过 ProTable `actionRef.reloadAndRest()` 主动拉取第一页，避免进入选择页后没有自动搜索数据。销售 / 采购新建和编辑页已通过结构化 `onSelectLines` 接入。重复选品规则为同 SKU 但单位、仓库、销售模式或价格不同允许分行，完全相同业务维度自动合并数量。库存类页面仍保持轻量弹窗商品选择，不启用交易业务行编辑。
-- 当前正在修复交易选品自动加载空结果问题：对照 mobile 采购选品实现后，Web 已采用同样策略：空关键词自动加载走 `list_products_v2` 获取候选列表，再按 `item_context` 在前端兜底过滤可销售 / 可采购商品；有关键词或分类 / 品牌筛选时继续走 `search_product_v2`。Web `searchProducts` 已显式保留空 `search_key: ''`，避免旧后端或网关 wrapper 必填参数缺失；后端 `search_product_v2` wrapper 已把 `search_key` 默认值改为空字符串，服务层也支持空关键词按上下文返回候选商品第一页。Web 交易选品搜索区新增“库存仓库”筛选，默认订单当前仓库，可清空查看全部仓库；该筛选只影响库存查看、库存过滤和候选范围，不决定最终明细行仓库。库存范围已改为“全部商品 / 仅有库存”下拉，避免搜索表单内开关难点击。后端 `API_GATEWAY.zh-CN.md`、`WHOLESALE_TECH_DESIGN.zh-CN.md` 和 Web `WEB_DEVELOPMENT.zh-CN.md` 已同步接口语义。该修复当前未提交。
+- Web 销售 / 采购订单交易选品核心增强已提交：Web `de4a40a feat: enhance order product picker` 完成右侧交易选品 Drawer、加入后不关闭、结构化 `onSelectLines`、重复业务行合并规则和销售 / 采购新建编辑页接入；Web `9a6fdc8 fix: load order picker candidates` 和后端 `8e6539b fix: support empty product search` 完成空关键词候选加载、`search_key` 默认空字符串、库存仓库筛选、库存范围下拉和相关接口文档；父仓库 `da1037fc chore: record order picker search fixes` 已记录后端子模块指针和交接。
+- 销售订单 0 价格修复、销售生命周期测试、客户地址 fallback 和 API 文档已提交到后端：`cc64198 fix: preserve explicit sales prices`。Web 销售详情兼容清理已提交：`6eb6494 fix: clean sales detail warnings`。Web 客户自动填充 / 电话校验已提交：`f7625da fix: validate sales order contact phone`。Web 商品选择器增强已提交：`e74ac07 feat: enhance order product picker`。
 
 ## 仓库状态
 
-- 父仓库：当前有本交接文档改动待提交，另有既有未跟踪 `.codex`。
-- 后端 `apps/myapp`：当前工作区干净。
-- Web `frontend/myapp-web`：当前有销售 / 采购订单选品增强相关未提交改动，包含 `ProductSelect`、销售 / 采购订单新建和编辑页、订单 editor 工具、工具测试和 `WEB_DEVELOPMENT.zh-CN.md`。最新已提交基线为 `59a16f0 fix: harden sales document edit flow`。
+- 父仓库：当前只需提交本交接文档和 `apps/myapp` 子模块指针；另有既有未跟踪 `.codex`，不应提交。
+- 后端 `apps/myapp`：当前工作区干净，最新提交 `cc64198 fix: preserve explicit sales prices`。
+- Web `frontend/myapp-web`：当前工作区干净，最新提交 `6eb6494 fix: clean sales detail warnings`。
+- Mobile `frontend/myapp-mobile`：当前未参与本轮提交，未发现需要提交的移动端改动。
 
 ## 已完成改动
 
@@ -637,9 +688,83 @@ git diff --check
 
 结果：后端 wholesale service 和 gateway wrappers 共 120 个测试通过；Web TypeScript、Biome、domain service 56 个测试通过；空白检查通过。Jest 仍提示既有 open handle，但退出码为 0。
 
+交易选品去暂存化验证（2026-07-05 CST）：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand
+
+git -C frontend/myapp-web diff --check
+git diff --check
+```
+
+结果：Web TypeScript、Biome、domain service 56 个测试通过；Web 和父仓库 diff 空白检查通过。Jest 仍提示既有 open handle，但退出码为 0。
+
+快捷新增商品 UOM payload 修复验证（2026-07-05 CST）：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-mobile
+npm run lint
+
+git -C frontend/myapp-web diff --check
+git -C frontend/myapp-mobile diff --check
+git -C apps/myapp diff --check
+```
+
+结果：Web TypeScript、Biome、domain service 56 个测试通过；Mobile Expo lint 通过；Web、Mobile 和后端 diff 空白检查通过。Web Jest 仍提示既有 open handle，但退出码为 0；Mobile lint 输出 Node `UNDICI-EHPA` 实验性 warning，不影响退出码。
+
+商品选择器名称 / 昵称 / 备注显示语义修复验证（2026-07-05 CST）：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand
+git -C frontend/myapp-web diff --check
+```
+
+结果：Web TypeScript、Biome、domain service 56 个测试通过；Web diff 空白检查通过。Jest 仍提示既有 open handle，但退出码为 0。
+
+销售参考价缺失批发价回退修复验证（2026-07-05 CST）：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- src/utils/__tests__/sales-order-editor.test.ts src/services/myapp/__tests__/domain-services.test.ts --runInBand
+git -C frontend/myapp-web diff --check
+```
+
+结果：Web TypeScript、Biome、sales-order-editor 和 domain service 共 62 个测试通过；Web diff 空白检查通过。
+
+Web 商品选择器默认单位共享 UOM 工具与 Mobile 价格逻辑对齐验证（2026-07-06 CST）：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- src/utils/__tests__/sales-order-editor.test.ts --runInBand
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-mobile
+npm run lint
+
+git -C frontend/myapp-web diff --check
+git -C frontend/myapp-mobile diff --check
+git diff --check
+```
+
+结果：Web TypeScript、Biome、sales-order-editor 7 个测试通过；Mobile Expo lint 通过；Web、Mobile 和父仓库 diff 空白检查通过。Mobile lint 仍输出 Node `UNDICI-EHPA` 实验性 warning，不影响退出码。
+
 ## 未完成事项
 
-- 当前销售 / 采购订单交易选品第一阶段尚未提交；Web 有未提交改动，父仓库有本交接文档改动。
+- 销售模块主流程当前无已知重大阻塞；本轮仅剩父仓库交接文档和后端子模块指针待提交。
 - `.codex` 是既有未跟踪目录，不处理。
 - 库存批量盘点直接提交式工作流已接入；盘点草稿、复核确认、作废 / 取消和审计生命周期仍未接入，当前阶段暂不继续深挖。
 - 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
@@ -648,6 +773,6 @@ git diff --check
 
 ## 下一步建议
 
-1. 如用户要求提交，先在 `frontend/myapp-web` 提交当前交易选品增强，再按需提交父仓库 handoff 改动；不要提交既有 `.codex`。
-2. 可继续补真实浏览器回归：销售 / 采购新建和编辑页打开右侧交易选品 Drawer，确认自动加载、加入后不关闭、订单明细即时更新、业务维度调整、批量暂存、已选明细抽屉和重复业务行合并。
+1. 后续优化采购链路时，优先复用 `ProductSelect`、`RemoteLinkSelect`、`phone-validation`、UOM / 金额工具、`InvoicePaymentForm` 和回退指引组件；采购供应商上下文、默认价格 / 单位、收货开票付款状态仍放在采购 domain/service 层。
+2. 可继续补真实浏览器回归：销售 / 采购新建和编辑页打开右侧交易选品 Drawer，确认没有暂存 / 勾选中间态，点击加入后不关闭且订单明细即时更新，业务维度调整后直接加入，右侧本单已加入展示和重复业务行合并正常。
 3. 下一步可做条码输入回车快速加入及异常提示：唯一命中直接加入、多结果保留确认、被筛选隐藏提示查看全部、未命中引导新建商品。
