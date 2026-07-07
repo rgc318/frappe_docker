@@ -1,10 +1,64 @@
 # 当前交接状态
 
-更新时间：2026-07-06 06:35 CST
+更新时间：2026-07-07 09:57 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-06 采购模块对齐销售模块起步
+
+本轮开始参考销售订单详情完善采购订单详情，优先补齐采购付款、业务时间线与下游回退的安全交互。
+
+- Web `frontend/myapp-web` 当前有未提交改动：
+  - `src/pages/Purchase/Orders/Detail.tsx`
+  - `src/pages/Purchase/Invoices/Detail.tsx`
+  - `src/pages/Purchase/Receipts/Detail.tsx`
+  - `src/pages/Purchase/Receipts/Detail.test.tsx`
+  - `src/services/myapp/purchase.ts`
+  - `src/services/myapp/__tests__/domain-services.test.ts`
+- 后端 `apps/myapp` 当前有未提交改动：
+  - `myapp/services/purchase_service.py`
+  - `API_GATEWAY.zh-CN.md`
+- 已完成内容：
+  - 后端 `get_purchase_order_detail_v2` 新增 `payment.entries[]` 和 `timeline[]`，覆盖采购订单、采购收货单、采购发票、采购退货、供应商付款和供应商退款事件。
+  - 采购订单详情页把“记录付款”改为受控 Modal，复用 `InvoicePaymentForm`，避免 `Modal.confirm` 内部临时变量状态不透明。
+  - 采购订单详情页新增订单进度、业务时间线、供应商付款 / 采购退货 / 供应商退款关联展示。
+  - 采购订单详情页把“快捷回退下游”改为受控 Modal；支持展示多笔供应商付款、逐笔取消付款，并在同步取消单笔付款回退前增加二次确认。
+  - 采购订单详情页布局已对齐销售订单详情页：顶部摘要、金额概览、左侧订单进度 / 业务时间线 / 商品明细、右侧采购动作 / 基本信息 / 关联单据 / 供应商信息；采购动作里的“快捷回退下游”文案同步改为“回退并修改订单”。
+  - 采购订单商品明细表对齐销售订单详情页样式，改为“商品信息”复合列，并展示数量、已收数量、待收数量、单位、单价和金额。
+  - 采购订单列表页对齐销售订单列表页入口体验：新增状态视图 Tabs、同款统计卡、供应商筛选、表格空态引导、状态视图标签、批量选择、复制订单号、导出当前筛选和导出选中 CSV。
+  - 采购订单关联单据区新增供应商付款、采购退货和供应商退款链接，付款单指向通用 `/payments/:name` 详情。
+  - Web purchase service 映射 `references.latest_payment_entry` 为 `latestPaymentEntry`，并新增采购订单 `paymentEntries` / `timeline` 映射。
+  - 采购发票详情后端新增 `payment.entries[]` 供应商付款历史；Web 采购发票详情新增付款历史表、受控付款弹窗、选择取消具体付款、作废发票前多笔付款清理、单笔付款同步取消并作废发票。
+  - 采购发票详情页改用 `App.useApp()` 获取 AntD message，避免受控弹窗操作中触发静态 message context 告警。
+  - 采购收货单详情对齐销售发货单详情：返回来源采购订单详情、展示后续处理提示、已开票时引导先处理采购发票、取消收货单改为受控确认弹窗，并在确认中展示库存 / 收货回退影响和下游发票阻塞提示。
+  - Web purchase service 映射 `cancelPurchaseReceiptHint`，供收货单详情页展示后端下游保护原因。
+  - 采购订单编辑页新增前端禁用保护，与销售 `salesOrderEditDisabledReason` 对齐：已作废、未提交、已完成结清、已付款、已收货、已开票订单会在进入编辑表单前展示原因和返回入口，避免加载可编辑商品行后再被后端拒绝。
+  - Web purchase service 新增 `purchaseOrderEditDisabledReason`，并补充领域服务测试覆盖采购订单下游单据和结清后的直接编辑阻断。
+  - 补充采购订单编辑页页面测试，覆盖已收货 / 已开票订单打开编辑页时展示禁用原因、不渲染采购明细表格、也不拉取商品详情。
+  - 补充采购发票详情页页面测试，覆盖单笔供应商付款需二次确认后同步取消并作废发票、多笔供应商付款阻断作废、选择并取消具体供应商付款。
+  - 补充 domain service 测试覆盖采购订单详情最近付款 / 付款历史 / 时间线映射，以及采购发票详情付款历史映射。
+  - 补充采购收货单详情页面测试，覆盖取消确认、返回来源采购订单、下游采购发票阻塞提示。
+  - `API_GATEWAY.zh-CN.md` 已把采购快捷链路从“规划中”改为已实现，并补充采购订单详情、采购发票详情、采购收货单详情新增字段说明。
+  - 顺手将采购订单详情加载错误 `Alert message` 迁移为 `title`，避免新增 AntD 旧 API 告警。
+- 已验证：
+  - `npm run tsc`
+  - `npm run biome:lint`
+  - `npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand`
+  - `npm test -- src/pages/Purchase/Orders/Edit.test.tsx --runInBand`
+  - `npm test -- src/services/myapp/__tests__/domain-services.test.ts src/pages/Purchase/Orders/Edit.test.tsx --runInBand`
+  - `npm test -- src/services/myapp/__tests__/domain-services.test.ts src/pages/Purchase/Orders/Edit.test.tsx src/pages/Purchase/Invoices/Detail.test.tsx src/pages/Purchase/Receipts/Detail.test.tsx --runInBand`
+  - `npm test -- src/pages/Purchase/Invoices/Detail.test.tsx --runInBand`
+  - `npm test -- src/services/myapp/__tests__/domain-services.test.ts src/pages/Purchase/Orders/Edit.test.tsx src/pages/Purchase/Invoices/Detail.test.tsx --runInBand`
+  - `npm test -- src/pages/Purchase/Receipts/Detail.test.tsx --runInBand`
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_purchase_service'`
+  - `git -C apps/myapp diff --check`
+  - `git -C frontend/myapp-web diff --check`
+  - `git diff --check`
+- 注意事项：
+  - Jest 仍输出既有 open handle 提示；采购收货单详情页面测试还会输出 jsdom `window.getComputedStyle` not implemented 噪音，但退出码为 0。
+  - 下一步建议继续抽取销售 / 采购共享展示组件，优先处理 `docLinks`、`paymentEntryPath`、`toPercent`、`isCancelled`、订单详情商品表列、发票付款历史表列等重复逻辑。
 
 本轮围绕销售订单主链路完成收口检查、数据整理、代码修复、验证和提交。当前销售模块主流程已可作为后续采购链路优化的稳定参照，通用选品、电话校验、UOM / 金额工具和回退指引组件可继续复用。
 
