@@ -1,25 +1,66 @@
 # 当前交接状态
 
-更新时间：2026-07-07 09:57 CST
+更新时间：2026-07-08 18:05 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
 
+### 2026-07-08 销售 / 采购共享模块抽取提交总结
+
+本轮在采购模块已对齐销售模块主链路的基础上，开始做前端共享模块抽取。目标是保留销售 / 采购各自的领域判断、接口和动作编排，同时把对应模块中重复的展示结构、单据链接、导出和付款表列收敛为通用实现。
+
+- 当前抽取范围已提交，主要覆盖销售 / 采购订单列表、订单详情、发票详情，以及采购订单新建 / 编辑体验。
+- 本轮提交：
+  - 后端 `apps/myapp`：`e023370 feat: harden purchase warehouse workflows`
+  - Web `frontend/myapp-web`：`ed60444 feat: share order detail components`
+  - 父仓库：记录后端子模块指针和本交接文档。
+- 新增共享模块：
+  - `src/utils/business-document.tsx`：业务单据路径、付款单路径、取消状态判断、百分比、关联单据链接和时间线文档链接。
+  - `src/utils/csv-export.ts`：CSV / 文本下载工具。
+  - `src/components/BusinessOrderDetail.tsx`：订单金额概览、业务时间线、交易商品明细列、发票商品明细列。
+  - `src/components/BusinessPaymentTables.tsx`：付款 / 收款历史列、取消付款 / 收款操作列、采购发票关联列。
+  - `src/components/InvoicePaymentForm.tsx`：新增 `useInvoicePaymentModal`，统一收 / 付款弹窗的 draft、open、loading 和提交包裹状态。
+- 已接入页面：
+  - 销售 / 采购订单列表：导出逻辑改用通用 CSV / 文本下载工具。
+  - 销售 / 采购订单详情：金额概览、业务时间线、商品明细列、关联单据链接、付款回退表列和收 / 付款弹窗状态骨架改为共享实现。
+  - 销售 / 采购发票详情：商品明细列、收款 / 付款历史表、取消收付款表列和收 / 付款弹窗状态骨架改为共享实现；销售特有的差额核销、多收保留、参考号仍通过 extra columns 保留，采购特有的采购发票关联列也保留。
+- 当前 Web diff 覆盖销售 / 采购订单列表、订单详情、发票详情、付款表单组件和采购发票测试 mock；已从页面内删除大量重复 JSX / 列定义，保留页面自己的业务状态机、接口调用和弹窗文案。
+- 采购订单新建 / 编辑专用明细表没有改成详情通用组件，但已补齐图片展示能力：`PurchaseOrderEditorLine.imageUrl` 从商品数据透传，采购订单详情行也映射后端图片字段作为 fallback，`PurchaseOrderLinesTable` 的实际编辑行显示缩略图；分组标题保持摘要样式，避免重复图片挤压信息密度；分仓快捷按钮会过滤 `All Warehouses` 汇总仓。
+- 采购订单 / 收货 / 发票详情页图片缺失根因在后端采购行序列化未返回 `Item.image`；已在 `apps/myapp` 为 `_serialize_purchase_order_items`、`_serialize_purchase_receipt_items`、`_serialize_purchase_invoice_items` 补充 `image` 字段，并更新 `API_GATEWAY.zh-CN.md` 和采购 service 单测。Web `purchase.ts` 已将 `image` / `image_url` / `item_image` 映射为 `imageUrl`，详情页共享商品列会直接显示图片。
+- 采购订单详情“创建采购发票”误导问题已修复：后端新增采购订单 billing 汇总和行级 `billed_qty` / `pending_billing_qty`，`actions.can_create_purchase_invoice` 改按待开票数量判断，不再按付款状态判断；Web 开票弹窗改用“已开票 / 待开票”口径。已用实际订单 `PUR-ORD-2026-01846-1` 验证当前代码返回 `can_create_purchase_invoice=False`，三行 `pending_billing_qty=0`。
+- 采购退货 / 供应商退款入口已按销售模块同样策略暂停：新增 `PURCHASE_RETURN_REFUND_ENTRY_ENABLED=false`；采购订单详情隐藏“发起退货 / 退款核对”和关联单据中的采购退货 / 供应商退款；采购收货单 / 采购发票详情隐藏“采购退货”；直接访问 `/purchase/returns/new` 和 `/purchase/refunds/review` 会显示暂停页。后端能力和历史页面代码未删除，后续可通过 feature flag 恢复。
+- 采购订单详情已新增类似销售订单详情的“一键开单”入口：确认后按整单快捷链路执行，未收货时先调用 `receivePurchaseOrder` 创建采购收货单，再基于返回的收货单调用 `createPurchaseInvoiceFromReceipt` 创建采购发票；已无需收货但仍可开票时直接调用 `createPurchaseOrderInvoice`。若收货接口未返回收货单号，会停止继续开票，避免采购侧绕过实际收货单口径。新增 `src/pages/Purchase/Orders/Detail.test.tsx` 覆盖“确认收货并开票”的调用顺序。
+- 采购订单详情供应商地址和备注问题已定位并修复：
+  - 地址问题是后端 `Purchase Order.address_display` 为 HTML 片段，例如 `更新地址 88 号<br>\n杭州<br>\nChina...`，Web 之前直接当纯文本显示。`purchase.ts` 已新增 `normalizeDocumentText`，采购订单详情优先用结构化地址字段 `address_line1/city/country/...` 拼纯文本，供应商上下文默认地址也会清理 HTML。
+  - 备注问题不是详情页读取错字段，而是当前站点原生 `Purchase Order` 没有 `remarks` 字段，旧单 `PUR-ORD-2026-01846-2` 的备注实际没有落库。后端已新增 patch `myapp.patches.add_purchase_order_remark_field`，给 `Purchase Order` 创建 `custom_order_remark`，采购订单创建 / 更新 / 详情统一优先使用该字段；已在 `localhost` 执行 `bench --site localhost migrate`，确认字段存在。旧订单无法自动恢复之前未保存的备注。
+- 采购订单新建 / 编辑页底部操作区已对齐销售订单页面：从普通 `ProCard` 改为 Ant Design Pro `FooterToolbar` 固定底栏，使用同款 `footerContentStyle` / `footerSummaryStyle` / `footerActionsStyle`，展示行数、数量、总金额并保留保存 / 快捷采购 / 取消操作。
+- 采购订单新建 / 编辑页新增“默认取值模式”，默认批发；该字段只影响前端选品时默认取商品批发 / 零售档案单位，不提交后端、不成为采购单持久字段，采购价仍按采购参考价 / 标准采购价取值。采购明细数量输入已对齐销售页，不再把整数强制显示为 `1.000`。
+- 交易仓库下拉已统一排除父级 / 汇总仓：采购 / 销售订单新建与编辑的默认仓库、采购 / 销售明细行仓库、商品选择器库存仓库筛选和建品入库仓库均加上 `disabled=0`、`is_group=0` 过滤。当前开发库中 `All Warehouses - RD` 是 `is_group=1`，会被隐藏；`Work In Progress - RD`、`Stores - RD`、`Finished Goods - RD` 是可交易叶子仓，不会被隐藏。
+- 后端交易仓库强校验已补齐：新增 `myapp.utils.warehouse.validate_transaction_warehouse` / `get_transaction_warehouse_context`，统一校验仓库存在、未停用、`is_group=0`、绑定公司；销售订单、采购订单、库存转仓、单品盘点和批量盘点写接口均接入该校验。父级 / 汇总仓不再只靠前端隐藏，即使绕过前端直接调 API 也会被拦截。新增 `apps/myapp/myapp/tests/unit/test_warehouse_utils.py` 覆盖父级仓、禁用仓和跨公司仓拒绝。
+- 已完成一轮销售 / 采购逻辑回归检查：销售侧改动仅接入共享列、链接、时间线、金额概览和收款弹窗状态骨架，`recordSalesOrderPayment`、销售回退 / 作废 / 退货退款 feature flag 等业务编排保持页面内原逻辑；付款操作列补强为空 `paymentEntry` 一律禁用。
+- 已验证 `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_warehouse_utils apps.myapp.myapp.tests.unit.test_inventory_service apps.myapp.myapp.tests.unit.test_purchase_service apps.myapp.myapp.tests.unit.test_order_service'`、`npm run tsc`、`npm run biome:lint`、`npm test -- src/services/myapp/__tests__/domain-services.test.ts src/pages/Purchase/Orders/Edit.test.tsx src/pages/Purchase/Orders/Detail.test.tsx src/utils/__tests__/purchase-order-editor.test.ts --runInBand`、后端 / Web / 父仓库 diff 空白检查均通过。Jest 仍有既有 open handle 提示。
+- 下一步建议先做一次人工 UI 回看。若继续抽取，只建议小步处理订单动作区布局壳或多笔 / 单笔付款处理提示块，不建议强抽销售 / 采购状态机和 API 编排。
+
 ### 2026-07-06 采购模块对齐销售模块起步
 
 本轮开始参考销售订单详情完善采购订单详情，优先补齐采购付款、业务时间线与下游回退的安全交互。
 
-- Web `frontend/myapp-web` 当前有未提交改动：
+- 上一批采购模块对齐已提交：
+  - 后端 `apps/myapp`：`29d17a7 feat: enrich purchase order workflows`
+  - Web `frontend/myapp-web`：`327fb26 feat: align purchase workflows with sales`
+  - 父仓库：`84138ca9 chore: record purchase workflow updates`
+- 当前新一轮通用模块抽取有未提交 Web 改动：
+  - `src/components/BusinessOrderDetail.tsx`
+  - `src/components/BusinessPaymentTables.tsx`
+  - `src/utils/business-document.tsx`
+  - `src/utils/csv-export.ts`
+  - `src/pages/Sales/Orders/Detail.tsx`
   - `src/pages/Purchase/Orders/Detail.tsx`
+  - `src/pages/Sales/Invoices/Detail.tsx`
   - `src/pages/Purchase/Invoices/Detail.tsx`
-  - `src/pages/Purchase/Receipts/Detail.tsx`
-  - `src/pages/Purchase/Receipts/Detail.test.tsx`
-  - `src/services/myapp/purchase.ts`
-  - `src/services/myapp/__tests__/domain-services.test.ts`
-- 后端 `apps/myapp` 当前有未提交改动：
-  - `myapp/services/purchase_service.py`
-  - `API_GATEWAY.zh-CN.md`
+  - `src/pages/Sales/Orders/index.tsx`
+  - `src/pages/Purchase/Orders/index.tsx`
 - 已完成内容：
   - 后端 `get_purchase_order_detail_v2` 新增 `payment.entries[]` 和 `timeline[]`，覆盖采购订单、采购收货单、采购发票、采购退货、供应商付款和供应商退款事件。
   - 采购订单详情页把“记录付款”改为受控 Modal，复用 `InvoicePaymentForm`，避免 `Modal.confirm` 内部临时变量状态不透明。
@@ -28,6 +69,10 @@
   - 采购订单详情页布局已对齐销售订单详情页：顶部摘要、金额概览、左侧订单进度 / 业务时间线 / 商品明细、右侧采购动作 / 基本信息 / 关联单据 / 供应商信息；采购动作里的“快捷回退下游”文案同步改为“回退并修改订单”。
   - 采购订单商品明细表对齐销售订单详情页样式，改为“商品信息”复合列，并展示数量、已收数量、待收数量、单位、单价和金额。
   - 采购订单列表页对齐销售订单列表页入口体验：新增状态视图 Tabs、同款统计卡、供应商筛选、表格空态引导、状态视图标签、批量选择、复制订单号、导出当前筛选和导出选中 CSV。
+  - 第一批低风险通用模块已抽取：新增 `src/utils/business-document.tsx`，承载 `DocumentLinks`、`TimelineDocumentLinks`、`businessDocumentPath`、`paymentEntryPath`、`isCancelledStatus`、`toPercent`；新增 `src/utils/csv-export.ts`，承载 CSV / 文本下载工具。
+  - 销售 / 采购订单详情页已改用通用业务单据链接、时间线文档链接和百分比工具；销售 / 采购订单列表页已改用通用 CSV 下载工具。
+  - 第二批订单详情展示组件已抽取：新增 `src/components/BusinessOrderDetail.tsx`，承载 `AmountOverview`、`BusinessTimeline`、`buildTransactionItemColumns`；销售 / 采购订单详情页的金额概览、业务时间线和商品明细列已共用同一套实现，只保留字段名、文案和领域动作差异。
+  - 第三批付款展示组件已抽取：新增 `src/components/BusinessPaymentTables.tsx`，承载 `buildPaymentEntryColumns`、`buildPaymentActionColumn`、`purchaseInvoiceReferenceColumn`；销售订单回退收款表、采购订单回退付款表、销售发票收款历史 / 取消表、采购发票付款历史 / 取消表已共用付款单链接、日期、方式、金额和操作列实现。
   - 采购订单关联单据区新增供应商付款、采购退货和供应商退款链接，付款单指向通用 `/payments/:name` 详情。
   - Web purchase service 映射 `references.latest_payment_entry` 为 `latestPaymentEntry`，并新增采购订单 `paymentEntries` / `timeline` 映射。
   - 采购发票详情后端新增 `payment.entries[]` 供应商付款历史；Web 采购发票详情新增付款历史表、受控付款弹窗、选择取消具体付款、作废发票前多笔付款清理、单笔付款同步取消并作废发票。
@@ -45,6 +90,8 @@
 - 已验证：
   - `npm run tsc`
   - `npm run biome:lint`
+  - `npm test -- src/services/myapp/__tests__/domain-services.test.ts src/pages/Sales/Orders/Detail.test.tsx src/pages/Purchase/Orders/Edit.test.tsx src/pages/Purchase/Invoices/Detail.test.tsx src/pages/Purchase/Receipts/Detail.test.tsx --runInBand`
+  - `npm test -- src/services/myapp/__tests__/domain-services.test.ts src/pages/Sales/Orders/Detail.test.tsx src/pages/Sales/Invoices/Detail.test.tsx src/pages/Purchase/Orders/Edit.test.tsx src/pages/Purchase/Invoices/Detail.test.tsx src/pages/Purchase/Receipts/Detail.test.tsx --runInBand`（当前仓库没有 `src/pages/Sales/Invoices/Detail.test.tsx`，Jest 实际匹配到 5 个 suite / 75 个 tests）
   - `npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand`
   - `npm test -- src/pages/Purchase/Orders/Edit.test.tsx --runInBand`
   - `npm test -- src/services/myapp/__tests__/domain-services.test.ts src/pages/Purchase/Orders/Edit.test.tsx --runInBand`
@@ -58,7 +105,8 @@
   - `git diff --check`
 - 注意事项：
   - Jest 仍输出既有 open handle 提示；采购收货单详情页面测试还会输出 jsdom `window.getComputedStyle` not implemented 噪音，但退出码为 0。
-  - 下一步建议继续抽取销售 / 采购共享展示组件，优先处理 `docLinks`、`paymentEntryPath`、`toPercent`、`isCancelled`、订单详情商品表列、发票付款历史表列等重复逻辑。
+  - 单独运行 `npm test -- src/pages/Sales/Invoices/Detail.test.tsx --runInBand` 会因当前仓库没有该测试文件返回 `No tests found`。
+  - 下一步建议继续抽取销售 / 采购共享操作组件，优先处理受控付款弹窗上下文、订单动作按钮组和发票详情商品明细列。
 
 本轮围绕销售订单主链路完成收口检查、数据整理、代码修复、验证和提交。当前销售模块主流程已可作为后续采购链路优化的稳定参照，通用选品、电话校验、UOM / 金额工具和回退指引组件可继续复用。
 
@@ -134,9 +182,9 @@
 
 ## 仓库状态
 
-- 父仓库：当前只需提交本交接文档和 `apps/myapp` 子模块指针；另有既有未跟踪 `.codex`，不应提交。
-- 后端 `apps/myapp`：当前工作区干净，最新提交 `cc64198 fix: preserve explicit sales prices`。
-- Web `frontend/myapp-web`：当前工作区干净，最新提交 `6eb6494 fix: clean sales detail warnings`。
+- 父仓库：本轮提交后应只剩既有未跟踪 `.codex`，不应提交。
+- 后端 `apps/myapp`：当前工作区干净，最新提交 `e023370 feat: harden purchase warehouse workflows`。
+- Web `frontend/myapp-web`：当前工作区干净，最新提交 `ed60444 feat: share order detail components`。
 - Mobile `frontend/myapp-mobile`：当前未参与本轮提交，未发现需要提交的移动端改动。
 
 ## 已完成改动
