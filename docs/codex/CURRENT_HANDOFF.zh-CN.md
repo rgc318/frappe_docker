@@ -6,6 +6,26 @@
 
 ## 本轮工作总结
 
+### 2026-07-08 最终状态快照
+
+本轮销售 / 采购共享模块抽取、采购订单体验优化、后端交易仓库强校验和采购字段补齐已完成提交并推送。
+
+- 已推送提交：
+  - 后端 `apps/myapp` `develop`：`e023370 feat: harden purchase warehouse workflows`
+  - Web `frontend/myapp-web` `main`：`ed60444 feat: share order detail components`
+  - 父仓库 `frappe_docker` `develop`：`dc324c85 chore: record shared order workflow updates`
+- 当前仓库状态：
+  - 后端 `apps/myapp`：干净。
+  - Web `frontend/myapp-web`：干净。
+  - 父仓库：只剩既有未跟踪 `.codex`，不应提交。
+- 推送备注：
+  - 三个仓库远端推送均已成功。
+  - 父仓库 push 后本地更新 `refs/remotes/origin/develop` 时因 `.git/refs/remotes/origin/develop.lock` 只读报错；远端已显示 `4767e615..dc324c85 develop -> develop`，不影响 GitHub 上的代码状态。
+- 最后验证：
+  - 后端：`env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_warehouse_utils apps.myapp.myapp.tests.unit.test_inventory_service apps.myapp.myapp.tests.unit.test_purchase_service apps.myapp.myapp.tests.unit.test_order_service`，127 tests 通过。
+  - Web：`npm run tsc`、`npm run biome:lint`、`npm test -- src/services/myapp/__tests__/domain-services.test.ts src/pages/Purchase/Orders/Edit.test.tsx src/pages/Purchase/Orders/Detail.test.tsx src/utils/__tests__/purchase-order-editor.test.ts --runInBand`，4 suites / 64 tests 通过。
+  - 空白检查：父仓库、后端、Web `diff --check` 均通过。
+
 ### 2026-07-08 销售 / 采购共享模块抽取提交总结
 
 本轮在采购模块已对齐销售模块主链路的基础上，开始做前端共享模块抽取。目标是保留销售 / 采购各自的领域判断、接口和动作编排，同时把对应模块中重复的展示结构、单据链接、导出和付款表列收敛为通用实现。
@@ -25,7 +45,7 @@
   - 销售 / 采购订单列表：导出逻辑改用通用 CSV / 文本下载工具。
   - 销售 / 采购订单详情：金额概览、业务时间线、商品明细列、关联单据链接、付款回退表列和收 / 付款弹窗状态骨架改为共享实现。
   - 销售 / 采购发票详情：商品明细列、收款 / 付款历史表、取消收付款表列和收 / 付款弹窗状态骨架改为共享实现；销售特有的差额核销、多收保留、参考号仍通过 extra columns 保留，采购特有的采购发票关联列也保留。
-- 当前 Web diff 覆盖销售 / 采购订单列表、订单详情、发票详情、付款表单组件和采购发票测试 mock；已从页面内删除大量重复 JSX / 列定义，保留页面自己的业务状态机、接口调用和弹窗文案。
+- Web 改动覆盖销售 / 采购订单列表、订单详情、发票详情、付款表单组件和采购发票测试 mock；已从页面内删除大量重复 JSX / 列定义，保留页面自己的业务状态机、接口调用和弹窗文案。
 - 采购订单新建 / 编辑专用明细表没有改成详情通用组件，但已补齐图片展示能力：`PurchaseOrderEditorLine.imageUrl` 从商品数据透传，采购订单详情行也映射后端图片字段作为 fallback，`PurchaseOrderLinesTable` 的实际编辑行显示缩略图；分组标题保持摘要样式，避免重复图片挤压信息密度；分仓快捷按钮会过滤 `All Warehouses` 汇总仓。
 - 采购订单 / 收货 / 发票详情页图片缺失根因在后端采购行序列化未返回 `Item.image`；已在 `apps/myapp` 为 `_serialize_purchase_order_items`、`_serialize_purchase_receipt_items`、`_serialize_purchase_invoice_items` 补充 `image` 字段，并更新 `API_GATEWAY.zh-CN.md` 和采购 service 单测。Web `purchase.ts` 已将 `image` / `image_url` / `item_image` 映射为 `imageUrl`，详情页共享商品列会直接显示图片。
 - 采购订单详情“创建采购发票”误导问题已修复：后端新增采购订单 billing 汇总和行级 `billed_qty` / `pending_billing_qty`，`actions.can_create_purchase_invoice` 改按待开票数量判断，不再按付款状态判断；Web 开票弹窗改用“已开票 / 待开票”口径。已用实际订单 `PUR-ORD-2026-01846-1` 验证当前代码返回 `can_create_purchase_invoice=False`，三行 `pending_billing_qty=0`。
@@ -50,7 +70,7 @@
   - 后端 `apps/myapp`：`29d17a7 feat: enrich purchase order workflows`
   - Web `frontend/myapp-web`：`327fb26 feat: align purchase workflows with sales`
   - 父仓库：`84138ca9 chore: record purchase workflow updates`
-- 当前新一轮通用模块抽取有未提交 Web 改动：
+- 该阶段后续通用模块抽取已在 2026-07-08 完成提交，涉及文件包括：
   - `src/components/BusinessOrderDetail.tsx`
   - `src/components/BusinessPaymentTables.tsx`
   - `src/utils/business-document.tsx`
