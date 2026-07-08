@@ -13,14 +13,14 @@
 - 已推送提交：
   - 后端 `apps/myapp` `develop`：`e023370 feat: harden purchase warehouse workflows`
   - Web `frontend/myapp-web` `main`：`ed60444 feat: share order detail components`
-  - 父仓库 `frappe_docker` `develop`：`dc324c85 chore: record shared order workflow updates`
+  - 父仓库 `frappe_docker` `develop`：`6536b56c docs: summarize shared order workflow handoff`
 - 当前仓库状态：
   - 后端 `apps/myapp`：干净。
   - Web `frontend/myapp-web`：干净。
   - 父仓库：只剩既有未跟踪 `.codex`，不应提交。
 - 推送备注：
   - 三个仓库远端推送均已成功。
-  - 父仓库 push 后本地更新 `refs/remotes/origin/develop` 时因 `.git/refs/remotes/origin/develop.lock` 只读报错；远端已显示 `4767e615..dc324c85 develop -> develop`，不影响 GitHub 上的代码状态。
+  - 父仓库最后一次 push 后本地更新 `refs/remotes/origin/develop` 时因 `.git/refs/remotes/origin/develop.lock` 只读报错；远端已显示 `dc324c85..6536b56c develop -> develop`，不影响 GitHub 上的代码状态。
 - 最后验证：
   - 后端：`env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_warehouse_utils apps.myapp.myapp.tests.unit.test_inventory_service apps.myapp.myapp.tests.unit.test_purchase_service apps.myapp.myapp.tests.unit.test_order_service`，127 tests 通过。
   - Web：`npm run tsc`、`npm run biome:lint`、`npm test -- src/services/myapp/__tests__/domain-services.test.ts src/pages/Purchase/Orders/Edit.test.tsx src/pages/Purchase/Orders/Detail.test.tsx src/utils/__tests__/purchase-order-editor.test.ts --runInBand`，4 suites / 64 tests 通过。
@@ -202,7 +202,7 @@
 
 ## 仓库状态
 
-- 父仓库：本轮提交后应只剩既有未跟踪 `.codex`，不应提交。
+- 父仓库：当前只剩既有未跟踪 `.codex`，不应提交；最新提交 `6536b56c docs: summarize shared order workflow handoff` 已推送。
 - 后端 `apps/myapp`：当前工作区干净，最新提交 `e023370 feat: harden purchase warehouse workflows`。
 - Web `frontend/myapp-web`：当前工作区干净，最新提交 `ed60444 feat: share order detail components`。
 - Mobile `frontend/myapp-mobile`：当前未参与本轮提交，未发现需要提交的移动端改动。
