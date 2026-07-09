@@ -1,10 +1,97 @@
 # 当前交接状态
 
-更新时间：2026-07-08 18:05 CST
+更新时间：2026-07-09 00:30 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-09 打印模块阶段性完整交接
+
+本轮按“通用打印平台”方向连续完善打印模块，已从简单预览 / 下载入口升级为具备模板元数据、打印历史、审计追溯、水印治理和 Web 通用入口的企业打印基础平台。当前完成度评估：后端约 85%，Web 约 75%，Mobile 约 40% 到 50%，整体约 75%。
+
+本轮关键原则：
+
+- 保持旧接口兼容，尤其不破坏 Mobile 现有打印预览、PDF 下载和分享链路。
+- 所有打印入口仍走 `doctype + docname + template`，业务页面不直接拼 Frappe 打印 URL。
+- 打印模板继续走 registry 白名单，未登记 DocType 和未启用模板不可打印。
+- 打印历史采用显式记录，不由旧预览 / 下载接口自动写入，避免给旧调用增加不可见副作用。
+
+- 后端 `apps/myapp` 已扩展打印 registry：
+  - 新增 `PrintDocumentDefinition`，为可打印 DocType 提供 `doctype`、`label`、`module`、`capabilities`、默认模板和模板列表。
+  - 扩展 `PrintTemplateDefinition` 元数据：`category`、`paper_size`、`orientation`、`description`、`enabled`。
+  - 托管模板返回 `managed`、`template_version`、`template_hash`，用于审计追溯。
+  - 模板解析仍走白名单 registry，禁用模板不会被返回或解析。
+- 后端已新增查询接口：
+  - `list_print_doctypes_v1`
+  - `get_print_templates_v1`
+  - `record_print_job_v1`
+  - `list_print_jobs_v1`
+  - 原有 `get_print_preview_v1`、`get_print_file_v1`、`download_print_file_v1` 保持兼容。
+- 后端已新增打印历史表迁移：
+  - `myapp.patches.create_print_job_table`
+  - 表名：`tabMyApp Print Job`
+  - 本地 `localhost` 已执行 `bench --site localhost migrate`，确认表已创建。
+- 打印历史当前为显式记录：
+  - 旧预览 / PDF 元数据 / PDF 下载接口不会自动写打印历史，避免改变 Web/Mobile 原有副作用。
+  - `record_print_job_v1` 会校验单据存在、读权限、模板白名单和模板启用状态。
+  - 表未创建时返回 `recorded=false`，不阻断打印流程。
+- 后端打印上下文已新增治理派生字段：
+  - `myapp_print_status_label`
+  - `myapp_print_copy_label`
+  - `myapp_print_watermark`
+  - `myapp_print_history_summary`
+  - 6 个托管标准模板已展示状态、打印次数和草稿 / 作废 / 补打水印。
+- 托管模板已新增版本指纹：
+  - `get_print_templates_v1` / `list_print_doctypes_v1` 返回 `managed`、`template_version`、`template_hash`。
+  - `record_print_job_v1` 自动把模板版本、模板 hash、托管状态和 `print_format` 固化进打印记录 metadata，用于后续审计追溯。
+- Web `frontend/myapp-web` 已升级通用打印能力：
+  - `src/services/myapp/printing.ts` 新增 `listPrintDoctypes`、`fetchPrintTemplates`，并映射新增模板元数据。
+  - `src/components/PrintDocumentButton.tsx` 改为下拉展开时加载模板，按模板执行“预览”或“下载 PDF”；页面层仍只传 `doctype` 和 `docname`。
+  - `src/services/myapp/printing.ts` 新增 `recordPrintJob`、`listPrintJobs`。
+  - Web 通用打印按钮在预览成功 / 下载成功后显式记录打印动作；记录失败不阻断用户打印。
+  - Web 通用打印按钮新增“打印历史”菜单项，打开 Drawer 查询并展示该单据最近打印 / 下载 / 分享记录。
+- Mobile 兼容性结论：
+  - Mobile 当前仍只调用旧接口 `get_print_preview_v1`、`get_print_file_v1`、`download_print_file_v1`。
+  - 旧接口名称、参数和核心返回字段保持兼容，新增字段会被当前 Mobile mapper 忽略。
+  - 因此 Mobile 不需要立刻修改；只有后续要支持多模板选择、打印历史或模板版本展示时才需要接入新接口。
+- 文档已同步：
+  - `apps/myapp/API_GATEWAY.zh-CN.md` 增加打印查询、记录、历史和模板版本字段说明。
+  - `apps/myapp/PRINTING_TECH_DESIGN.zh-CN.md` 增加通用打印平台升级设计，并把查询、历史、审计字段从建议项更新为已落地。
+- 已验证：
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_printing_service apps.myapp.myapp.tests.unit.test_gateway_wrappers'`，110 tests 通过。
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && bench --site localhost migrate'` 成功，执行 `myapp.patches.create_print_job_table`。
+  - `bench --site localhost mariadb -e "SHOW TABLES LIKE 'tabMyApp Print Job';"` 确认表存在。
+  - `npm run tsc` 通过。
+  - `npm run biome:lint` 通过。
+  - `npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand`，1 suite / 61 tests 通过；仍有既有 Jest open handle 提示，退出码为 0。
+  - `git -C apps/myapp diff --check`、`git -C frontend/myapp-web diff --check`、`git diff --check` 均通过。
+- 当前未提交状态：
+  - 后端 `apps/myapp` 有打印 registry/service/api/gateway、托管模板、patch、单测和文档改动。
+  - Web `frontend/myapp-web` 有打印 service、通用打印按钮和 domain service 单测改动。
+  - 父仓库显示 `apps/myapp` 子模块指针变化，并修改了本交接文档。
+  - 父仓库另有既有未跟踪 `.codex`，不要提交 `.codex`。
+- 本轮关键文件：
+  - 后端核心：`myapp/services/printing_service.py`、`myapp/printing/registry.py`、`myapp/printing/templates.py`
+  - 后端接口：`myapp/api/printing_api.py`、`myapp/api/gateway.py`、`myapp/api/__init__.py`、`myapp/api/api.py`
+  - 后端迁移：`myapp/patches/create_print_job_table.py`、`myapp/patches.txt`
+  - 托管模板：`myapp/printing/templates/*_standard.html`
+  - 后端测试：`myapp/tests/unit/test_printing_service.py`、`myapp/tests/unit/test_gateway_wrappers.py`
+  - Web：`src/components/PrintDocumentButton.tsx`、`src/services/myapp/printing.ts`、`src/services/myapp/__tests__/domain-services.test.ts`
+- 当前风险 / 注意事项：
+  - `tabMyApp Print Job` 在本地 `localhost` 已 migrate；其他环境需要部署后执行 migrate。
+  - 打印记录是显式记录，旧接口不会自动记录；Web 已接入预览 / 下载成功后的记录，Mobile 暂未接入记录。
+  - 模板版本目前记录 hash 和短版本号，但没有保存当时模板完整 HTML/CSS 快照。
+  - 水印和打印次数依赖打印历史表；表缺失时打印仍可用，但补打识别会退化为首次打印。
+  - Jest 仍有既有 open handle 提示，退出码为 0。
+- 下一步建议：
+  - 优先补实际多模板内容：客户联、财务联、仓库联、内部联、简版。
+  - 增加角色级模板权限：仓库、财务、销售、采购看到不同模板集合。
+  - 增加模板设置 / 打印设置中心：默认模板、纸张、页边距、水印开关。
+  - 增加模板内容快照归档，补齐严格审计场景下“当时模板内容可还原”。
+  - 增加批量打印、合并 PDF、异步生成能力。
+  - Mobile 后续可接入 `get_print_templates_v1`、`record_print_job_v1`、`list_print_jobs_v1`。
+  - 若提交本轮改动，应分别在 `apps/myapp` 和 `frontend/myapp-web` 提交，再按需要提交父仓库子模块指针和交接文档。
 
 ### 2026-07-08 最终状态快照
 
