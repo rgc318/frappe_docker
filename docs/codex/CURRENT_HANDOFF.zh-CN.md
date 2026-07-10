@@ -1,10 +1,42 @@
 # 当前交接状态
 
-更新时间：2026-07-10 22:42 CST
+更新时间：2026-07-10 23:32 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-10 Web 打印模块第一阶段接入
+
+本轮按打印领域模块架构完成 Web 第一阶段接入并已提交。
+
+- 后端：`90d9dde fix: refine print copy audit semantics`
+- Web：`deb4ef4 feat: add web print operations workflow`
+- 父仓库：同步提交后端子模块指针和本交接文档，提交号以父仓库当前 HEAD 为准。
+
+- 新增独立打印预览页 `/printing/preview`：
+  - 后端 HTML 通过 iframe 展示。
+  - 支持模板切换、刷新、系统打印和 PDF 下载。
+  - 预览页显式记录 Web 审计 metadata。
+- 重构单张打印入口：
+  - 不再在前端硬编码 fallback `standard`。
+  - 模板尚未加载或未显式选择时，由后端解析全局默认模板。
+- 新增 `PrintBatchAction`：
+  - 后台创建 PDF 批次。
+  - 自动轮询进度。
+  - 支持取消、失败项重试和成功项 ZIP 下载。
+- 六类单据列表均已接入批量打印：销售 / 采购订单、销售发货单、销售发票、采购收货单、采购发票。
+- 新增 `/printing/settings`：仅 `System Manager` 可见，可维护每类单据的全局默认模板和启用状态。
+- `src/services/myapp/printing.ts` 已补齐打印设置和批次生命周期的领域类型、snake_case 映射和带认证下载错误处理。
+- 后端修正补打统计口径：`preview` 保留审计但不增加打印副本次数；`download`、`print`、`share`、`archive` 才计入补打判断。
+- 已验证：
+  - 后端 `test_printing_service` + `test_gateway_wrappers`：138 tests 通过。
+  - Web `npm run tsc` 通过。
+  - Web `npm run biome:lint` 通过。
+  - Web domain service Jest：1 suite / 62 tests 通过；仍有既有 open handle 提示，退出码为 0。
+  - Web access Jest：1 suite / 2 tests 通过。
+  - `git -C apps/myapp diff --check`、`git -C frontend/myapp-web diff --check`、`git diff --check` 通过。
+- 待完成：人工浏览器回归，以及全局批次列表 / 全局打印历史页面。
 
 ### 2026-07-10 打印平台阶段提交
 
