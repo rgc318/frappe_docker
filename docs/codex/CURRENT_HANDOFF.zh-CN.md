@@ -1,10 +1,294 @@
 # 当前交接状态
 
-更新时间：2026-07-09 00:30 CST
+更新时间：2026-07-10 22:42 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-10 打印平台阶段提交
+
+本轮完成打印平台阶段性收口和提交准备。按现有 6 类核心单据口径，后端功能完成度约 94%，已经形成单张打印、模板治理、打印审计和批量异步打印的完整基础链路。
+
+- 本轮提交：
+  - 后端 `apps/myapp`：`413dac2 feat: complete print platform governance`
+  - Web `frontend/myapp-web`：`4bd3002 feat: enrich print template menu`
+  - 父仓库：提交本交接文档和 `apps/myapp` 子模块指针；提交号以父仓库当前 HEAD 为准。
+- 提交后仓库预期状态：
+  - `apps/myapp` clean。
+  - `frontend/myapp-web` clean。
+  - 父仓库除既有未跟踪 `.codex` 外 clean。
+
+- 当前可打印单据：
+  - `Sales Invoice`
+  - `Purchase Invoice`
+  - `Sales Order`
+  - `Purchase Order`
+  - `Delivery Note`
+  - `Purchase Receipt`
+- 当前核心能力：
+  - HTML / PDF 预览、PDF 流式下载、可选私有归档。
+  - 标准模板和第二业务模板、模板角色可见性、全局默认模板设置。
+  - 打印历史、动作审计、补打标识、水印和最近打印摘要。
+  - 异步批量打印、进度查询、ZIP 下载、取消、失败项重试、90 天过期清理。
+- Web 通用打印按钮已展示后端模板分类和说明，不在页面层硬编码模板清单。
+- 本轮文档已同步：
+  - `apps/myapp/API_GATEWAY.zh-CN.md`
+  - `apps/myapp/PRINTING_TECH_DESIGN.zh-CN.md`
+  - `frontend/myapp-web/WEB_DEVELOPMENT.zh-CN.md`
+  - `docs/codex/CURRENT_HANDOFF.zh-CN.md`
+- 最新验证：
+  - 后端打印服务和 gateway wrapper 共 137 tests 通过。
+  - `git -C apps/myapp diff --check`、`git -C frontend/myapp-web diff --check`、`git diff --check` 通过。
+- 发布要求：
+  - 目标站点必须执行 `bench --site <site> migrate`，以创建 `tabMyApp Print Batch` 和 `tabMyApp Print Setting`。
+  - 本地 `localhost` 已迁移并确认两张表存在。
+- 剩余边界：
+  - 收款单 / 付款单尚未接入。
+  - 第二业务模板仍主要复用标准模板 HTML，尚需进一步做业务版式差异化。
+  - 批量结果尚不支持合并 PDF。
+  - 模板角色、纸张、页边距和水印策略尚未形成完整可运营设置中心。
+  - 文件读取和清理当前主要覆盖 Frappe 本地 `File`，对象存储仍需适配。
+
+### 2026-07-10 打印全局默认模板设置
+
+本轮继续增强后端打印治理，已落地第一版全局默认模板设置。
+
+- 新增迁移：
+  - `myapp.patches.create_print_setting_table`
+  - 表名：`tabMyApp Print Setting`
+  - 唯一维度：`reference_doctype`
+- 新增设置字段：
+  - `default_template`
+  - `enabled`
+  - `metadata_json`
+- 默认模板解析规则已接入 `resolve_print_template`：
+  - 显式传入 `template` 时仍优先使用显式模板，并严格校验模板可见性。
+  - 未显式传入 `template` 时，优先读取启用状态的全局默认模板设置。
+  - 如果配置模板对当前用户不可见、禁用或不存在，自动回退 registry 默认模板。
+- 新增服务和 gateway 能力：
+  - `get_print_settings_v1`
+  - `set_print_default_template_v1`
+- 权限：
+  - 当前仅 `System Manager` 可维护默认模板设置。
+  - 查询设置不替代 `get_print_templates_v1` 的可见模板过滤。
+- 文档已同步：
+  - `apps/myapp/API_GATEWAY.zh-CN.md`
+  - `apps/myapp/PRINTING_TECH_DESIGN.zh-CN.md`
+- 已验证：
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_printing_service apps.myapp.myapp.tests.unit.test_gateway_wrappers'`，137 tests 通过。
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && bench --site localhost migrate'` 成功，执行 `myapp.patches.create_print_setting_table`。
+  - `bench --site localhost mariadb -e "SHOW TABLES LIKE 'tabMyApp Print Setting';"` 确认表存在。
+  - `git -C apps/myapp diff --check`、`git -C frontend/myapp-web diff --check`、`git diff --check` 均通过。
+- 当前边界：
+  - 第一版设置中心仅覆盖默认模板。
+  - 纸张、页边距、水印开关等仍在 registry / 模板层控制，后续可通过 `metadata_json` 扩展。
+
+### 2026-07-09 打印模板角色权限
+
+本轮继续完善后端打印模板治理，已在 registry 层落地第一版模板角色可见性。
+
+- 后端 `PrintTemplateDefinition` 新增：
+  - `allowed_roles`
+  - 输出元数据 `restricted`
+  - 输出元数据 `allowed_roles`
+- `get_print_templates_v1` / `list_print_doctypes_v1` 现在只返回当前用户角色可见的模板。
+- `resolve_print_template` 也会按同一角色规则拦截不可见模板，绕过前端直接传模板 key 也会被拒绝。
+- 当前角色规则：
+  - `standard` 暂不限制，作为默认兜底模板。
+  - `finance`：`Accounts Manager`、`Accounts User`、`System Manager`
+  - 销售 `external`：`Sales Manager`、`Sales User`、`System Manager`
+  - 采购 `external`：`Purchase Manager`、`Purchase User`、`System Manager`
+  - `warehouse`：`Stock Manager`、`Stock User`，并按单据侧允许对应销售 / 采购业务角色；`System Manager` 可见全部模板。
+- 文档已同步：
+  - `apps/myapp/API_GATEWAY.zh-CN.md`
+  - `apps/myapp/PRINTING_TECH_DESIGN.zh-CN.md`
+- 已验证：
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_printing_service apps.myapp.myapp.tests.unit.test_gateway_wrappers'`，130 tests 通过。
+  - `git -C apps/myapp diff --check`、`git diff --check` 均通过。
+- 当前边界：
+  - 权限规则仍是 Python registry 固定配置，尚未做可运营维护的模板权限配置表。
+  - 全局默认模板设置表已落地，但 Web 尚未做设置管理页。
+  - Web 目前会自然消费后端返回的可见模板，但尚未做角色权限说明或模板管理页。
+
+### 2026-07-09 打印批次过期清理
+
+本轮继续完善后端批量打印生命周期治理，已补齐批次和归档文件过期清理。
+
+- 新增服务层能力：
+  - `cleanup_expired_print_batches`
+- 新增定时任务：
+  - `myapp.tasks.cleanup_print_batches`
+- 已接入 `hooks.py` scheduler：
+  - 每小时执行一次。
+- 默认清理策略：
+  - 保留期 90 天。
+  - 只清理最终态批次：`completed`、`partial_failed`、`failed`、`canceled`。
+  - 默认删除批次成功项 `results[].file_url` 对应的归档 PDF `File`。
+  - 删除 `tabMyApp Print Batch` 批次记录。
+  - 保留 `tabMyApp Print Job` 逐单审计记录。
+- 当前边界：
+  - 不清理 `queued`、`processing`、`cancel_requested`。
+  - 文件删除当前覆盖 Frappe 本地 `File`；对象存储后续需要统一文件删除适配层。
+- 文档已同步：
+  - `apps/myapp/API_GATEWAY.zh-CN.md`
+  - `apps/myapp/PRINTING_TECH_DESIGN.zh-CN.md`
+- 已验证：
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_printing_service apps.myapp.myapp.tests.unit.test_gateway_wrappers'`，127 tests 通过。
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python - <<\"PY\" ... import myapp.tasks ... PY'` 确认 `cleanup_print_batches` 可导入。
+  - `git -C apps/myapp diff --check`、`git diff --check` 均通过。
+- 当前后端批量打印链路：
+  - 创建批次
+  - 异步逐单归档 PDF
+  - 查询进度 / 结果
+  - ZIP 下载成功项
+  - 取消批次
+  - 失败项重试
+  - 90 天最终态批次和归档 PDF 清理
+
+### 2026-07-09 打印批次取消与失败项重试
+
+本轮继续完善后端批量打印治理，已补齐批次取消和失败项重试。
+
+- 新增服务层能力：
+  - `cancel_print_batch_v1`
+  - `retry_print_batch_failed_v1`
+- 新增 gateway 接口：
+  - `myapp.api.gateway.cancel_print_batch_v1`
+  - `myapp.api.gateway.retry_print_batch_failed_v1`
+- 批次状态扩展：
+  - `queued`
+  - `processing`
+  - `cancel_requested`
+  - `canceled`
+  - `completed`
+  - `partial_failed`
+  - `failed`
+- 取消语义：
+  - `queued` 批次直接进入 `canceled`，所有单据结果记为 `skipped`。
+  - `processing` 批次进入 `cancel_requested`，Worker 当前单据完成后跳过后续单据并最终进入 `canceled`。
+  - 已完成 / 失败 / 已取消批次不回滚，不删除已归档 PDF，不删除已写入的 `MyApp Print Job`。
+- 失败项重试语义：
+  - 只读取原批次 `results[]` 中 `status=failed` 的单据。
+  - 创建新批次，不覆盖原批次结果。
+  - 新批次 metadata 写入 `retry_of=<原批次号>`。
+  - 原批次没有失败项时返回业务校验错误。
+- 文档已同步：
+  - `apps/myapp/API_GATEWAY.zh-CN.md`
+  - `apps/myapp/PRINTING_TECH_DESIGN.zh-CN.md`
+- 已验证：
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_printing_service apps.myapp.myapp.tests.unit.test_gateway_wrappers'`，126 tests 通过。
+  - `git -C apps/myapp diff --check`、`git diff --check` 均通过。
+- 当前边界：
+  - 已支持批次取消、失败项重试、ZIP 下载成功项。
+  - 尚未做合并 PDF。
+  - 尚未做批次和归档文件过期清理。
+
+### 2026-07-09 打印批次 ZIP 聚合下载
+
+本轮继续增强后端批量打印能力，已在“批次任务 + 逐单归档 PDF + 进度查询”的基础上补齐批次成功项 ZIP 聚合下载。
+
+- 新增服务层能力：
+  - `build_print_batch_archive_download_v1`
+- 新增 gateway 下载接口：
+  - `myapp.api.gateway.download_print_batch_archive_v1`
+- ZIP 下载语义：
+  - 读取 `get_print_batch_v1.results[]` 中 `status=success` 且有 `file_url` 的 PDF。
+  - 打包为 ZIP 下载流，`content_type=application/zip`。
+  - 失败项不会进入 ZIP，也不会阻断下载；失败原因仍通过 `get_print_batch_v1` 查看。
+  - ZIP 内文件名来自批次结果 `filename`，重名时自动追加序号。
+  - 当前文件读取支持本地 `/private/files/` 和 `/files/`；后续接对象存储时需要统一文件读取适配层。
+- 文档已同步：
+  - `apps/myapp/API_GATEWAY.zh-CN.md`
+  - `apps/myapp/PRINTING_TECH_DESIGN.zh-CN.md`
+- 已验证：
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_printing_service apps.myapp.myapp.tests.unit.test_gateway_wrappers'`，120 tests 通过。
+  - `git -C apps/myapp diff --check`、`git diff --check` 均通过。
+- 当前边界：
+  - 已支持 ZIP 聚合下载，但尚未做合并 PDF。
+  - 尚未做批次取消、失败项重试和批次 / 归档文件过期清理。
+
+### 2026-07-09 打印模块后端批量异步能力
+
+本轮聚焦后端打印批量 / 异步能力，已完成第一版“批次任务 + 后台逐单归档 PDF + 进度查询”的基础设施。当前后端打印模块完成度评估提升到约 90%。
+
+- 新增批量打印批次表：
+  - patch：`myapp.patches.create_print_batch_table`
+  - 表名：`tabMyApp Print Batch`
+  - 本地 `localhost` 已执行 `bench --site localhost migrate`，确认表存在。
+- 新增后端服务能力：
+  - `create_print_batch_v1`
+  - `get_print_batch_v1`
+  - `process_print_batch_v1`
+- 新增 gateway/API 暴露：
+  - `myapp.api.gateway.create_print_batch_v1`
+  - `myapp.api.gateway.get_print_batch_v1`
+- 批量任务当前语义：
+  - 入参 `documents[]` 支持 `doctype`、`docname/name`、`template`、`filename`。
+  - 当前仅支持 `pdf` 输出，每批最多 100 张单据。
+  - 默认通过 Frappe background job 异步执行，可传 `run_async=0` 同步执行，便于开发 / 测试。
+  - Worker 逐单复用 `get_print_file_v1(..., archive=1)`，将 PDF 归档为私有 `File`。
+  - 每个成功 / 失败项都会尽量写入 `record_print_job_v1(action="archive")`，metadata 包含 `batch_id` 和 `batch_idx`。
+  - 批次状态支持 `queued`、`processing`、`completed`、`partial_failed`、`failed`。
+  - 查询返回 `total_count`、`done_count`、`success_count`、`failed_count`、`skipped_count`、`progress`、`items[]`、`results[]`。
+- 当前明确边界：
+  - 第一版不合并 PDF，不生成 ZIP；调用方通过 `get_print_batch_v1` 获取每张单据归档后的 `file_url`。
+  - 批次表保存任务级状态；逐单审计仍写入 `tabMyApp Print Job`。
+  - 如果 `tabMyApp Print Batch` 未迁移创建，创建接口返回 `queued=false` / `reason=table_missing`。
+- 文档已同步：
+  - `apps/myapp/API_GATEWAY.zh-CN.md`
+  - `apps/myapp/PRINTING_TECH_DESIGN.zh-CN.md`
+- 已验证：
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_printing_service apps.myapp.myapp.tests.unit.test_gateway_wrappers'`，118 tests 通过。
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && bench --site localhost migrate'` 成功，执行 `myapp.patches.create_print_batch_table`。
+  - `bench --site localhost mariadb -e "SHOW TABLES LIKE 'tabMyApp Print Batch';"` 确认表存在。
+  - `git -C apps/myapp diff --check`、`git -C frontend/myapp-web diff --check`、`git diff --check` 均通过。
+- 当前未提交状态：
+  - 后端 `apps/myapp` 有批量打印 service/API/gateway/patch/单测/文档改动，同时包含上一轮多模板增强改动。
+  - Web `frontend/myapp-web` 仍有上一轮 `PrintDocumentButton` 菜单增强和文档改动；本轮没有继续改 Web。
+  - 父仓库显示 `apps/myapp` 子模块修改，并修改了本交接文档；`.codex` 仍是既有未跟踪状态，不要提交。
+- 下一步建议：
+  - 增加批次结果下载聚合：ZIP 或合并 PDF。
+  - 增加批次取消 / 重试失败项。
+  - 增加批次过期清理和归档文件清理策略。
+  - Web 后续接入批量打印入口和批次进度 Drawer / 轮询。
+
+### 2026-07-09 打印模块多模板补强
+
+本轮继续完善打印模块，把 6 类核心单据从单一标准模板扩展为“标准模板 + 业务变体模板”的通用多模板能力。当前完成度评估微调：后端约 88%，Web 约 78%，Mobile 仍约 40% 到 50%，整体约 78%。
+
+- 后端 `apps/myapp` 已在打印 registry 中为 6 类核心单据增加第二模板：
+  - 销售 / 采购发票：`finance`
+  - 销售 / 采购订单：`external`
+  - 发货单 / 采购收货单：`warehouse`
+- 新增的第二模板均有独立 key、label、category、description、Print Format 名称、版本号和 hash。
+- 托管 Print Format 映射已补齐：
+  - `myapp Sales Invoice Finance`
+  - `myapp Purchase Invoice Finance`
+  - `myapp Sales Order External`
+  - `myapp Purchase Order External`
+  - `myapp Delivery Note Warehouse`
+  - `myapp Purchase Receipt Warehouse`
+- 当前第二模板复用对应标准模板的基础 HTML，但渲染前会注入 `myapp_print_template_key`、`myapp_print_template_label`、`myapp_print_template_category` 和 `myapp_print_format`，模板会显示模板名和标题后缀；后续可逐个替换为更完整的客户确认版、供应商确认版、财务留档版和仓库执行版。
+- Web `PrintDocumentButton` 多模板菜单已增强为展示模板分类 Tag 和说明，仍由后端 `get_print_templates_v1` 驱动，页面层不硬编码模板清单。
+- 文档已同步：
+  - `apps/myapp/API_GATEWAY.zh-CN.md`
+  - `apps/myapp/PRINTING_TECH_DESIGN.zh-CN.md`
+  - `frontend/myapp-web/WEB_DEVELOPMENT.zh-CN.md`
+- 已验证：
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_printing_service'`，16 tests 通过。
+  - `docker exec frappe_docker-backend-1 bash -lc 'cd /home/frappe/frappe-bench && env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_gateway_wrappers'`，95 tests 通过。
+  - `npm run tsc` 通过。
+  - `npm run biome:lint` 通过。
+  - `npm test -- src/services/myapp/__tests__/domain-services.test.ts --runInBand`，1 suite / 61 tests 通过；仍有既有 Jest open handle 提示，退出码为 0。
+  - `git -C apps/myapp diff --check`、`git -C frontend/myapp-web diff --check`、`git diff --check` 均通过。
+- 当前未提交状态：
+- 后端 `apps/myapp` 修改了打印 registry、托管 Print Format 映射、打印上下文注入、6 个托管模板、打印单测和打印文档。
+  - Web `frontend/myapp-web` 修改了 `PrintDocumentButton` 和 Web 开发说明。
+  - 父仓库显示 `apps/myapp` 子模块有修改，并修改了本交接文档；`.codex` 仍是既有未跟踪状态，不要提交。
+- 下一步建议：
+  - 优先把第二模板从“复用标准 HTML”替换成真实差异化版式：财务留档弱化收货地址、强化付款 / 核销信息；仓库执行版隐藏金额或弱化金额、强化仓库 / 数量 / 复核栏；外部确认版增加签字栏和确认条款。
+  - 之后再做可运营维护的模板权限配置表和 Web 打印设置管理页。
 
 ### 2026-07-09 打印模块阶段性完整交接
 
@@ -87,7 +371,7 @@
 - 下一步建议：
   - 优先补实际多模板内容：客户联、财务联、仓库联、内部联、简版。
   - 增加角色级模板权限：仓库、财务、销售、采购看到不同模板集合。
-  - 增加模板设置 / 打印设置中心：默认模板、纸张、页边距、水印开关。
+  - 继续扩展模板设置 / 打印设置中心：纸张、页边距、水印开关。
   - 增加模板内容快照归档，补齐严格审计场景下“当时模板内容可还原”。
   - 增加批量打印、合并 PDF、异步生成能力。
   - Mobile 后续可接入 `get_print_templates_v1`、`record_print_job_v1`、`list_print_jobs_v1`。
@@ -973,7 +1257,7 @@ git diff --check
 
 ## 未完成事项
 
-- 销售模块主流程当前无已知重大阻塞；本轮仅剩父仓库交接文档和后端子模块指针待提交。
+- 销售模块主流程当前无已知重大阻塞；打印平台阶段改动已分别提交到后端和 Web，父仓库同步提交后端子模块指针与本交接文档。
 - `.codex` 是既有未跟踪目录，不处理。
 - 库存批量盘点直接提交式工作流已接入；盘点草稿、复核确认、作废 / 取消和审计生命周期仍未接入，当前阶段暂不继续深挖。
 - 待处理确认当前覆盖核心草稿业务单据提交；如后续需要工作流动作审批，需要补 action 列表/状态来源。
