@@ -1,10 +1,39 @@
 # 当前交接状态
 
-更新时间：2026-07-10 23:32 CST
+更新时间：2026-07-11 10:27 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-11 Web 打印中心第二阶段
+
+本轮在第一阶段已提交基础上继续实现全局打印中心，并完成后端、Web 和父仓库分层提交。
+
+- 后端：`ec6d484 feat: add print operations query APIs`
+- Web：`420d0a3 feat: add print center pages`
+- 父仓库：同步提交后端子模块指针和本交接文档，提交号以父仓库当前 HEAD 为准。
+
+- 后端新增：
+  - `list_print_batches_v1`：打印批次服务端分页、状态 / 日期 / 申请人筛选。
+  - `list_print_jobs_v2`：跨单据打印历史服务端分页和多条件筛选。
+  - 批次访问控制：批次详情、取消、失败重试和 ZIP 下载只允许申请人或 `System Manager`。
+  - 普通用户的批次列表和全局历史强制限定为本人；`System Manager` 可查看全部并按用户筛选。
+  - 修复 `myapp.api.api` 聚合模块误导入不存在的 `build_print_file_download_v1`；现在正确导出 gateway `download_print_file_v1`，并增加聚合导入回归测试。
+- Web 新增一级菜单 `/printing`：
+  - `/printing/batches`
+  - `/printing/history`
+  - `/printing/settings`
+  - 隐藏菜单 `/printing/preview`
+- 批次页支持任务找回、服务端分页、筛选、详情轮询、取消、失败重试和 ZIP 下载。
+- 历史页支持跨单据筛选、跳回原业务单据和进入统一预览页补打。
+- 已验证：
+  - 后端打印和 gateway wrapper：144 tests 通过。
+  - 真实 `localhost` 数据库查询：批次列表返回 `total=0`，打印历史返回 `total=6` / 当前页 2 条。
+  - Web TypeScript、Biome 通过。
+  - Web access + domain service Jest：2 suites / 65 tests 通过。
+- `git -C apps/myapp diff --check`、`git -C frontend/myapp-web diff --check`、`git diff --check` 已通过。
+- 待完成：人工浏览器回归；代码提交已完成。
 
 ### 2026-07-10 Web 打印模块第一阶段接入
 
