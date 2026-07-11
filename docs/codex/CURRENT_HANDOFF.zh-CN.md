@@ -1,10 +1,49 @@
 # 当前交接状态
 
-更新时间：2026-07-11 10:27 CST
+更新时间：2026-07-11 14:29 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-11 打印模块功能收口
+
+本轮补齐此前明确剩余的打印功能，并完成后端、Web 和父仓库分层提交。
+
+- 后端：`9ba905e feat: complete print platform capabilities`
+- Web：`9a4699c feat: complete web print workflows`
+- 父仓库：同步提交后端子模块指针和本交接文档，提交号以父仓库当前 HEAD 为准。
+
+- 批次严格幂等：
+  - 新增 patch `myapp.patches.add_print_batch_request_id`。
+  - `tabMyApp Print Batch` 新增 `request_id`。
+  - 唯一约束：`(requested_by, request_id)`。
+  - 重复请求和并发竞争均返回原批次，响应包含 `deduplicated`。
+- 批次聚合输出：
+  - 新增 `download_print_batch_merged_pdf_v1`。
+  - 成功项可继续下载 ZIP，也可按批次顺序合并为单个 PDF。
+- 文件存储适配：
+  - 归档读取优先使用 Frappe `File.get_content()`，兼容站点本地文件和对象存储实现。
+  - 本地 `/private/files/`、`/files/` 路径保留兜底。
+- 收付款凭证：
+  - registry 新增 `Payment Entry`。
+  - 新增 `standard` 和 `finance` 两个托管模板。
+  - Web `/payments/:name` 接入通用打印按钮。
+  - Web `/payments` 接入批量选择和 `PrintBatchAction`。
+  - 打印历史支持跳转回收付款详情。
+- 业务模板差异化：
+  - 发票财务版增加已收 / 已付、未结和财务复核信息。
+  - 销售 / 采购订单外部确认版增加确认条款和签章栏。
+  - 发货 / 收货仓库版增加拣货、收货、复核和交接栏。
+- 已验证：
+  - 后端打印 + gateway wrapper：148 tests 通过。
+  - Web TypeScript、Biome 通过；全量 Jest 16 suites / 114 tests 通过，仍有既有 open handle 提示，退出码为 0。
+  - `bench --site localhost migrate` 成功执行新 patch。
+  - 确认 `request_id` 字段和 `(requested_by, request_id)` 唯一索引存在。
+  - 真实 `Payment Entry ACC-PAY-2026-00938` finance HTML / PDF 生成成功，PDF 278111 bytes。
+  - 真实同步批次 `PRN-BATCH-20260711111314-f07dff33` 验证：首次创建、第二次幂等命中同一批次，合并 PDF 279286 bytes / 1 page。
+- `git -C apps/myapp diff --check`、`git -C frontend/myapp-web diff --check`、`git diff --check` 通过。
+- 待完成：真实浏览器视觉回看；功能实现、迁移、自动化验证和代码提交已完成。
 
 ### 2026-07-11 Web 打印中心第二阶段
 
