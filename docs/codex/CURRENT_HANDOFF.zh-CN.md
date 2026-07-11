@@ -1,10 +1,47 @@
 # 当前交接状态
 
-更新时间：2026-07-11 14:29 CST
+更新时间：2026-07-11 15:26 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-11 企业级用户与权限模块第一阶段
+
+本轮已完成架构设计、第一阶段代码实现、自动化验证和分仓库提交。
+
+- 后端：`b98f45f feat: add enterprise user management`
+- Web：`2ca0320 feat: add web user administration`
+- 父仓库：同步提交后端子模块指针和本交接文档，提交号以父仓库当前 HEAD 为准。
+
+- 新增架构文档：`apps/myapp/USER_MANAGEMENT_TECH_DESIGN.zh-CN.md`。
+- 后端新增用户治理服务和 gateway：
+  - 当前用户资料查询 / 修改、密码修改。
+  - 用户分页、详情、创建、编辑、启停。
+  - 角色目录、用户角色整体分配。
+  - 标准 `User Permission` 数据范围新增 / 删除。
+  - `Version` 用户主档变更记录。
+  - 保护 `Administrator`、`Guest`、当前操作者和最后一个启用的 `System Manager`。
+- `me_v1` 已扩展邮箱、头像、电话、所在地、语言和时区。
+- Web 新增：
+  - `/account/center`
+  - `/account/settings`
+  - `/administration/users`
+  - `/administration/users/:user`
+  - `/administration/roles`
+- Web 个人设置支持资料、默认公司 / 仓库远程选择和密码修改后重新登录。
+- 管理员详情支持主档、角色、公司 / 仓库 / 客户 / 供应商数据范围和审计记录。
+- 已验证：
+  - 后端用户 / JWT / 偏好 / gateway：125 tests 通过。
+  - Web TypeScript、Biome 通过。
+  - Web 全量 Jest：17 suites / 117 tests 通过。
+  - 真实 `localhost` 站点成功执行角色目录、用户分页、当前用户资料和 Administrator 详情查询。
+  - 三个仓库 `diff --check` 通过。
+- 当前仓库状态：
+  - `apps/myapp` clean。
+  - `frontend/myapp-web` clean。
+  - 父仓库提交后除既有未跟踪 `.codex` 外 clean。
+- 下一步：人工浏览器回归个人中心、个人设置、用户列表 / 详情 / 角色页；发现的问题按页面或权限边界做聚焦修复。
 
 ### 2026-07-11 打印模块功能收口
 
