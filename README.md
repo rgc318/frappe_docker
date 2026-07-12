@@ -124,6 +124,10 @@ Wait for a couple of minutes for ERPNext site to be created or check `create-sit
 
 ## Documentation Links
 
+### [myapp 项目差距与交付路线图](docs/codex/PROJECT_GAP_ROADMAP.zh-CN.md)
+
+### [myapp 当前交接状态](docs/codex/CURRENT_HANDOFF.zh-CN.md)
+
 ### [Getting Started Guide](docs/getting-started.md)
 
 ### [Frequently Asked Questions](https://github.com/frappe/frappe_docker/wiki/Frequently-Asked-Questions)
