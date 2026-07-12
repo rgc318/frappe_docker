@@ -1,10 +1,57 @@
 # 当前交接状态
 
-更新时间：2026-07-11 15:26 CST
+更新时间：2026-07-12 08:32 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-12 用户模块企业级 UI 与安全治理收口
+
+本轮在第一阶段用户模块基础上继续增强，并完成后端、Web 和父仓库分层提交。
+
+- 后端：`ce79f04 feat: complete user security governance`
+- Web：`eda4561 feat: complete web user experience`
+- 父仓库：同步提交后端子模块指针和本交接文档，提交号以父仓库当前 HEAD 为准。
+
+- Web 视觉与信息架构按本地 Ant Design Pro 官方账号中心、设置页、列表页和详情页重构：
+  - 个人中心：身份卡、治理指标、工作空间、功能授权、数据范围和安全状态。
+  - 个人设置：左侧设置导航、右侧内容工作区、响应式资料表单、头像预览、工作偏好和安全状态。
+  - 用户列表：用户治理指标、头像身份列、服务端表格、横向滚动和批量启停。
+  - 用户详情：状态头、角色 / 数据权限 / 审计指标和分域 Tabs。
+  - 角色目录：角色使用量、权限规则、DocType 覆盖和可写范围摘要。
+- 新增后端治理能力：
+  - `get_user_management_overview_v1`。
+  - `batch_set_users_enabled_v1`，单批最多 100 人并执行整批保护校验。
+  - `list_roles_v1` 补充权限规则数、DocType 覆盖数和可写 DocType 数。
+- 真实 `localhost` 验证：
+  - 用户概览返回 13 个用户、4 个启用账号、2 个启用系统管理员。
+  - `Sales User` 返回 58 条权限规则、52 个 DocType 覆盖、20 个可写 DocType。
+- 自动化验证：
+  - 后端用户 / JWT / 偏好 / gateway：128 tests 通过。
+  - Web TypeScript、Biome 通过。
+  - Web 全量 Jest：18 suites / 121 tests 通过；仍有既有 open handle 提示，退出码为 0。
+- 写操作错误反馈已统一：
+  - `runGatewayMutation` 对业务异常显示去重后的 `notification.error`。
+  - 用户创建、批量启停、用户详情、个人资料、工作偏好和密码修改均捕获 Promise 异常。
+  - 用户创建和密码修改会把密码校验消息同步绑定到对应表单字段，不再只输出浏览器控制台。
+  - Frappe 密码建议中的 HTML 已转换为可读纯文本；同类弱密码请求已确认是密码强度分数低于站点最低要求，并非邮箱、手机号或角色重复。
+- 剩余安全治理能力已继续落地：
+  - 个人头像使用 Frappe `File` 真实上传并绑定 `User.user_image`。
+  - 新增用户安全摘要、Frappe Session / JWT refresh 会话统计和全设备注销。
+  - JWT 新增 `auth_generation`，全设备注销、修改密码和停用账号后旧 access / refresh token 立即失效。
+  - JWT 登录复用 Frappe 2FA，Web 支持 OTP 二次挑战。
+  - 管理员用户详情新增核心业务 DocType 权限快照。
+  - 真实 `localhost` 已验证 Administrator 安全摘要和 13 个核心 DocType 权限快照。
+- 最新验证：
+  - 后端用户 / JWT / gateway：133 tests 通过。
+  - Web TypeScript、Biome 通过。
+  - Web 全量 Jest：18 suites / 123 tests 通过；仍有既有 open handle 提示，退出码为 0。
+- 提交后仓库状态：
+  - `apps/myapp` clean。
+  - `frontend/myapp-web` clean。
+  - 父仓库除既有未跟踪 `.codex` 外 clean。
+- 下一步：人工浏览器回归五个用户模块页面，并使用实际启用 2FA 的测试账号验证 OTP App / Email / SMS 投递流程。
 
 ### 2026-07-11 企业级用户与权限模块第一阶段
 
