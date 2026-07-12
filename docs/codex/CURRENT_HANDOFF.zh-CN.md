@@ -6,6 +6,20 @@
 
 ## 本轮工作总结
 
+### 2026-07-12 Web 单位与币种初始展示映射修复
+
+- 修复 `UomSelect`：初始值不再只因选项尚未加载而回显原始 UOM 编码。商品编辑页会优先消费后端已返回的 `stock_uom_display`、`wholesale_default_uom_display`、`retail_default_uom_display`；其他 UOM 表单会按初始值异步加载并使用带 `display_name` 的标签，且共享缓存避免重复请求。
+- 新增 `CurrencySelect`：统一显示“人民币 (CNY)”等映射标签，保存值仍为稳定币种编码。已替换商品编辑、客户/供应商默认币种以及采购订单新建/编辑的全部币种输入框。
+- 验证：`npm run tsc`、`npm run biome:lint`、父仓库 / 后端 / Web `diff --check` 均通过。
+
+### 2026-07-12 报表资金筛选与采购差额核销
+
+- 资金流水 `list_cashflow_entries_v1` 已补齐服务端精确筛选：方向（`Receive` / `Pay` / `Internal Transfer`）、付款方式、往来方类型和往来方；关键词搜索仍覆盖单号、往来方、付款方式和参考号。Web `/payments` 已接入对应筛选控件。
+- 采购付款 `record_supplier_payment` 统一复用结算服务；采购发票现在支持 `settlement_mode="writeoff"`。少付部分会以公司 `Write Off Account` 差额核销，且保留完整应付分配，采购订单聚合会分别反映实付与核销金额。
+- 自动化验证：后端报表、结算、采购服务单测共 97 项通过；Web `npm run tsc`、`npm run biome:lint` 与三个仓库 `diff --check` 通过。
+- 真实 HTTP 回归已通过：宿主机执行 `PurchaseQuickHttpTestCase.test_update_purchase_payment_status_writeoff_settles_purchase_invoice`，自动创建采购订单 / 收货 / 发票后以 4500 付款 + 100 核销完成结清并自动清理测试单据。此前失败是 backend 容器内错误使用宿主机 `localhost:8080` 地址；HTTP 测试应按 `.env.http-test` 在宿主机执行，或在容器内将地址改为 `http://localhost:8000`。
+- 报表剩余 P1：发票/库存凭证钻取、通用导出与大数据异步导出、多公司真实对账和性能基线；这些需要先确认导出文件存储、任务保留期以及跨公司币种/内部往来抵销口径。
+
 ### 2026-07-12 全项目差距盘点与文档治理
 
 本轮只更新文档，不修改业务代码。
