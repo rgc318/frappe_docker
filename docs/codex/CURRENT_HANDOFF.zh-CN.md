@@ -28,7 +28,7 @@
   - `services/gateway.ts`
   - `services/products.ts`
   - `services/sales.ts`
-- 后端文档已提交：`84fcdca docs: update module delivery status`；Web 文档已提交：`02d53b7 docs: refresh web delivery plan`。父仓库待提交 README、staging runbook、路线图、交接文档及后端子模块指针。
+- 后端文档已提交：`84fcdca docs: update module delivery status`；Web 文档已提交：`02d53b7 docs: refresh web delivery plan`；父仓库路线图、README、staging runbook 和后端子模块指针已提交：`73f1be61 docs: add project gap roadmap`。本次交接状态收口将在随后单独提交。
 - `git diff --check`、`git -C apps/myapp diff --check`、`git -C frontend/myapp-web diff --check` 已通过。Web 的提交钩子会将纯 Markdown 交给已忽略 `.md` 的 Biome 并报“未处理文件”，本次仅文档提交已使用 `--no-verify`；不涉及代码检查绕过。
 - 当前改动边界：后端和 Web 仅有文档变化；既有 `.codex` 仍未跟踪。移动端前述 5 个文件仍是本轮之前的既有未提交改动。
 - 建议下一项实现工作：按路线图 P0 优先启动库存盘点草稿、复核、确认、驳回、作废和审计生命周期。
