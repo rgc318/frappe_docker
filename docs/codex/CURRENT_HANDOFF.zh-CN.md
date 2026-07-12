@@ -1,10 +1,47 @@
 # 当前交接状态
 
-更新时间：2026-07-12 08:32 CST
+更新时间：2026-07-12 22:45 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-12 AI Copilot Phase A 第一条纵向链路
+
+- 本轮分仓库提交：
+  - 后端 `apps/myapp`：`81d9688 feat: add auditable AI copilot platform`。
+  - Web `frontend/myapp-web`：`6a0abc8 feat: add streaming AI copilot workspace`。
+  - 父仓库：本次提交同步 AI Orchestrator、Compose 接入、环境变量示例、后端子模块指针和本交接文档；提交号以父仓库当前 HEAD 为准。
+- 新增后端设计文档 `apps/myapp/AI_TECH_DESIGN.zh-CN.md`，并在应用 README 加入入口。
+- 已确定企业级边界：Web/Mobile 只调用 `myapp` AI Gateway；Frappe 负责权限、会话、草稿、审计和正式业务写入；独立 AI Orchestrator 负责模型编排与工具调用；内部 LiteLLM 负责多供应商模型适配、路由、限流和预算。
+- 已确定安全模型：AI 只生成、解释和修改草稿，不能创建/提交/取消正式业务单据，也不能直连数据库或生成 SQL；用户进入既有业务编辑器并主动点击后才由现有接口创建正式单据。
+- 设计首期范围：聊天工作台、商品混合检索、自然语言受限查询 DSL、报表解释、销售/采购/库存调整草稿、数据整理建议任务；详细接口、DocType、工具白名单、分期验收与待决策项见设计文档。
+- 新增独立 FastAPI 服务 `services/myapp-ai`：提供健康检查、内部 Bearer 服务认证、只读系统提示、LiteLLM OpenAI 兼容调用和模型响应归一化；传给模型供应商的终端用户标识使用稳定哈希，不发送 Frappe 登录名。
+- `compose.yaml` 已接入 `ai-orchestrator`；本地密钥保存在被忽略的 `.env.ai.local`，提交模板为 `.env.ai.example`。临时密钥不得写入代码、文档、测试结果或 Git。
+- 后端新增 `myapp.api.gateway.chat_ai_v1` 和 AI 服务层，限制消息角色、条数、长度和场景，客户端不能传入系统/工具消息；Web 新增 `/ai`、领域 service、菜单与只读边界提示。
+- 已验证：AI Orchestrator 单测 1 项通过；后端 AI 与 gateway wrapper 108 项通过；Web TypeScript、Biome 和 AI service Jest 通过；真实 `localhost:8080` HTTP 回归 1 项通过，完整覆盖 Frappe Session → Gateway → Orchestrator → LiteLLM → `gpt-5.5`，最低推理等级返回 `reasoning_tokens = 0`。
+- Phase A 第二条链路已继续实现：
+  - 新增 `MyApp AI Conversation`、`MyApp AI Message`、`MyApp AI Run` 三张内部审计表，默认保留 30 天，小时任务清理过期数据；`bench --site localhost migrate` 已成功执行 patch。
+  - 新增会话创建、列表、详情和归档网关；真实 HTTP 冒烟已验证当前用户隔离链路和归档状态。
+  - `chat_ai_v1` 现在记录用户消息、模型消息、Run、Prompt 版本、Token、延迟、trace、工具摘要和失败状态，并返回可复用于 SSE 的 `events[]` 契约。
+  - 首个 `product_search` 工具已接入：Frappe 校验 Item 读取权限和公司范围，复用 `search_product_v2`，最多向模型提供 8 条裁剪候选；Web 展示商品引用卡片，不从模型文本猜测商品事实。
+  - ERP 工具采用混合编排：业务查询在 Frappe 当前用户上下文执行，AI Orchestrator 只消费裁剪结果，不持有 ERP 超级账号，也不任意回调业务接口。
+  - Web `/ai` 已增加历史会话、消息回读、归档、场景选择、Run 标识和商品引用卡片。
+- Phase A 第二条链路已完成收口：
+  - 新增真正 POST + JWT SSE：Frappe 返回 Werkzeug 流式 Response，代理 AI Orchestrator / LiteLLM 增量事件；Web 使用 `fetch + ReadableStream`，支持消息逐段展示、工具状态、引用和完成/错误事件。
+  - 新增 `MyApp AI Feedback` 表和 `submit_ai_feedback_v1`，只允许当前用户对本人已完成 Run 点赞/点踩；Web 已接正负反馈按钮。
+  - 商品描述搜索增加确定性短语提取，可把“帮我找数码相机，只说明……”还原为真实搜索词，不额外消耗模型调用。
+  - `order_query` 已接入第一版受限 DSL：销售/采购、今天/本周/本月/上月/近 N 天、状态、金额排序/门槛和最多 20 条；复用既有订单工作台服务并二次执行记录级权限过滤。
+  - Web 已增加商品和销售/采购订单来源卡片，模型文本不作为商品编码、库存、金额或订单状态事实源。
+- 模型成本策略已调整：普通开发/回归默认使用 `opencode-deepseek-v4-flash`，只有显式 OpenAI 专项能力测试才调用 `gpt-5.5`。新 LiteLLM 密钥只保存在被忽略的 `.env.ai.local`。
+- 最新验证：AI Orchestrator 单测 2 项通过；后端 AI + gateway wrapper 116 项通过；Web TypeScript、Biome 和 AI service Jest 5 项通过；反馈表迁移成功；AI SSE + 订单查询 + 反馈专项真实 HTTP 用例通过；三个仓库 `diff --check` 均通过。
+- 真实链路已通过：Orchestrator SSE 正常；完整 Frappe 商品 SSE 首事件约 42ms，商品 `SKU010` 引用、低价模型完成和正向反馈成功；自然语言采购订单查询返回 5 条真实引用，按金额降序首条为 `PUR-ORD-2026-01846-5`。
+- 当前尚未实现：Langfuse、向量语义检索/rerank、报表真实工具、结构化单据草稿和数据治理任务。下一步优先接经营报表解释和 Langfuse，再进入 Phase B 单据草稿。
+- 提交与运维说明：
+  - `services/myapp-ai` 的源码和 Dockerfile 已纳入父仓库；最后一轮运行容器通过源码同步并重启验证，正式镜像尚未基于最终工作区重新构建，后续部署应执行 `docker compose build ai-orchestrator` 后再启动。
+  - `.env.ai.local` 和真实 LiteLLM 密钥仅保留在本机且已被 `.gitignore` 排除；`.env.ai.example` 只包含占位符和低价默认模型配置。
+  - 提交前敏感信息扫描未在提交范围发现 `sk-*`；父仓库 `.codex` 是既有本地未跟踪状态，继续禁止提交。
+- 提交后预期仓库状态：`apps/myapp` clean，`frontend/myapp-web` clean，父仓库除既有未跟踪 `.codex` 外 clean。
 
 ### 2026-07-12 Web 单位与币种初始展示映射修复
 

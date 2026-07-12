@@ -54,15 +54,34 @@ services:
     platform: linux/amd64
     ports:
       - "5678:5678"
+      - "8000:8000"
     environment:
       ENABLE_PYCHARM_DEBUG: "1"
+      MYAPP_AI_ORCHESTRATOR_URL: ${MYAPP_AI_ORCHESTRATOR_URL:-http://ai-orchestrator:4010}
+      MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:-local-development-ai-service-token}
     entrypoint:
       - bash
       - -c
     command:
       - >
+        mkdir -p /home/frappe/logs /home/frappe/frappe-bench/logs;
         ./env/bin/pip install -e apps/myapp;
         exec bench serve
+
+  ai-orchestrator:
+    build:
+      context: ./services/myapp-ai
+    restart: ${RESTART_POLICY:-unless-stopped}
+    env_file:
+      - .env.ai.local
+    ports:
+      - "4010:4010"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4010/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   frontend:
     <<: *customizable_image
