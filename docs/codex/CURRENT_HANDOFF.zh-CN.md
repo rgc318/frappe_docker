@@ -1,10 +1,26 @@
 # 当前交接状态
 
-更新时间：2026-07-13 16:45 CST
+更新时间：2026-07-13 17:45 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-13 AI 库存调整结构化草稿
+
+- 本轮分仓库提交：
+  - 后端 `apps/myapp`：`65f3ff4 feat: add AI inventory adjustment drafts`。
+  - Web `frontend/myapp-web`：`1f8d9e0 feat: hand off AI inventory drafts`。
+  - 父仓库：同步 Orchestrator、后端子模块指针、路线图和本交接文档；提交号以父仓库当前 HEAD 为准。
+- Orchestrator 新增 `inventory_adjustment_draft` 严格 Schema 和 `/internal/v1/drafts/inventory-adjustment`，只提取单个库存商品、仓库、`set_target / increase / decrease`、数量、单位、过账日期和原因候选；保留 `json_schema → JSON-only + 同 Schema 校验` 降级。
+- Frappe 新增 `generate_ai_inventory_adjustment_draft_v1`，要求当前用户具有 `Stock Entry` 创建权限，并按公司和记录权限解析真实 Item / Warehouse；商品查询使用 `item_context=inventory`，数量通过共享 `resolve_item_quantity_to_stock` 换算。
+- 草稿使用实时仓库库存计算目标库存和差异数量，估值参考只取后端商品上下文；减少后目标库存不得为负，调整原因必填。人工编辑或历史恢复都会重新读取当前库存、UOM、仓库和商品状态并创建不可变新版本。
+- `prepare_ai_draft_handoff_v1` 新增 `inventory_adjustment` 安全载荷，只把库存单位下的目标数量一次性交接到 `/inventory/adjustments`。库存调整页显示 AI 来源警告并重新读取商品详情；只有用户主动点击原有“提交调整”按钮才会调用正式库存写接口。
+- AI 不调用 `reconcile_inventory_stock_v1`，不创建或提交 `Stock Entry` / `Stock Reconciliation`。真实回归前后 `Stock Entry` 均为 815，`Stock Reconciliation` 为 0。
+- 修复采购草稿改动中暴露的反馈同步函数不可达问题，`submit_ai_feedback_v1` 再次按失败开放契约同步 Orchestrator / Langfuse score。
+- 最终 `ai-orchestrator` 镜像已重建并启动，`/health` 返回 `status=ok`、`litellm_configured=true`、`langfuse_configured=false`。
+- 验证：Orchestrator 8 项通过；后端 AI + gateway wrapper 125 项通过；Web TypeScript、Biome、19 个 Jest 套件共 129 项通过；库存调整真实 HTTP 链路通过；三个仓库 `diff --check` 通过。
+- AI 三类首期结构化草稿已全部完成。下一步优先部署真实 Langfuse 与固定评测集，随后实现商品向量检索/rerank、数据整理建议任务和模型策略管理台。
 
 ### 2026-07-13 AI 采购订单结构化草稿
 
