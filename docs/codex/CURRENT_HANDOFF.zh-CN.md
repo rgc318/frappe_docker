@@ -1,8 +1,17 @@
 # 当前交接状态
 
-更新时间：2026-07-13 17:45 CST
+更新时间：2026-07-13 18:00 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
+
+## 当前最终状态
+
+- 父仓库最新提交：`b2dc3414 feat: complete AI inventory draft flow`；除既有未跟踪 `.codex` 外工作区干净。
+- 后端 `apps/myapp` 最新提交：`65f3ff4 feat: add AI inventory adjustment drafts`；工作区干净。
+- Web `frontend/myapp-web` 最新提交：`1f8d9e0 feat: hand off AI inventory drafts`；工作区干净。
+- AI Orchestrator 当前健康，`status=ok`、`litellm_configured=true`、`langfuse_configured=false`。
+- 销售订单、采购订单和库存调整三类首期结构化草稿均已完成生成、人工编辑、不可变版本、安全恢复、放弃和现有业务编辑器交接。
+- 当前 AI Copilot 整体完成度约 80%；剩余重点是实际 Langfuse/固定评测集、向量检索与 rerank、数据整理审批任务、模型预算与策略管理台。
 
 ## 本轮工作总结
 
@@ -11,7 +20,7 @@
 - 本轮分仓库提交：
   - 后端 `apps/myapp`：`65f3ff4 feat: add AI inventory adjustment drafts`。
   - Web `frontend/myapp-web`：`1f8d9e0 feat: hand off AI inventory drafts`。
-  - 父仓库：同步 Orchestrator、后端子模块指针、路线图和本交接文档；提交号以父仓库当前 HEAD 为准。
+  - 父仓库：`b2dc3414 feat: complete AI inventory draft flow`。
 - Orchestrator 新增 `inventory_adjustment_draft` 严格 Schema 和 `/internal/v1/drafts/inventory-adjustment`，只提取单个库存商品、仓库、`set_target / increase / decrease`、数量、单位、过账日期和原因候选；保留 `json_schema → JSON-only + 同 Schema 校验` 降级。
 - Frappe 新增 `generate_ai_inventory_adjustment_draft_v1`，要求当前用户具有 `Stock Entry` 创建权限，并按公司和记录权限解析真实 Item / Warehouse；商品查询使用 `item_context=inventory`，数量通过共享 `resolve_item_quantity_to_stock` 换算。
 - 草稿使用实时仓库库存计算目标库存和差异数量，估值参考只取后端商品上下文；减少后目标库存不得为负，调整原因必填。人工编辑或历史恢复都会重新读取当前库存、UOM、仓库和商品状态并创建不可变新版本。
@@ -27,7 +36,7 @@
 - 本轮分仓库提交：
   - 后端 `apps/myapp`：`0a16313 feat: add auditable AI purchase drafts`。
   - Web `frontend/myapp-web`：`8f37980 feat: hand off AI purchase drafts`。
-  - 父仓库：同步 Orchestrator、后端子模块指针、路线图和本交接文档；提交号以父仓库当前 HEAD 为准。
+  - 父仓库：`1c733f93 feat: complete AI purchase draft flow`。
 - 新增 Orchestrator `purchase_order_draft` 严格 Schema 和 `/internal/v1/drafts/purchase-order`；支持供应商、商品、数量、单位、币种、收货仓库、日期、供应商参考号和备注候选，保留 `json_schema → JSON-only + 同 Schema 校验` 兼容降级。
 - Frappe 新增 `generate_ai_purchase_order_draft_v1`，按当前用户权限解析真实 Supplier，商品查询使用 `item_context=purchase`，采购价只取后端 `standard_buying_rate` / buying prices，模型价格不直接采用。
 - 采购草稿复用通用 Draft / Draft Line / Version、人工编辑、重新校验、放弃、差异、安全恢复和状态机；供应商、采购价、采购 UOM、币种、预计到货日期及收货仓库保持采购领域独立口径。
@@ -37,7 +46,7 @@
 - 最终 `ai-orchestrator` 镜像已基于当前工作区重建并重启，`/health` 返回 `status=ok`、`litellm_configured=true`；本地未配置 Langfuse，健康字段为 `false`，不影响草稿链路。
 - 验证：Orchestrator 7 项通过；后端 AI + gateway wrapper 122 项通过；Web TypeScript、Biome、AI service Jest 5 项通过；三个仓库 `diff --check` 通过。
 - 采购草稿、销售草稿版本治理、Web 人工编辑/版本历史及相关文档已完成分仓库提交。
-- 下一步：实现库存调整结构化草稿，重点约束盘点/调整原因、目标仓库、库存 UOM、差异数量和禁止直接入账边界。
+- 后续库存调整结构化草稿已在上一节完成；采购草稿当前无待提交代码。
 
 ### 2026-07-13 AI 草稿不可变版本与安全恢复
 
