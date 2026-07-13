@@ -1,10 +1,38 @@
 # 当前交接状态
 
-更新时间：2026-07-13 10:07 CST
+更新时间：2026-07-13 14:18 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-13 AI Copilot 销售订单结构化草稿
+
+- 本轮分仓库提交：
+  - 后端 `apps/myapp`：`bb68490 feat: add auditable AI sales drafts`。
+  - Web `frontend/myapp-web`：`182e612 feat: hand off AI sales drafts`。
+  - 父仓库：本次提交包含 Langfuse Orchestrator、最终镜像构建优化、后端子模块指针、路线图和交接文档；提交号以父仓库当前 HEAD 为准。
+- Phase B 首个纵向链路已完成：新增 `MyApp AI Draft` / `MyApp AI Draft Line` 内部表和 patch，支持销售订单草稿、来源 Run、版本、校验、候选、UOM、价格、仓库及行级审计；`bench --site localhost migrate` 成功。
+- Orchestrator 新增 `/internal/v1/drafts/sales-order` 和严格 Pydantic Schema。优先使用模型 `json_schema`；当前低成本模型返回 400 时降级为 JSON-only 提取，但仍通过同一 Schema，非法自由文本不会持久化。
+- Frappe 新增 `generate_ai_sales_order_draft_v1`、`get_ai_draft_v1`、`prepare_ai_draft_handoff_v1`：模型只提取候选，Frappe 按当前用户和公司权限重新解析 Customer、Item、Warehouse、UOM、换算系数和当前参考价；模型价格不直接采用，歧义会阻止交接。
+- 草稿工具审计等级为 `L2_DRAFT_ONLY`。只有 `ready_for_handoff=true` 的草稿可以交接，交接只返回安全预填载荷并标记 `handed_off`，不创建或提交 Sales Order。
+- Web `/ai` 新增“销售订单草稿”场景和草稿卡片；校验通过后使用一次性 sessionStorage 载荷进入现有 `/sales/orders/new`，页面显示 AI 来源警告，用户必须复核并主动点击现有 v2 创建按钮。
+- 真实链路通过：使用真实客户和 `SKU010 × 2` 生成 `AI-DRAFT-e7f566a5573d4db2a78c49a480680707`，真实主数据解析、草稿持久化和 handoff 均成功；测试会话已归档，未调用正式订单创建接口。
+- 验证：Orchestrator 6 项测试通过；后端 AI + gateway wrapper 121 项通过；Web TypeScript、Biome、AI service Jest 5 项通过；草稿表迁移成功；三个仓库 `diff --check` 和敏感信息检查通过。
+- 最终 `ai-orchestrator` 镜像已基于当前工作区重建并启动；Dockerfile 将第三方依赖层与业务源码层分离，后续源码变更可复用依赖缓存。
+- 提交后预期状态：后端和 Web clean；父仓库除既有 `.codex` 外 clean。
+- 下一步：补草稿人工修改、重新校验、版本差异和放弃；随后实现采购订单草稿和库存调整草稿。
+
+### 2026-07-13 AI Copilot Langfuse 可观测性接入
+
+- AI Orchestrator 新增可选 Langfuse ingestion 客户端，记录 trace、generation、模型、Token、成功 / 错误状态，并把 Frappe conversation / run、场景、Prompt 版本、公司、环境和 release 作为关联元数据。
+- 默认 `MYAPP_AI_LANGFUSE_CAPTURE_CONTENT=0`，输入输出只发送 SHA-256、字符数和字节数；终端用户继续使用稳定哈希，不把 Frappe 登录名发送给观测平台。只有完成数据治理评审后才能显式上传原文。
+- Langfuse 集成为失败开放：未配置完整 host / public key / secret key、请求超时或平台返回错误时，不阻断模型调用、SSE 完成和 ERP 反馈保存。
+- Frappe 发送给 Orchestrator 的请求已补充 `conversation_id` / `run_id`；`submit_ai_feedback_v1` 在本地持久化后调用新的 `/internal/v1/feedback`，把点赞 / 点踩同步为 Langfuse score。Run 查询补充 `trace_id` 关联。
+- `.env.ai.example`、Orchestrator README、AI 技术设计和项目差距路线图已更新；健康检查现在返回 `langfuse_configured`。当前本地未配置真实 Langfuse 密钥，健康状态为 `false`，但接入代码和降级契约已完成。
+- 已基于最终源码重建并重启 `frappe_docker-ai-orchestrator-1`，容器健康。Orchestrator 容器单测 5 项通过；后端 AI + gateway wrapper 120 项通过；真实低成本模型订单查询 SSE + 反馈链路通过，日志确认 `/internal/v1/chat/stream` 和 `/internal/v1/feedback` 均返回 200。
+- 当前改动尚未提交：父仓库 Orchestrator、环境变量模板、路线图和本交接文档；后端 AI repository / service / tests 与设计文档。Web 无改动。父仓库既有 `.codex` 继续禁止提交。
+- 下一步：部署或接入真实 Langfuse 实例完成 trace / score 实际落库与看板验收，然后进入 Phase B 销售订单结构化草稿、校验和现有编辑器交接。
 
 ### 2026-07-12 AI Copilot 经营报表解释
 
