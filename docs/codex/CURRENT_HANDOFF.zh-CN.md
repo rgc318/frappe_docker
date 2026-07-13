@@ -1,10 +1,45 @@
 # 当前交接状态
 
-更新时间：2026-07-13 14:30 CST
+更新时间：2026-07-13 16:45 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-13 AI 采购订单结构化草稿
+
+- 本轮分仓库提交：
+  - 后端 `apps/myapp`：`0a16313 feat: add auditable AI purchase drafts`。
+  - Web `frontend/myapp-web`：`8f37980 feat: hand off AI purchase drafts`。
+  - 父仓库：同步 Orchestrator、后端子模块指针、路线图和本交接文档；提交号以父仓库当前 HEAD 为准。
+- 新增 Orchestrator `purchase_order_draft` 严格 Schema 和 `/internal/v1/drafts/purchase-order`；支持供应商、商品、数量、单位、币种、收货仓库、日期、供应商参考号和备注候选，保留 `json_schema → JSON-only + 同 Schema 校验` 兼容降级。
+- Frappe 新增 `generate_ai_purchase_order_draft_v1`，按当前用户权限解析真实 Supplier，商品查询使用 `item_context=purchase`，采购价只取后端 `standard_buying_rate` / buying prices，模型价格不直接采用。
+- 采购草稿复用通用 Draft / Draft Line / Version、人工编辑、重新校验、放弃、差异、安全恢复和状态机；供应商、采购价、采购 UOM、币种、预计到货日期及收货仓库保持采购领域独立口径。
+- `prepare_ai_draft_handoff_v1` 现在支持 sales_order / purchase_order 两类安全载荷。Web `/ai` 新增“采购订单草稿”，草稿卡片、人工编辑和版本治理按草稿类型显示；handoff 使用一次性 sessionStorage 进入 `/purchase/orders/new`。
+- 采购订单新建页新增 AI 草稿预填和来源警告，预填供应商、公司、币种、日期、采购模式、仓库、供应商参考号、备注和商品行；用户仍需主动点击现有采购创建接口。
+- 真实链路通过：供应商 `HTTP Sort Supplier 1783508721925502138` + `SKU010 × 2` 生成 `AI-DRAFT-2cd683de4f7e4eceac8b54165c56c0a5`，采购参考价 920，validation ready，handoff 类型和供应商正确；会话已归档，未创建正式采购单。
+- 最终 `ai-orchestrator` 镜像已基于当前工作区重建并重启，`/health` 返回 `status=ok`、`litellm_configured=true`；本地未配置 Langfuse，健康字段为 `false`，不影响草稿链路。
+- 验证：Orchestrator 7 项通过；后端 AI + gateway wrapper 122 项通过；Web TypeScript、Biome、AI service Jest 5 项通过；三个仓库 `diff --check` 通过。
+- 采购草稿、销售草稿版本治理、Web 人工编辑/版本历史及相关文档已完成分仓库提交。
+- 下一步：实现库存调整结构化草稿，重点约束盘点/调整原因、目标仓库、库存 UOM、差异数量和禁止直接入账边界。
+
+### 2026-07-13 AI 草稿不可变版本与安全恢复
+
+- 新增 `MyApp AI Draft Version` 内部表和迁移 patch；已有草稿自动保存当前状态为 `migration` 基线版本，新草稿生成、人工修改和历史恢复分别记录 `generated`、`user_edit`、`restore_vN` 来源。
+- 新增 `list_ai_draft_versions_v1` 和 `restore_ai_draft_version_v1`。版本接口返回字段变化以及商品行新增、删除、数量/UOM/价格/仓库变化。
+- 历史恢复不会直接覆盖当前草稿，而是重新调用现有更新与真实主数据校验流程，并创建新的不可变版本，防止恢复过期价格、失效仓库或旧 UOM。
+- Web 草稿卡片新增“版本历史”，展示版本号、来源、时间、字段/商品行差异，并支持将旧版本重新校验后恢复为新版本；当前最新版本不能重复恢复。
+- 草稿人工编辑 Modal 已完成：客户、仓库、日期、销售模式、备注和商品行修改后由后端重新解析并刷新 validation；卡片展示状态、版本和校验错误。
+- 验证：版本迁移成功；后端 AI + gateway wrapper 122 项通过；Web TypeScript、Biome、AI service Jest 5 项通过；真实 HTTP 版本列表返回既有草稿版本 1 / `migration`。
+- 当前版本治理、人工编辑 UI、AI 技术设计、路线图和本交接文档尚未提交。
+- 下一步：实现采购订单结构化草稿，复用通用草稿版本状态机但保持采购价格、供应商、收货仓库和采购 UOM 领域校验独立。
+
+### 2026-07-13 AI 草稿人工编辑与版本展示
+
+- 在生命周期控制提交后继续实现 Web 草稿人工编辑 Modal：客户、默认仓库、订单/交货日期、销售模式、备注和商品行可编辑，使用 Ant Design Form / Modal / InputNumber 和项目 RemoteLinkSelect。
+- 保存调用 `update_ai_draft_v1`，后端重新解析真实 Customer / Item / Warehouse / UOM / 价格并递增版本；页面用后端返回值刷新来源卡片，不在浏览器自行判定 `ready_for_handoff`。
+- 草稿卡片新增版本、状态和 validation errors 展示；只有 `draft` 状态可编辑，放弃或交接后按钮按状态禁用。
+- Web TypeScript 与 Biome 通过。当前人工编辑 UI、AI 技术设计和本交接文档尚未提交。
 
 ### 2026-07-13 AI 草稿生命周期继续完善
 
