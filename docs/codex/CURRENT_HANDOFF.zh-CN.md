@@ -1,10 +1,26 @@
 # 当前交接状态
 
-更新时间：2026-07-12 22:45 CST
+更新时间：2026-07-13 10:07 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-12 AI Copilot 经营报表解释
+
+- 本轮分仓库提交：
+  - 后端 `apps/myapp`：`0628a9e feat: add AI report explanations`。
+  - Web `frontend/myapp-web`：`7c306eb feat: add AI report source cards`。
+  - 父仓库：本次提交同步后端子模块指针、项目差距路线图和本交接文档；提交号以父仓库当前 HEAD 为准。
+- 已完成 Phase A 的经营报表解释纵向链路：`report_summary` 不再是占位场景，Frappe 会把自然语言确定性解析为经营总览、销售、采购、资金或应收应付报表，以及今天 / 本周 / 本月 / 上月 / 近 N 天（最多 366 天）的受限 DSL。
+- 报表工具复用既有结构化报表服务，不生成 SQL；执行前校验当前公司范围和报表依赖的 Sales Order、Purchase Order、Payment Entry、Sales Invoice、Purchase Invoice 读取权限，只把裁剪后的指标、趋势、排行和口径元数据交给 AI Orchestrator。
+- Prompt / 工具策略审计版本升级为 `erp-readonly-v3`。回答被明确要求区分订单金额、实际收付款和发票未结金额，不得把模型推测当作报表原因或明细事实。
+- Web `/ai` 已启用“报表解释”，增加示例问题、独立 `business_report` 来源卡片、中文经营指标标签和报表跳转，并同步更新只读安全边界说明。
+- 修复真实回归发现的 DSL 组合语义：销售 + 应收未结仍走销售报表，采购 + 应付未结仍走采购报表；只有同时询问应收应付或明确往来账 / 欠款时才走应收应付报表。
+- 修复 AI HTTP 测试未启用计费开关时错误调用 class-level `skipTest` 的既有问题，改为标准 `unittest.SkipTest`。
+- 验证：后端 AI + gateway wrapper 120 项通过；真实低成本模型 SSE 报表专项 1 项通过，完整覆盖 Frappe Session → 报表权限 / 公司范围 → 销售报表 → AI Orchestrator → LiteLLM，并返回 `business_report` 引用后归档测试会话；Web TypeScript、Biome 和 AI service Jest 5 项通过；三个仓库 `diff --check` 通过。
+- 提交后预期仓库状态：`apps/myapp` clean，`frontend/myapp-web` clean，父仓库除既有未跟踪 `.codex` 外 clean。
+- 下一步优先项：接入 Langfuse trace / feedback 可观测性，之后进入 Phase B 结构化单据草稿；语义向量检索 / rerank 可与草稿阶段并行评估。
 
 ### 2026-07-12 AI Copilot Phase A 第一条纵向链路
 
