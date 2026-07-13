@@ -1,10 +1,23 @@
 # 当前交接状态
 
-更新时间：2026-07-13 14:18 CST
+更新时间：2026-07-13 14:30 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 ## 本轮工作总结
+
+### 2026-07-13 AI 草稿生命周期继续完善
+
+- 本轮分仓库提交：
+  - 后端 `apps/myapp`：`02dbba6 feat: add AI draft lifecycle controls`。
+  - Web `frontend/myapp-web`：`95a8bc3 feat: add AI draft discard action`。
+  - 父仓库：同步后端子模块指针和本交接文档；提交号以父仓库当前 HEAD 为准。
+- 在已提交的销售订单草稿纵向链路上继续新增人工修改后重新解析 / 校验、版本号递增、行级 `updated_by_user` 审计和显式放弃能力。
+- 新增 `update_ai_draft_v1` 与 `discard_ai_draft_v1`；只有 `draft` 状态可以修改或交接，`handed_off` 草稿不可再次修改或放弃，避免重复交接和版本漂移。
+- 更新草稿时不信任前端传入的商品、价格或换算结果：Frappe 再次按当前用户、公司和真实主数据解析 Customer、Item、Warehouse、UOM、换算系数与参考价，然后重建 Draft Line 并更新 validation。
+- Web AI 草稿卡片增加“放弃草稿”，放弃后当前卡片立即禁用交接。人工字段编辑界面和版本差异可视化仍待继续。
+- 验证：后端 AI + gateway wrapper 121 项通过；Web TypeScript 和 Biome 通过；三个仓库 `diff --check` 通过。
+- 提交后预期状态：后端和 Web clean；父仓库除既有 `.codex` 外 clean。
 
 ### 2026-07-13 AI Copilot 销售订单结构化草稿
 
