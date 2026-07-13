@@ -1,6 +1,7 @@
 # Environment Variables
 .env
 .env.ai.local
+.env.langfuse.local
 
 # mounted volume
 sites

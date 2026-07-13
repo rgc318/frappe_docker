@@ -72,10 +72,17 @@ services:
     build:
       context: ./services/myapp-ai
     restart: ${RESTART_POLICY:-unless-stopped}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
     env_file:
       - .env.ai.local
     ports:
-      - "4010:4010"
+      - "127.0.0.1:${MYAPP_AI_ORCHESTRATOR_PORT:-4010}:4010"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4010/health', timeout=3)"]
       interval: 10s

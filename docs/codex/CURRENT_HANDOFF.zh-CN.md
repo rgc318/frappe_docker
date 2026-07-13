@@ -1,19 +1,39 @@
 # 当前交接状态
 
-更新时间：2026-07-13 18:00 CST
+更新时间：2026-07-13 22:53 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
+下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
+
 ## 当前最终状态
 
-- 父仓库最新提交：`b2dc3414 feat: complete AI inventory draft flow`；除既有未跟踪 `.codex` 外工作区干净。
-- 后端 `apps/myapp` 最新提交：`65f3ff4 feat: add AI inventory adjustment drafts`；工作区干净。
+- 父仓库本轮提交：本交接文件所在当前 HEAD，包含 Langfuse、Orchestrator、固定评测、运行安全配置、文档和后端子模块指针；提交后除既有未跟踪 `.codex` 外工作区干净。
+- 后端 `apps/myapp` 最新提交：`09fcb10 feat: add AI prompt evaluation governance`；工作区干净，父仓库已同步该子模块指针。
 - Web `frontend/myapp-web` 最新提交：`1f8d9e0 feat: hand off AI inventory drafts`；工作区干净。
-- AI Orchestrator 当前健康，`status=ok`、`litellm_configured=true`、`langfuse_configured=false`。
+- Mobile `frontend/myapp-mobile` 最新提交：`ca87e1c`；保留本轮开始前已有的 `app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts` 五个未提交改动，本轮未修改、回滚或提交。
+- AI Orchestrator 已基于最终源码重建并健康，`status=ok`、`litellm_configured=true`、`langfuse_configured=true`，`/health` 返回完整 Prompt 版本表；宿主机端口只绑定 `127.0.0.1:4010`。
+- Orchestrator 以 UID/GID `10001` 非 root 用户运行，rootfs 只读、capabilities 为空、`NoNewPrivs=1`，仅 `/tmp` tmpfs 可写；Python 基础镜像固定 digest。
+- 本地 Langfuse v3.212.0 的 Web、Worker、PostgreSQL、ClickHouse、Redis、MinIO 已启动并通过健康检查；UI 为 `127.0.0.1:3000`。
 - 销售订单、采购订单和库存调整三类首期结构化草稿均已完成生成、人工编辑、不可变版本、安全恢复、放弃和现有业务编辑器交接。
-- 当前 AI Copilot 整体完成度约 80%；剩余重点是实际 Langfuse/固定评测集、向量检索与 rerank、数据整理审批任务、模型预算与策略管理台。
+- 当前 AI Copilot 整体完成度约 85%；剩余重点是商品向量检索与 rerank、生产观测运维/OTLP、数据整理审批任务、模型预算与策略管理台。
 
 ## 本轮工作总结
+
+### 2026-07-13 AI Langfuse 本地可观测性与固定评测集
+
+- 新增 `overrides/compose.langfuse.yaml`，本地固定 Langfuse v3.212.0，并使用独立 PostgreSQL、ClickHouse 26.6.1.1193、Redis 7.4.9、PostgreSQL 17.10 和固定 MinIO digest。Web/MinIO 只绑定 loopback，数据库、ClickHouse、Redis 和 MinIO Console 不发布宿主机端口。
+- 新增 `setup-ai-observability.sh` 和 `.env.langfuse.example`。脚本生成 `.env.langfuse.local`、随机数据库/存储/NextAuth/加密/API Key/管理员密码，文件权限为 `0600` 且被 Git 忽略，密钥不打印到终端，并拒绝覆盖已经存在的密钥文件。
+- Orchestrator 新增统一 Prompt registry；Frappe 审计、模型请求和 Langfuse metadata 已对齐到只读 `erp-readonly-v5`、销售 `sales-order-draft-v2`、采购 `purchase-order-draft-v2`、库存 `inventory-adjustment-draft-v2`。只读提示补强公司/完整日期口径、不转述上下文注入文本和不自行推导财务公式；草稿提示明确保留用户单位量词及全单/行仓库边界。
+- Langfuse 批次客户端修复 HTTP 207 误判：只有逐事件 `errors` 为空且 `successes` 覆盖本批次全部事件 ID 才算同步成功。Trace `release`、generation Prompt `version` 和 score `environment/source` 写入原生字段；eval 为 `source=EVAL`，feedback 为 `source=API`。Trace、generation、固定评测 score 和 `user-feedback` 已通过真实 API 查询持久化。
+- 新增 `myapp_ai.evals`：21 个纯合成固定用例、版本化 JSONL、确定性 grader、offline replay、显式付费 live runner、阈值退出码、脱敏 JSON 报告和 Langfuse score。默认不保存模型输出或反馈 comment 原文，只保留哈希、长度、失败原因、Prompt/DataSet 版本、延迟和 Token。
+- Partial eval 明确返回 `gate_scope=partial`、`release_gate_eligible=false`，缺失指标为 `null`；未知 case ID 拒绝并退出 `2`。只有覆盖当前 mode 全部用例的 full gate 可作为发布依据。
+- Prompt 版本治理拒绝显式不一致及空白版本，聊天、流式和三类草稿接口返回 HTTP `409`；`/health` 返回全部场景的当前版本。镜像新增 `.dockerignore`、精确生产顶层依赖、`pip check`、非 root 用户和 Compose 运行态安全限制。
+- 首次 live baseline 暴露 UOM、全单/行仓库、公司/日期口径、Unicode 连字符/千分位评分和上下文注入转述问题；修复 Prompt 和 grader 后最终低价模型 live gate 21/21 通过，critical、安全、Schema、禁止模式、结构化字段准确率和普通场景通过率均为 100%。最终 Token：prompt 13811、completion 13436、reasoning 11580、total 27247；p50 约 7.22 秒、p95 约 14.44 秒。
+- Frappe 新增 20 个纯合成确定性 fixture 用例，固定 `as_of=2026-07-13`，覆盖商品短语、订单 DSL、报表 DSL；日期函数只增加测试用可选 `as_of`，生产默认仍使用 `date.today()`。同时修复 AI HTTP 测试凭据缺失分支错误调用 `cls.skipTest`。
+- 最终故障演练通过：停止 Langfuse Web 后，真实低价模型聊天仍返回 200（540 tokens）；反馈接口返回 `accepted=true`、`observability_synced=false`，恢复后 Langfuse v3.212.0 健康。说明观测失败不会阻断 ERP/AI 主链路。
+- 验证：Orchestrator 37 项通过；offline full gate 21/21 且可发布，partial gate 1/1 且明确不可发布，未知 case 退出 `2`；既有最终低价模型 live full gate 21/21，本轮最终镜像额外 live partial 1/1（509 tokens，约 3.26 秒）。后端 AI/确定性评测/gateway wrappers 132 项通过；Langfuse trace/generation/eval/feedback 查询、feedback 原文脱敏和失败开放演练均通过。Dockerfile 源码层可复用依赖缓存。
+- 本轮分仓库提交：后端 `09fcb10 feat: add AI prompt evaluation governance`；父仓库提交为本交接文件所在当前 HEAD。既有 `.codex` 和 Mobile 五个本地改动未提交。生产剩余风险：legacy `/api/public/ingestion` 已被 Langfuse v3 标记废弃，需迁移 OTLP；生产还需 PostgreSQL/ClickHouse/MinIO 联合备份恢复、告警、SSO/访问治理、成本看板和密钥轮换演练。
 
 ### 2026-07-13 AI 库存调整结构化草稿
 
