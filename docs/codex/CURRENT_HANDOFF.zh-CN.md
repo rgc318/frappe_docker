@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-13 22:53 CST
+更新时间：2026-07-13 22:59 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,7 +8,7 @@
 
 ## 当前最终状态
 
-- 父仓库本轮提交：本交接文件所在当前 HEAD，包含 Langfuse、Orchestrator、固定评测、运行安全配置、文档和后端子模块指针；提交后除既有未跟踪 `.codex` 外工作区干净。
+- 父仓库本轮功能提交：`95a7cae8 feat: complete AI observability evaluation milestone`，包含 Langfuse、Orchestrator、固定评测、运行安全配置、文档和后端子模块指针；当前 HEAD 为本交接补充提交，提交后除既有未跟踪 `.codex` 外工作区干净。
 - 后端 `apps/myapp` 最新提交：`09fcb10 feat: add AI prompt evaluation governance`；工作区干净，父仓库已同步该子模块指针。
 - Web `frontend/myapp-web` 最新提交：`1f8d9e0 feat: hand off AI inventory drafts`；工作区干净。
 - Mobile `frontend/myapp-mobile` 最新提交：`ca87e1c`；保留本轮开始前已有的 `app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts` 五个未提交改动，本轮未修改、回滚或提交。
@@ -33,7 +33,7 @@
 - Frappe 新增 20 个纯合成确定性 fixture 用例，固定 `as_of=2026-07-13`，覆盖商品短语、订单 DSL、报表 DSL；日期函数只增加测试用可选 `as_of`，生产默认仍使用 `date.today()`。同时修复 AI HTTP 测试凭据缺失分支错误调用 `cls.skipTest`。
 - 最终故障演练通过：停止 Langfuse Web 后，真实低价模型聊天仍返回 200（540 tokens）；反馈接口返回 `accepted=true`、`observability_synced=false`，恢复后 Langfuse v3.212.0 健康。说明观测失败不会阻断 ERP/AI 主链路。
 - 验证：Orchestrator 37 项通过；offline full gate 21/21 且可发布，partial gate 1/1 且明确不可发布，未知 case 退出 `2`；既有最终低价模型 live full gate 21/21，本轮最终镜像额外 live partial 1/1（509 tokens，约 3.26 秒）。后端 AI/确定性评测/gateway wrappers 132 项通过；Langfuse trace/generation/eval/feedback 查询、feedback 原文脱敏和失败开放演练均通过。Dockerfile 源码层可复用依赖缓存。
-- 本轮分仓库提交：后端 `09fcb10 feat: add AI prompt evaluation governance`；父仓库提交为本交接文件所在当前 HEAD。既有 `.codex` 和 Mobile 五个本地改动未提交。生产剩余风险：legacy `/api/public/ingestion` 已被 Langfuse v3 标记废弃，需迁移 OTLP；生产还需 PostgreSQL/ClickHouse/MinIO 联合备份恢复、告警、SSO/访问治理、成本看板和密钥轮换演练。
+- 本轮分仓库提交：后端 `09fcb10 feat: add AI prompt evaluation governance`；父仓库功能提交 `95a7cae8 feat: complete AI observability evaluation milestone`；当前交接补充提交为本文件所在 HEAD。既有 `.codex` 和 Mobile 五个本地改动未提交。生产剩余风险：legacy `/api/public/ingestion` 已被 Langfuse v3 标记废弃，需迁移 OTLP；生产还需 PostgreSQL/ClickHouse/MinIO 联合备份恢复、告警、SSO/访问治理、成本看板和密钥轮换演练。
 
 ### 2026-07-13 AI 库存调整结构化草稿
 
