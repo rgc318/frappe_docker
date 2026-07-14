@@ -205,3 +205,33 @@ ERPNext 原生支持 `Item Barcode` 子表，本项目后端也已围绕商品�
 - 前端退货页应改为 `resolveDisplayUom(record.uom, record.uomDisplay)`。
 - 编辑页 fallback 行如果无法加载商品详情，应保留单据行已有 `uomDisplay`，并只提供当前单位的降级选项；能加载商品详情时必须使用商品接口返回的 `all_uoms` 和 `conversion_factor`。
 - 相关改动必须保留后端序列化测试和 Web service 映射测试，覆盖自定义单位展示名。
+
+## 9. LiteLLM Chat 因 request_timeout 为空而全局失败
+
+现象：
+
+```text
+litellm.APIConnectionError: float() argument must be a string or a real number, not 'NoneType'
+```
+
+- `/v1/models` 可以正常返回。
+- `/v1/embeddings` 可能仍然正常。
+- 多个不同聊天模型的 `/v1/chat/completions` 都在路由前返回 HTTP 500。
+
+原因：
+
+- LiteLLM 全局 `request_timeout` 被解析为 `None`。
+- Chat completion 的 timeout resolver 会执行 `float(litellm.request_timeout)`，因此不是某一个供应商模型故障，也不是 Frappe、Qdrant 或 Embedding 故障。
+
+处理：
+
+在 LiteLLM 服务端配置中显式设置数值，例如：
+
+```yaml
+litellm_settings:
+  request_timeout: 60
+```
+
+重启 LiteLLM 后分别验证一个聊天别名和 Embedding 别名。不要只检查 `/v1/models`，因为模型注册成功不代表 Chat 路由已经可调用。
+
+如果业务侧 API Key 对 `/config/list` 等管理端点返回 403，必须由 LiteLLM 管理员在服务端修复，不能通过普通推理 Key 修改全局配置。

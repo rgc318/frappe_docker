@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-13 22:59 CST
+更新时间：2026-07-14 18:56 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,17 +8,38 @@
 
 ## 当前最终状态
 
-- 父仓库本轮功能提交：`95a7cae8 feat: complete AI observability evaluation milestone`，包含 Langfuse、Orchestrator、固定评测、运行安全配置、文档和后端子模块指针；当前 HEAD 为本交接补充提交，提交后除既有未跟踪 `.codex` 外工作区干净。
-- 后端 `apps/myapp` 最新提交：`09fcb10 feat: add AI prompt evaluation governance`；工作区干净，父仓库已同步该子模块指针。
-- Web `frontend/myapp-web` 最新提交：`1f8d9e0 feat: hand off AI inventory drafts`；工作区干净。
+- 2026-07-14 AI 商品向量检索纵向链路已完成真实启用、验收和分仓库提交：Backend `0206fb6 feat: add governed AI product vector search`，Web `f507efb feat: show AI semantic product matches`，父仓库为本文件所在的 `feat: complete AI semantic search milestone` 提交。
+- Qdrant v1.15.5 已固定 digest 并健康运行，不发布宿主机端口；UID/GID `65534` 非 root、rootfs 只读、capabilities 为空、`NoNewPrivs=1`、遥测关闭，数据使用独立 `ai-vector-data` 卷。
+- LiteLLM 已新增 `erp-embedding` 能力别名；`/v1/embeddings` 真实调用返回 1024 维数值向量。`.env.ai.local` 已启用 `MYAPP_AI_VECTOR_SEARCH_ENABLED=1`，Orchestrator 健康状态为 `vector_search_configured=true`。
+- 真实站点 582 个 Item 已全部索引：tracked 582、indexed 582、due 0、failed 0，Qdrant points 582、vector size 1024。10 条中文跨语言语义固定查询 Top-1/Top-3 均为 10/10；混合检索返回 `SKU010` 首位，向量不可达时关键词降级正常。
+- 已验证：Orchestrator 44 项测试通过，offline full gate 21/21；后端 AI/vector/确定性评测/gateway 142 项通过；Web TypeScript、Biome 和 19 套 Jest 共 129 项通过；Qdrant fresh-volume、payload index、过滤检索、重复删除幂等、删除后恢复、权限拒绝、健康检查和运行安全配置均通过。
+- 新增仅 System Manager 可用的 `get_ai_product_vector_status_v1` / `rebuild_ai_product_vector_index_v1`；普通无 Item 权限用户的商品检索与向量治理均返回 `PermissionError`。支持指定商品、仅失败项和最多 500 条的受控分批重建。
+- 新增 `AI_MODEL_GOVERNANCE_TECH_DESIGN.zh-CN.md`，详细定义模型注册、场景策略、预算、灰度、审批、发布、回滚、用量聚合和 Embedding 双 collection 治理；新增 `AI_HIGH_CONCURRENCY_TECH_DESIGN.zh-CN.md`，详细定义异步连接池、多副本、分布式限流/背压、SSE Stream Gateway、独立向量队列、Qdrant 高可用和压测验收。两项当前均为详细设计基线，尚未实现管理模块和生产高并发改造。
+
+- 父仓库已提交本文件所在的 `feat: complete AI semantic search milestone`；当前只剩既有未跟踪 `.codex`，不得提交。
+- 后端 `apps/myapp` 已提交 `0206fb6 feat: add governed AI product vector search`，工作区干净。
+- Web `frontend/myapp-web` 已提交 `f507efb feat: show AI semantic product matches`，工作区干净。
 - Mobile `frontend/myapp-mobile` 最新提交：`ca87e1c`；保留本轮开始前已有的 `app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts` 五个未提交改动，本轮未修改、回滚或提交。
-- AI Orchestrator 已基于最终源码重建并健康，`status=ok`、`litellm_configured=true`、`langfuse_configured=true`，`/health` 返回完整 Prompt 版本表；宿主机端口只绑定 `127.0.0.1:4010`。
+- AI Orchestrator 已基于最终源码重建并健康，`status=ok`、`litellm_configured=true`、`langfuse_configured=true`、`vector_search_configured=true`，`/health` 返回完整 Prompt 版本表；宿主机端口只绑定 `127.0.0.1:4010`。Backend、queue-short、queue-long、scheduler 已重建并运行。
+- LiteLLM 管理员已修复 Chat 全局 timeout 配置并完成重启；`opencode-deepseek-v4-flash` 最小请求返回 HTTP 200，完整登录 → Frappe Gateway → 混合商品检索 → Orchestrator → LiteLLM → `SKU010` 首条引用 → 测试会话归档链路通过。
 - Orchestrator 以 UID/GID `10001` 非 root 用户运行，rootfs 只读、capabilities 为空、`NoNewPrivs=1`，仅 `/tmp` tmpfs 可写；Python 基础镜像固定 digest。
 - 本地 Langfuse v3.212.0 的 Web、Worker、PostgreSQL、ClickHouse、Redis、MinIO 已启动并通过健康检查；UI 为 `127.0.0.1:3000`。
 - 销售订单、采购订单和库存调整三类首期结构化草稿均已完成生成、人工编辑、不可变版本、安全恢复、放弃和现有业务编辑器交接。
-- 当前 AI Copilot 整体完成度约 85%；剩余重点是商品向量检索与 rerank、生产观测运维/OTLP、数据整理审批任务、模型预算与策略管理台。
+- 当前 AI Copilot 整体完成度约 91%；商品向量检索、语义质量和真实 Copilot HTTP 验收已完成，模型治理和高并发详细设计已补齐。剩余重点是实现模型预算/策略管理台和高并发 P0、生产 Qdrant/Langfuse 备份与 OTLP 运维、数据整理审批任务。
 
 ## 本轮工作总结
+
+### 2026-07-14 AI 商品向量检索真实启用与验收
+
+- LiteLLM `/v1/models` 已出现 `erp-embedding`，真实 `/v1/embeddings` 请求成功，返回 1024 维数值向量；本地密钥仍只保存在被 Git 忽略的 `.env.ai.local`。
+- `.env.ai.local` 已配置 `erp-embedding`、`myapp-products-v1`、Qdrant 内部地址并显式打开向量检索。Orchestrator、Backend、queue-short、queue-long、scheduler 已按现有 Compose/Langfuse 组合重建；此前退出的两个 Worker 和 scheduler 已恢复运行。
+- 582 个 Item 已通过补偿队列全部索引，最终 tracked/indexed/points 均为 582，due/failed 为 0，collection 维度为 1024。`SKU010` 重复删除两次均成功，点数降至 581；重新同步后恢复为 582，验证删除幂等和恢复路径。
+- 真实中文语义质量集覆盖 T 恤、电脑、读物、手机、运动鞋、咖啡杯、电视、背包、耳机、相机，10/10 目标商品均排 Top-1。额外宽泛查询暴露历史 HTTP 测试商品会产生噪声，生产数据治理仍应清理测试主数据并建立更大人工标注集。
+- 混合检索确认 `retrieval_mode=hybrid`、`embedding_model=erp-embedding`、`vector_collection=myapp-products-v1`；临时不可达地址演练确认自动降级为 `lexical_fallback`。现有无 Item 权限用户的商品检索和向量治理接口均被拒绝。
+- 启用真实向量环境后，既有商品工具单测暴露未 mock `search_products_semantic` 的环境耦合；测试已补充显式 lexical fallback mock，确保单测不受本机开关影响。最终 Orchestrator 44 项、offline gate 21/21、后端 142 项、Web 129 项全部通过。
+- 真实商品 Copilot HTTP 回归最初在向量检索成功后被外部 LiteLLM Chat `request_timeout=None` 阻断；LiteLLM 管理员修复并重启后，`opencode-deepseek-v4-flash` 最小请求返回 200，完整商品 Copilot 用例在 13.926 秒内通过，首条商品引用为 `SKU010`，测试会话自动归档。
+- 文档收口新增模型治理与高并发两份详细设计，并同步 Backend README、AI 总体设计、父仓库 README 和项目路线图。最终提交前复跑 Orchestrator 44 项、Backend 142 项、Web 19 套/129 项，全部通过；三个仓库 `diff --check` 和敏感信息扫描通过。
+- 本轮分仓库提交：Backend `0206fb6`、Web `f507efb`、父仓库为本文件所在提交。Mobile 既有五个改动未修改、回滚或提交，父仓库 `.codex` 未提交。
 
 ### 2026-07-13 AI Langfuse 本地可观测性与固定评测集
 

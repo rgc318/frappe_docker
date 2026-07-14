@@ -12,6 +12,13 @@ x-depends-on-configurator: &depends_on_configurator
     configurator:
       condition: service_completed_successfully
 
+x-ai-backend-environment: &ai_backend_environment
+  MYAPP_AI_ORCHESTRATOR_URL: ${MYAPP_AI_ORCHESTRATOR_URL:-http://ai-orchestrator:4010}
+  MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:-local-development-ai-service-token}
+  MYAPP_AI_VECTOR_SEARCH_ENABLED: ${MYAPP_AI_VECTOR_SEARCH_ENABLED:-0}
+  MYAPP_AI_EMBEDDING_MODEL: ${MYAPP_AI_EMBEDDING_MODEL:-}
+  MYAPP_AI_QDRANT_COLLECTION: ${MYAPP_AI_QDRANT_COLLECTION:-myapp-products-v1}
+
 x-backend-defaults: &backend_defaults
   <<: [*depends_on_configurator, *customizable_image]
   #  extra_hosts:
@@ -56,9 +63,8 @@ services:
       - "5678:5678"
       - "8000:8000"
     environment:
+      <<: *ai_backend_environment
       ENABLE_PYCHARM_DEBUG: "1"
-      MYAPP_AI_ORCHESTRATOR_URL: ${MYAPP_AI_ORCHESTRATOR_URL:-http://ai-orchestrator:4010}
-      MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:-local-development-ai-service-token}
     entrypoint:
       - bash
       - -c
@@ -89,6 +95,48 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  ai-vector-init:
+    image: qdrant/qdrant@sha256:0fb8897412abc81d1c0430a899b9a81eb8328aa634e7242d1bc804c1fe8fe863
+    restart: "no"
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    entrypoint: ["sh", "-c"]
+    command: ["mkdir -p /qdrant/storage/snapshots && chown -R 65534:65534 /qdrant/storage"]
+    volumes:
+      - ai-vector-data:/qdrant/storage
+
+  ai-vector:
+    image: qdrant/qdrant@sha256:0fb8897412abc81d1c0430a899b9a81eb8328aa634e7242d1bc804c1fe8fe863
+    restart: ${RESTART_POLICY:-unless-stopped}
+    user: "65534:65534"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      QDRANT__STORAGE__SNAPSHOTS_PATH: /qdrant/storage/snapshots
+      QDRANT__TELEMETRY_DISABLED: "true"
+    volumes:
+      - ai-vector-data:/qdrant/storage
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      ai-vector-init:
+        condition: service_completed_successfully
 
   frontend:
     <<: *customizable_image
@@ -126,6 +174,8 @@ services:
     entrypoint:
       - bash
       - -c
+    environment:
+      <<: *ai_backend_environment
     command:
       - >
         ./env/bin/pip install -e apps/myapp;
@@ -137,6 +187,8 @@ services:
     entrypoint:
       - bash
       - -c
+    environment:
+      <<: *ai_backend_environment
     command:
       - >
         ./env/bin/pip install -e apps/myapp;
@@ -148,6 +200,8 @@ services:
     entrypoint:
       - bash
       - -c
+    environment:
+      <<: *ai_backend_environment
     command:
       - >
         ./env/bin/pip install -e apps/myapp;
@@ -156,3 +210,4 @@ services:
 # ERPNext requires local assets access (Frappe does not)
 volumes:
   sites:
+  ai-vector-data:

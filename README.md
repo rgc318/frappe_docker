@@ -128,6 +128,10 @@ Wait for a couple of minutes for ERPNext site to be created or check `create-sit
 
 ### [myapp 当前交接状态](docs/codex/CURRENT_HANDOFF.zh-CN.md)
 
+### [AI 模型治理与策略管理设计](apps/myapp/AI_MODEL_GOVERNANCE_TECH_DESIGN.zh-CN.md)
+
+### [AI 高并发与性能设计](apps/myapp/AI_HIGH_CONCURRENCY_TECH_DESIGN.zh-CN.md)
+
 ### [Getting Started Guide](docs/getting-started.md)
 
 ### [Frequently Asked Questions](https://github.com/frappe/frappe_docker/wiki/Frequently-Asked-Questions)
