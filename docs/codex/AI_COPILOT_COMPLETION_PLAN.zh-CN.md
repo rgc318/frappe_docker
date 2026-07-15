@@ -23,6 +23,8 @@
 4. 在外部 Provider 修复后完成 v2 Embedding collection 构建、扩大质量集、审批发布与回滚；修复前保持在线 v1 alias，不以模拟结果代替真实发布。
 5. 清理历史测试商品噪声并建立持续的数据质量、检索质量、成本和用户反馈门禁。
 
+当前 Goal 进度：第 1 项已完成第一阶段实现和真实验证。Orchestrator generation OTLP 已使用有界后台批处理 Dispatcher，77 项全测通过；真实调用确认请求成功后后台 `queued_total=1`、`sent_total=1` 且无重试/丢弃。后续继续推进 Secret 最小化和三环境生产部署契约。
+
 ## 1. 不可变边界
 
 - Web/Mobile 只调用 MyApp Gateway，不直连 Orchestrator、LiteLLM、Langfuse 或 Qdrant。

@@ -135,11 +135,10 @@
 
 ### 3.7 AI Copilot 平台化与单据草稿
 
-当前本地可实施的 AI 主链路已经基本完成：只读工具、三类核心业务草稿、模型策略/预算/灰度/降级、Prompt 与 Embedding 发布治理、商品数据任务、OTLP trace/score、固定评测、共享异步连接池、分布式限流/预算/熔断、独立向量队列、专项压测、Qdrant snapshot，以及 Langfuse PostgreSQL/ClickHouse/MinIO 联合备份恢复均有实现和验证证据。
+当前本地可实施的 AI 主链路已经基本完成：只读工具、三类核心业务草稿、模型策略/预算/灰度/降级、Prompt 与 Embedding 发布治理、商品数据任务、OTLP trace/score、有界异步批处理 Dispatcher、固定评测、共享异步连接池、分布式限流/预算/熔断、独立向量队列、专项压测、Qdrant snapshot，以及 Langfuse PostgreSQL/ClickHouse/MinIO 联合备份恢复均有实现和验证证据。
 
 剩余范围：
 
-- 把 Orchestrator 直接等待 Langfuse OTLP 写入升级为批处理/有界队列或 OpenTelemetry Collector，避免观测端慢响应增加 AI 请求尾延迟，并补充丢弃、重试、积压和写入失败指标。
 - 完成正式生产 Secret Manager、Langfuse Project Key/恢复根密钥轮换、SSO/RBAC、成本看板、告警负责人和保留策略；本地 env、初始化账号或单机健康不能替代这些外部部署项。
 - 将单节点 Compose 基线升级为生产多副本/负载均衡与托管 PostgreSQL、ClickHouse、Redis、对象存储或等价 HA 方案，并在真实 staging 完成故障摘除、容量和恢复验收。
 - 修复外部 `erp-embedding` v2 Provider 的 `float + str` 故障后，构建、评测和受控发布新 collection；在线 v1 alias 在此之前保持不变。

@@ -12,13 +12,17 @@
 
 ## 2. OTLP 运行契约
 
-Orchestrator 使用共享异步 Langfuse Client 发送 OTLP JSON，包含：
+Orchestrator 使用共享异步 Langfuse Client 和有界后台 Dispatcher 发送 OTLP JSON。AI 请求只构建脱敏 payload 并执行 `put_nowait`；后台按批发送、有限重试和优雅排空，包含：
 
 - 32 位十六进制 trace ID 和 16 位 span ID。
 - `langfuse.observation.type=generation`。
 - 模型、Prompt 名称/版本、Token、Run、Conversation、策略版本、环境和 release。
 - 默认只发送输入、输出和反馈 comment 的 SHA-256、字符数和字节数。
-- Langfuse 不可用时失败开放，模型调用和 ERP 反馈本地保存不受阻断。
+- Langfuse 不可用、队列满或重试耗尽时失败开放，模型调用和 ERP 反馈本地保存不受阻断，也不等待 Langfuse 网络超时。
+
+默认运行参数：队列 1000、批量 20、聚合窗口 250ms、最多重试 2 次、关闭排空 5 秒。`/health.langfuse_delivery` 暴露 `queue_depth`、`queued_total`、`sent_total`、`batch_success_total`、`batch_failure_total`、`retry_total`、`dropped_total` 和不含敏感内容的 `last_error`。生产告警至少覆盖 Worker 未运行、持续积压、批次失败和丢弃增长。
+
+注意：generation 入队成功不代表已经持久化；最终交付以 `sent_total`、Langfuse 查询和告警为准。用户 feedback/eval score 保持独立 ingestion 契约。
 
 真实验收 trace `6c4a83af7ecd4956bf84a154e0d47513` 已通过 Langfuse Public API 查询：
 
@@ -28,6 +32,8 @@ Orchestrator 使用共享异步 Langfuse Client 发送 OTLP JSON，包含：
 - version：`erp-readonly-v5`
 - input/output：均为哈希摘要
 - feedback：`accepted=true`、`observability_synced=true`
+
+2026-07-15 异步 Dispatcher 真实验收：最小 Chat 返回 HTTP 200 和 trace ID 后，后台指标达到 `queued_total=1`、`sent_total=1`、`queue_depth=0`、`retry_total=0`、`dropped_total=0`；Backend 容器未重建。
 
 ## 3. 创建一致性备份
 

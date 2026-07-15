@@ -76,6 +76,11 @@ trap 'rm -f "${temporary_file}"' EXIT
   printf '%s\n' 'MYAPP_AI_LANGFUSE_RELEASE=local'
   printf '%s\n' 'MYAPP_AI_LANGFUSE_CAPTURE_CONTENT=0'
   printf '%s\n' 'MYAPP_AI_LANGFUSE_TIMEOUT_SECONDS=5'
+  printf '%s\n' 'MYAPP_AI_LANGFUSE_QUEUE_CAPACITY=1000'
+  printf '%s\n' 'MYAPP_AI_LANGFUSE_BATCH_SIZE=20'
+  printf '%s\n' 'MYAPP_AI_LANGFUSE_FLUSH_INTERVAL_SECONDS=0.25'
+  printf '%s\n' 'MYAPP_AI_LANGFUSE_MAX_RETRIES=2'
+  printf '%s\n' 'MYAPP_AI_LANGFUSE_SHUTDOWN_TIMEOUT_SECONDS=5'
 } >"${temporary_file}"
 
 mv "${temporary_file}" "${OUTPUT_FILE}"
