@@ -1,0 +1,9 @@
+[submodule "apps/myapp"]
+	path = apps/myapp
+	url = https://github.com/rgc318/myapp.git
+	branch = develop
+
+[submodule "services/myapp-ai"]
+	path = services/myapp-ai
+	url = https://github.com/rgc318/myapp-ai.git
+	branch = develop

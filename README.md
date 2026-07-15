@@ -36,6 +36,16 @@ frappe_docker/
 
 This workspace includes a project-specific `myapp` development setup. Use `./start-dev.sh` to start the local stack with the same compose files used by the dev workflow. Development and test stacks enable the local Langfuse observability stack by default, together with the AI Orchestrator, Qdrant and the dedicated `ai-vector` worker:
 
+`apps/myapp` and `services/myapp-ai` are independent repositories attached as Git submodules. Clone this deployment repository recursively, or initialize submodules before starting Compose:
+
+```bash
+git clone --recurse-submodules https://github.com/rgc318/frappe_docker.git
+cd frappe_docker
+git submodule update --init --recursive
+```
+
+AI source changes belong to `https://github.com/rgc318/myapp-ai`; this parent repository owns the pinned AI revision, Compose, Dev Container and environment deployment configuration.
+
 ```bash
 ./start-dev.sh
 ```
@@ -82,6 +92,8 @@ When the stack is started through VS Code Dev Containers, use the Dev Container 
 The Dev Container `backend` service is intentionally kept idle. It installs/refreshes `myapp`, ensures `debugpy` is available for VS Code debugging, and then keeps the container alive. It does not run `bench serve` automatically. Pressing F5 in VS Code starts `bench serve --port 8000` from `.vscode/launch.json`; this avoids the `Address already in use` error caused by starting a second server on port `8000`.
 
 Before Compose starts, the Dev Container prepares the restricted AI and Langfuse runtime environment files. Its `runServices` includes the AI Orchestrator, Qdrant, the `ai-vector` worker and all six bundled Langfuse services by default. Run `./setup-ai-observability.sh` once before the first Dev Container build; if the secret file is missing, initialization stops with that instruction instead of starting a partially configured stack. Langfuse UI is forwarded on port `3000` and MinIO API on `9090`.
+
+The Dev Container `initializeCommand` runs `git submodule update --init --recursive` on the host before Compose resolves the AI build context. Existing clones can run the same command manually after pulling a parent commit that changes either submodule pointer.
 
 `debugpy` is a development/debugging dependency. It should not be listed in `apps/myapp/pyproject.toml` under normal runtime `dependencies`, otherwise every service that runs `pip install -e apps/myapp` will try to install it on startup. Keep it in the app's dev dependency section or install it only from the Dev Container startup path.
 

@@ -45,6 +45,7 @@
 - 测试服务器不再映射 `apps/myapp` 源码目录
 - `myapp` 通过镜像烘焙进入 bench
 - AI Orchestrator 使用独立镜像；staging Compose 同时启动 Qdrant、一次性卷初始化和专用 `ai-vector` Worker
+- AI Orchestrator 源码位于独立 `rgc318/myapp-ai` 仓库；父仓库通过 `services/myapp-ai` 子模块固定构建提交，staging workflow 必须递归检出子模块，并把 AI commit 写入 OCI 镜像元数据
 - Backend/Worker 只接收 Gateway 所需 AI 配置，LiteLLM/Langfuse Provider 密钥只进入 Orchestrator
 - 部署前 `validate-staging-env.sh` 对镜像、Provider、内部 Token、向量设置和 Langfuse 配置失败关闭
 - `myapp` 的 Python 依赖由 `apps/myapp/pyproject.toml` 管理，镜像构建阶段会刷新 `apps/frappe` 与 `apps/myapp` 的 editable 安装并执行 `pip check`
@@ -80,6 +81,7 @@ feature/* -> develop -> main -> build/deploy/release
 - 需要正式测试包或 staging 镜像时，再把确认过的 `develop` 合入 `main`
 - 如果只是临时验证后端镜像或部署脚本，优先使用 `workflow_dispatch` 手动触发
 - `Build myapp staging image` 的 `myapp_ref` 应优先选择已验证的 `main`、tag 或明确 commit；只有调试时才建议填 `develop`
+- AI 镜像默认从 workflow 所在父仓库提交固定的 `services/myapp-ai` gitlink 构建。需要升级 AI 时，先在 AI 仓库完成验证和推送，再更新父仓库子模块指针；不要在 workflow 中隐式追踪远程分支最新提交
 - `Build myapp staging image` 的 `frappe_ref` 与 `erpnext_ref` 默认固定为 `v16.18.3`，不要在常规 staging 发布中使用浮动 `version-16`
 - `image_tag` 建议使用唯一 tag，例如 `staging-20260526-bff502e`，不要只依赖 `staging-latest` 判断部署内容
 - `Deploy staging stack` 与 `Init staging site` 会让服务器上的 `frappe_docker` 切换到当前 workflow 运行所选择的分支；例如在 Actions 页面选择 `develop` 运行，就会部署 `frappe_docker@develop` 的部署脚本

@@ -5,6 +5,11 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WITH_OBSERVABILITY=no
 
+if [[ ! -f "${ROOT_DIR}/services/myapp-ai/Dockerfile" ]]; then
+  echo "Missing services/myapp-ai submodule; run: git submodule update --init --recursive" >&2
+  exit 1
+fi
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --with-observability)

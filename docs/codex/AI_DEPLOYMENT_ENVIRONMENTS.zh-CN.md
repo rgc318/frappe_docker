@@ -4,6 +4,8 @@
 
 本文定义 development、staging、production 的 AI Orchestrator、Qdrant 和 Langfuse 部署边界。功能设计、模型治理和业务权限仍分别以 Backend 与 Orchestrator 技术设计为准。
 
+源码与部署边界：AI Orchestrator 源码位于独立仓库 `rgc318/myapp-ai`，父部署仓库通过 `services/myapp-ai` 子模块固定已验证提交。AI 仓库负责源码 CI 和 GHCR 镜像发布；父仓库负责 Compose、Dev Container、Qdrant/Langfuse 编排和环境级发布。部署证据必须能同时追溯父仓库提交与 AI 提交或镜像 digest。
+
 ## 1. 共同不可变边界
 
 - Web/Mobile 只调用 Frappe Gateway，不直连 Orchestrator、LiteLLM、Langfuse 或 Qdrant。
@@ -18,6 +20,7 @@
 用途：个人开发、功能联调、固定评测、故障注入和恢复演练。
 
 - `./start-dev.sh` 和 Dev Container 默认启动 bundled Langfuse、AI Orchestrator、Qdrant 与专用 `ai-vector` Worker。
+- Dev Container 在宿主机执行 `git submodule update --init --recursive`；直接使用脚本或 Compose 前也必须保证 `services/myapp-ai` 已初始化到父仓库固定提交。
 - development 默认以 `MYAPP_AI_VECTOR_EXCLUDED_ITEM_PREFIXES=HTTP-` 排除明确 HTTP 测试商品；扩展前缀前必须审计历史交易引用。
 - bundled Langfuse 是单节点六服务组合，不代表生产 HA。
 - Web 和 MinIO 只绑定 loopback；PostgreSQL、ClickHouse、Redis 和 MinIO Console 不发布宿主机端口。

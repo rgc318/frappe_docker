@@ -68,6 +68,14 @@ Notes:
 
 This workspace uses the VS Code Dev Container as the main local development environment. The local Dev Container still starts from the upstream ERPNext image instead of maintaining a separate local derivative image.
 
+The project-specific backend and AI Orchestrator are Git submodules. Clone the repository with `--recurse-submodules`, or initialize an existing clone before opening it in a container:
+
+```shell
+git submodule update --init --recursive
+```
+
+The project Dev Container also runs this command from `initializeCommand` before Compose resolves `services/myapp-ai` as an image build context. AI source is committed in the `myapp-ai` repository; Compose and Dev Container changes remain in `frappe_docker`.
+
 #### Stop Dev Container services
 
 If the stack was started by VS Code Dev Containers, stop it with:

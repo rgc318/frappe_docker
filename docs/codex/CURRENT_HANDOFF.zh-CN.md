@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-16 00:05 CST
+更新时间：2026-07-16 00:55 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,6 +8,9 @@
 
 ## 当前最终状态
 
+- AI Orchestrator 已从父仓库普通目录迁移为独立公开仓库 `https://github.com/rgc318/myapp-ai`，完整保留 12 个历史里程碑；`main` 与 `develop` 当前均指向 `25e68c7 ci: establish independent AI repository delivery`。父仓库保持原路径 `services/myapp-ai`，但现在以 `develop` 子模块固定提交，因此现有 Compose、Dev Container 和 staging build context 不变。
+- 独立 AI 仓库已补 `.gitignore`、Docker test/runtime CI、GitHub Release/手工 GHCR 发布（provenance + SBOM）、Dependabot 和仓库/交付边界文档。Docker test target 80/80 通过，runtime target 构建通过，远程 GitHub CI 同样成功。
+- 父仓库已补齐 Backend 与 AI 两个 `.gitmodules` 声明；Dev Container 会在宿主机递归初始化子模块，开发/生产/本地 staging 构建脚本会对缺失 AI 子模块失败并给出恢复命令，staging workflow 会递归检出并把 AI commit 写入 OCI 镜像元数据。
 - 剩余 AI 企业级收口 Goal 的本地可实施范围已完成：异步 OTLP、Langfuse Secret 最小化、三环境部署契约、检索噪声治理、30 条中文质量门禁、真实数据清理、Provider 复测、文档和分仓库提交均已交付。`erp-embedding` 当前已恢复并达到 v1 在线门槛；正式 Secret Manager/SSO/TLS/HA/staging 和新向量空间 full gate 仍作为明确部署依赖，不误报本地完成等于生产上线。
 - 模型治理已覆盖注册、治理元数据、不可变策略版本、预算、灰度、失败关闭评测门禁、双人审批、System Manager 发布/回滚、运行时策略解析、Redis 原子限流/预算/熔断和每日用量聚合。Web `/administration/ai/models` 已实现模型、策略、用量和 Embedding release 管理。
 - Embedding 发布治理已实现候选构建、验证、审批、alias 原子发布与回滚控制面。2026-07-15 已从在线 `myapp-products-live → myapp-products-v1` 移除 439 个明确 `HTTP-` 测试 points，当前 143 points / 1024 维，alias 未变化、剩余 payload 无 `HTTP-`、SKU001～SKU010 全部存在；582 个 ERP Item 和 854 个 Sales Order 未修改。当前单条/批量 Embedding 均 HTTP 200、1024 维，30 条中文门禁 Top-1 96.67%、Top-3 100%、Provider error 0、p95 211.745ms。
@@ -22,7 +25,7 @@
 - Web `/administration/ai/data-tasks` 已实现 service camelCase 映射、独立权限、菜单/路由、管理入口重定向、ProTable 筛选、缺失描述扫描、手工字段建议、前值/建议值/证据对比、审批/驳回、执行和回滚。最终 `npm run tsc`、Biome、20 套/139 项 Jest 通过；仍有项目既有 Jest open handle 提示，但退出码为 0。
 - 正式生产仍需在 Secret Manager/正式环境完成 Langfuse Project Key、恢复根密钥、SSO/TLS、HA 数据服务、告警负责人和真实 staging 演练；这些外部部署项不能用本地开发密钥或单机 Compose 伪造完成。
 - 本轮分仓库提交：Backend `d8747fc feat: complete AI governance and data tasks`；Web `8f4410d feat: add AI governance workbenches`；父仓库 `0e71b8a3 feat: complete AI production readiness milestone`，并已把 `apps/myapp` gitlink 更新到 `d8747fc`。
-- 本轮检索质量治理提交：Backend `c4a6af3 feat: govern AI vector retrieval quality`；父仓库 `62bae6ee feat: complete AI retrieval quality governance`。Provider 恢复文档提交：Backend `9ba54f1 docs: record embedding provider recovery`；父仓库 `fc6268af docs: update embedding recovery status`，gitlink 已同步。当前仅有本交接文件待提交；Backend/Web 代码无未提交改动，父仓库 `.codex` 和 Mobile 既有 5 个用户改动继续不处理。本地 Secret、派生运行时文件和真实质量报告均受忽略且不得提交。
+- 本轮检索质量治理提交：Backend `c4a6af3 feat: govern AI vector retrieval quality`；父仓库 `62bae6ee feat: complete AI retrieval quality governance`。Provider 恢复文档提交：Backend `9ba54f1 docs: record embedding provider recovery`；父仓库 `fc6268af docs: update embedding recovery status`，gitlink 已同步。AI 独立仓库提交为 `25e68c7`；父仓库迁移提交已生成并通过本地门禁。Backend/Web 代码无未提交改动，父仓库 `.codex` 和 Mobile 既有 5 个用户改动继续不处理。本地 Secret、派生运行时文件和真实质量报告均受忽略且不得提交。
 - Mobile `frontend/myapp-mobile` 保留本轮开始前已有的五个未提交文件，本轮不得修改、回滚或提交。
 
 ## AI 企业级收口最终验收
@@ -33,6 +36,15 @@
 - Provider 恢复已确认：`erp-embedding` 字符串单条、数组单条和两条批量均 HTTP 200、1024 维；当前运行 Orchestrator 的真实检索返回 200。30 条质量门禁通过，最新报告保存在忽略目录 `ai-governance-reports/product-retrieval-v1-current.json`。新的 v2 alias/collection 尚未配置或发布；如果底层模型权重变化，必须按新向量空间完整发布流程处理。
 
 ## 本轮工作总结
+
+### 2026-07-16 AI Orchestrator 独立仓库迁移
+
+- 使用 `git subtree split --prefix=services/myapp-ai` 提取历史，独立历史从 `aabca837` 到 `f608ca7` 共保留 12 个实际 AI 里程碑；导出根目录和完整历史已扫描，不包含 `.env.ai.local`、真实 `sk-*` 或 Bearer Secret。
+- 创建公开远程 `rgc318/myapp-ai`，默认分支 `main`，同时保留 `develop`。两分支已推送到 `25e68c7`；AI 源码、测试、Dockerfile、CI 和镜像发布以后在独立仓库维护。
+- 父仓库把原普通目录替换为同路径 Git 子模块，并补齐此前缺失的 `apps/myapp` `.gitmodules` 声明。部署仓库继续拥有 Compose、Dev Container、Langfuse/Qdrant、staging 和跨服务 Secret 边界。
+- 验证：AI Docker 80 项通过、runtime 镜像构建通过，远程 GitHub CI 成功；development + Langfuse、Dev Container、现有 staging Compose 均 `config --quiet`；相关脚本 `bash -n`、workflow YAML、两个子模块 mode `160000`、父/Backend/AI `diff --check` 和敏感扫描通过。
+- 依赖仓库已先行推送：Backend `develop` 已到 `9ba54f1`，Web `main` 已到 `dcde5a9`，AI `main/develop` 已到 `25e68c7`。父仓库迁移提交随后推送 `develop`，形成完整可克隆提交链。
+- 用户曾在聊天中提供的测试 Key 未进入 Git 或镜像配置，但因已明文暴露，仍必须在 Provider/LiteLLM 侧轮换并撤销旧值。
 
 ### 2026-07-16 Embedding Provider 恢复与质量门禁复验
 

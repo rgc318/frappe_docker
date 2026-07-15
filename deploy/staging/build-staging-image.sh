@@ -6,6 +6,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/deploy/staging/staging.env}"
 APPS_JSON_FILE="${APPS_JSON_FILE:-${ROOT_DIR}/deploy/staging/apps.staging.json}"
 
+if [[ ! -f "${ROOT_DIR}/services/myapp-ai/Dockerfile" ]]; then
+  echo "Missing services/myapp-ai submodule; run: git submodule update --init --recursive"
+  exit 1
+fi
+
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing env file: ${ENV_FILE}"
   echo "Copy deploy/staging/staging.env.example to deploy/staging/staging.env first."

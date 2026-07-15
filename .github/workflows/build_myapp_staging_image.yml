@@ -47,6 +47,12 @@ jobs:
     steps:
       - name: Checkout frappe_docker
         uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Capture AI source revision
+        id: ai_source
+        run: echo "sha=$(git -C services/myapp-ai rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Create apps.staging.json
         run: |
@@ -128,8 +134,10 @@ jobs:
           labels: |
             org.opencontainers.image.title=myapp AI orchestrator
             org.opencontainers.image.description=MyApp AI orchestration service for staging deployment
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/myapp-ai
+            org.opencontainers.image.revision=${{ steps.ai_source.outputs.sha }}
             org.rgc.frappe_docker_ref=${{ github.ref_name }}
+            org.rgc.myapp_ai_ref=${{ steps.ai_source.outputs.sha }}
 
       - name: Build and push AI orchestrator
         uses: docker/build-push-action@v6
