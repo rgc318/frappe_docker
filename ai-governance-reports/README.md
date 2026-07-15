@@ -10,7 +10,7 @@ Expected local filenames:
 
 - `live-gate.json`: a passing `myapp-ai-eval-report-v1` live full-gate report whose attempts use the policy primary model alias.
 - `embedding-gate.json`: a passing full-gate report for the configured Embedding alias, collection, semantic quality, permission, delete and recovery checks.
-- `product-retrieval-v1-current.json`: the latest redacted 30-case Chinese retrieval diagnostic. A failed report is retained as Provider-blocking evidence but is never accepted as `embedding-gate.json`.
+- `product-retrieval-v1-current.json`: the latest redacted 30-case Chinese retrieval diagnostic. It may record either recovery evidence or a failure, but is never accepted as `embedding-gate.json` without the remaining permission, delete, recovery and release checks.
 
 The JSON artifacts are intentionally ignored by Git. Copy them from a controlled evaluation
 run or CI artifact store; do not edit them manually. Policy validation fails closed when the

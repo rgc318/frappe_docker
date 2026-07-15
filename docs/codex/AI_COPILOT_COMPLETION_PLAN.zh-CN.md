@@ -11,7 +11,7 @@
 - Wave 3 首期商品 Data Task 已完成 Backend + Web：确定性缺失描述扫描、手工建议、审批/执行职责分离、源数据漂移检查、幂等执行、安全回滚和审计均有测试与真实临时商品链路证据。
 - Wave 4 已完成本地综合验收：Orchestrator 74 项、Backend 171 项、Web 20 套/139 项通过；迁移、三仓库 `diff --check`、敏感扫描、临时资源清理和分仓库提交均已完成。
 - 开发与 Dev Container 启动配置已补齐：AI Orchestrator、Qdrant、专用 Worker 和 bundled Langfuse 默认纳入开发测试组合；Backend/Worker、Orchestrator 与 Langfuse 存储密钥保持分层。
-- 外部例外：在线 v1 collection 继续健康，但新的 v2 Embedding 构建受外部 Provider `float + str` 错误阻塞；正式生产 Langfuse Project Key、恢复根密钥、SSO 和 Secret Manager 轮换不能由本地环境伪造完成。
+- Embedding 当前状态：在线 v1 collection 健康，`erp-embedding` 单条/批量与 30 条中文质量门禁均已恢复通过；新的 v2 collection、完整权限/删除/恢复门禁和审批发布回滚尚未执行。正式生产 Langfuse Project Key、恢复根密钥、SSO 和 Secret Manager 轮换不能由本地环境伪造完成。
 
 ## 后续 Goal 范围
 
@@ -20,7 +20,7 @@
 1. 将 OTLP 上报从请求尾部直接等待改为批处理/有界异步队列或 OpenTelemetry Collector，并建立重试、积压、丢弃和故障指标及回归测试。
 2. 收紧 bundled Langfuse 内部 Secret 暴露面，形成开发、staging、生产三套明确配置契约；生产使用外部 Secret Manager、SSO/RBAC、TLS、告警和保留策略。
 3. 完成多副本 Orchestrator/Web/Worker、托管或 HA 数据服务、负载均衡和真实 staging 故障摘除/恢复/容量验收的部署基线。
-4. 在外部 Provider 修复后完成 v2 Embedding collection 构建、扩大质量集、审批发布与回滚；修复前保持在线 v1 alias，不以模拟结果代替真实发布。
+4. `erp-embedding` 已恢复并通过当前 v1 在线质量门槛；如果底层模型权重或向量空间变化，完成新 Embedding collection 构建、扩大质量集、审批发布与回滚，不以相同别名或模拟结果替代真实发布。
 5. 清理历史测试商品噪声并建立持续的数据质量、检索质量、成本和用户反馈门禁。
 
 当前 Goal 进度：
@@ -28,7 +28,7 @@
 - 第 1 项已完成第一阶段实现和真实验证。Orchestrator generation OTLP 已使用有界后台批处理 Dispatcher，77 项全测通过；真实调用确认请求成功后后台 `queued_total=1`、`sent_total=1` 且无重试/丢弃。
 - 第 2 项本地可实施部分已完成：bundled Langfuse 拆分 Web、应用、PostgreSQL、ClickHouse、Redis、MinIO 和 Orchestrator 专属 `0600` env；真实重建前后 projects=1、traces=122、objects=552 保持一致。三环境契约已形成，`start-prod.sh` 默认不启动 bundled Langfuse。
 - 第 5 项本地收口已完成：新增 `MYAPP_AI_VECTOR_EXCLUDED_ITEM_PREFIXES=HTTP-` 全链路过滤、管理员 dry-run/幂等清理 API、critical 审计和 30 条版本化中文检索质量 runner。真实清理只从 Qdrant 移除 439 个测试 points；ERP Item 582、Sales Order 854、alias、1024 维和 SKU001～SKU010 均保持。
-- 外部 Provider 已再次复测：`erp-embedding` HTTP 500 `float + str`，`erp-embedding-v2` HTTP 400 不存在；30/30 真实质量用例均 HTTP 502，失败报告已保留。因此不创建 v2 collection，在线 v1 维持 143 个非排除 points。
+- 外部 Provider 后续已修复：`erp-embedding` 字符串单条、数组单条和两条批量均 HTTP 200、1024 维；当前 Orchestrator 在线检索与 30 条质量门禁通过，Top-1 96.67%、Top-3 100%、Provider error 0、p95 211.745ms。在线 v1 维持 143 个非排除 points；在未完成新向量空间 full gate 前仍不创建或发布 v2。
 - 第 2/3 项剩余需要正式 Secret Manager、SSO/RBAC、TLS、告警平台、托管/HA 数据服务和真实 staging 环境，不能在本地伪造完成。
 
 ## 1. 不可变边界

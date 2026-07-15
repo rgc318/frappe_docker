@@ -96,7 +96,7 @@
 
 ## 6. 未完成边界
 
-- 外部 `erp-embedding` 仍存在 Provider `float + str` 配置故障，真实 32/64/128 Embedding 尚未验收。
+- 外部 `erp-embedding` 的 `float + str` 配置故障已于 2026-07-15 后续修复；真实单条和两条批量均 HTTP 200、1024 维，30 条在线检索 p50 145.692ms、p95 211.745ms。当前新 Provider 的 32/64/128 批量容量仍未重新验收，因此历史合成容量结果不能直接作为新 Provider 配额结论。
 - 尚未执行 staging 真实 Provider 的完整付费矩阵和单副本摘除/多副本一致性演练。
 - OTLP、Qdrant snapshot 恢复、Langfuse PostgreSQL/ClickHouse/MinIO 联合恢复尚未完成。
 - 因此当前只能宣称高并发 P0 代码与单副本合成基线完成，不能宣称生产高可用或供应商容量完成。

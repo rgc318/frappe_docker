@@ -238,6 +238,8 @@ litellm_settings:
 
 ## 10. LiteLLM Embedding 因 timeout 类型错误全量失败
 
+> 2026-07-15 23:57 CST 状态：已恢复。保留本节用于复发诊断；当前 `erp-embedding` 单条和批量均 HTTP 200、1024 维，30 条真实检索门禁通过。
+
 现象：
 
 - `/v1/models` 正常返回并只列出 `erp-embedding`。
@@ -251,3 +253,5 @@ litellm_settings:
 - 由 LiteLLM 管理员检查该 Embedding 模型组的 `timeout`、`connect_timeout`、`request_timeout` 等字段，确保 YAML/数据库中的值为数值而不是带引号字符串，并重启后复测单条与批量 Embedding。
 - `/v1/models` 中没有 v2 别名时，不得创建 v2 collection、候选 release 或伪造 full-gate 报告。
 - 故障期间保持在线 alias 指向已验证 v1 collection；真实检索质量门禁应失败关闭并保留 HTTP 502 报告。
+
+恢复验收不能只看 LiteLLM 控制台“连接成功”。必须从实际 MyApp Orchestrator 路径验证：字符串单条、数组单条、批量 `/v1/embeddings`、当前 alias 检索和完整中文质量门禁。控制台指定 deployment 成功但业务 Key/model group 仍失败时，检查多副本配置刷新、同别名重复 deployment、Virtual Key 路由和容器内 `api_base` 可达性。

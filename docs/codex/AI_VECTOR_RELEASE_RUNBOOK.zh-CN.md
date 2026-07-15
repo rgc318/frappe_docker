@@ -16,7 +16,7 @@
 - 稳定 alias：`myapp-products-live`
 - 当前物理 collection：`myapp-products-v1`
 - 2026-07-15 质量治理后真实核对：ERP Item 582、Sales Order 854；在线 alias `myapp-products-live → myapp-products-v1` 保持不变，143 points / 1024 维，`HTTP-` payload 为 0，SKU001～SKU010 全部存在。
-- 当前外部 `erp-embedding` 仍可能返回 `unsupported operand type(s) for +: 'float' and 'str'`。在供应商配置修复和新 full gate 证据存在前，不得创建“已完成”或发布 v2 的结论。
+- 2026-07-15 23:57 CST：`erp-embedding` 单条/批量恢复为 HTTP 200、1024 维；30 条中文门禁 Top-1 96.67%、Top-3 100%、Provider error 0、排除泄漏 0、p95 211.745ms。该结果满足当前 v1 在线质量门槛，但不是 v2 full-gate；新 collection 的全量补建、权限、删除/恢复、审批、发布和回滚仍必须独立完成。
 
 ## 3. Full Gate 报告
 

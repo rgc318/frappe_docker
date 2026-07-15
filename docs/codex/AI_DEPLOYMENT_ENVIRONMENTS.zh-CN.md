@@ -82,6 +82,6 @@ ENV_FILE=deploy/staging/staging.env ./deploy/staging/validate-staging-env.sh
 - 正式 Secret Manager、SSO/RBAC、TLS 证书、DNS 和网络策略。
 - 多副本 Orchestrator/Langfuse、托管或 HA 数据服务和负载均衡真实故障摘除。
 - 正式告警平台、负责人、保留/删除策略和定时备份平台。
-- 外部 `erp-embedding` v2 Provider 修复后的真实 collection 构建、质量门禁、审批发布和回滚。
+- 当前 `erp-embedding` 已恢复并通过 v1 在线质量门槛；新向量空间仍需在正式环境完成 collection 构建、权限/删除/恢复质量门禁、审批发布和回滚。
 
 这些项目不能用本地占位密钥、单机 Compose 健康或 mock Provider 结果替代。
