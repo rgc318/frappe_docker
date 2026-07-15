@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-15 19:16 CST
+更新时间：2026-07-15 19:36 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -22,17 +22,25 @@
 - Web `/administration/ai/data-tasks` 已实现 service camelCase 映射、独立权限、菜单/路由、管理入口重定向、ProTable 筛选、缺失描述扫描、手工字段建议、前值/建议值/证据对比、审批/驳回、执行和回滚。最终 `npm run tsc`、Biome、20 套/139 项 Jest 通过；仍有项目既有 Jest open handle 提示，但退出码为 0。
 - 正式生产仍需在 Secret Manager/正式环境完成 Langfuse Project Key、恢复根密钥、SSO 和正式轮换；这些外部部署项不能用本地开发密钥伪造完成。
 - 本轮分仓库提交：Backend `d8747fc feat: complete AI governance and data tasks`；Web `8f4410d feat: add AI governance workbenches`；父仓库 `0e71b8a3 feat: complete AI production readiness milestone`，并已把 `apps/myapp` gitlink 更新到 `d8747fc`。
-- Backend 与 Web 工作区均干净。Web 查询默认公司修复已提交为 `dcde5a9 fix: stop default company filtering searches`；父仓库 AI 启动、部署、Dev Container、staging 和 Langfuse 默认启用配置已提交为 `e1310344 feat: complete AI development deployment configuration`。父仓库只保留本交接文件待提交及既有未跟踪 `.codex`；`.env.ai.local`、`.env.ai.gateway.local`、`.env.langfuse.local` 和派生运行时文件均受忽略且不得输出或提交。
+- Backend 与 Web 工作区均干净。Web 查询默认公司修复已提交为 `dcde5a9`；父仓库启动/部署配置为 `e1310344`。新 Goal 的异步 OTLP 里程碑已提交：Backend 设计 `70b09c5`，父仓库实现与 gitlink `2b5b9ed9`。父仓库只保留本交接文件待提交及既有未跟踪 `.codex`；本地 Secret 和派生运行时文件均受忽略且不得输出或提交。
 - Mobile `frontend/myapp-mobile` 保留本轮开始前已有的五个未提交文件，本轮不得修改、回滚或提交。
 
 ## AI 企业级收口最终验收
 
 - 已完成：功能审计与追踪矩阵；模型治理 Backend/Orchestrator/Web；Embedding 发布控制面；高并发 P0 与压测；OTLP；备份恢复与内部 Token 轮换；Data Task Backend/Web。
-- 最终自动化：Orchestrator 当前源码镜像 74 项、Backend 171 项、Web 20 套/139 项全部通过；站点迁移成功。
+- 最终自动化：Orchestrator 当前源码镜像 77 项、Backend 171 项、Web 21 套/154 项全部通过；站点迁移成功。
 - 最终仓库门禁：三个仓库 `diff --check` 通过；敏感扫描仅命中 `.env.langfuse.example` 的 `replace-with-random-value` 占位符；`myapp-ai-mock` / `myapp-ai-loadtest` 已停止并自动移除。
 - 外部阻塞：`erp-embedding` v2 Provider `float + str`；生产 Secret Manager、SSO 和正式密钥轮换。在线 v1 collection 和现有 AI 主链路不因该阻塞回退。
 
 ## 本轮工作总结
+
+### 2026-07-15 剩余 AI Goal：异步 Langfuse OTLP Dispatcher
+
+- 新 Goal 已创建并开始执行，范围限定为剩余企业级收口，不重复四个已完成 Wave。首个 P0 已把 generation OTLP 从 Chat/SSE/structured 请求尾部直接网络等待改为进程内有界后台 Dispatcher。
+- 请求路径只构建脱敏 OTLP payload 并 `put_nowait`；后台按默认 20 条/250ms 聚合、最多重试 2 次，队列满、发送失败或关闭排空超时均失败开放并累计丢弃，不阻断 AI 主链路。
+- `/health.langfuse_delivery` 已暴露 Worker、队列容量/深度、入队、发送、批次成功/失败、重试、丢弃和通用错误状态。新增批处理、慢端不阻塞、队列满和重试成功测试，Orchestrator 全量从 74 增至 77 项并全部通过。
+- 当前 Orchestrator 已基于新源码重建；真实最小 Chat 返回 200 和 trace ID，随后后台指标为 `queued_total=1`、`sent_total=1`、`queue_depth=0`、`retry_total=0`、`dropped_total=0`。Backend 容器 ID/启动时间未变化。
+- 本里程碑提交：Backend `70b09c5 docs: define asynchronous AI observability delivery`；父仓库 `2b5b9ed9 feat: decouple AI generation observability delivery`。下一步是 Langfuse bundled stack 分服务 Secret 最小化和 development/staging/production 部署契约。
 
 ### 2026-07-15 开发与 Dev Container 默认启用 Langfuse
 
