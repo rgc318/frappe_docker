@@ -137,6 +137,12 @@ jobs:
               printf '\nCUSTOM_TAG=%s\n' "${IMAGE_TAG}" >> deploy/staging/staging.env
             fi
 
+            if grep -q '^MYAPP_AI_TAG=' deploy/staging/staging.env; then
+              sed -i "s/^MYAPP_AI_TAG=.*/MYAPP_AI_TAG=${IMAGE_TAG}/" deploy/staging/staging.env
+            else
+              printf '\nMYAPP_AI_TAG=%s\n' "${IMAGE_TAG}" >> deploy/staging/staging.env
+            fi
+
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
             SITE_NAME="${SITE_NAME}" ./deploy/staging/deploy-staging.sh
 

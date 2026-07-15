@@ -12,6 +12,8 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+ENV_FILE="${ENV_FILE}" "${ROOT_DIR}/deploy/staging/validate-staging-env.sh"
+
 compose() {
   docker compose \
     --env-file "${ENV_FILE}" \
@@ -55,6 +57,14 @@ fi
 
 echo "== Docker services =="
 compose ps
+
+echo
+echo "== AI service checks =="
+compose exec -T ai-orchestrator python -c \
+  'import json, urllib.request; data=json.load(urllib.request.urlopen("http://127.0.0.1:4010/health", timeout=5)); assert data.get("status") == "ok", data; print(json.dumps({key: data.get(key) for key in ("status", "litellm_configured", "runtime_governance_configured", "vector_search_configured", "langfuse_configured")}, sort_keys=True))'
+
+compose exec -T backend bash -lc \
+  './env/bin/python -c '\''import os, urllib.request; token=os.environ["MYAPP_AI_SERVICE_TOKEN"]; request=urllib.request.Request("http://ai-orchestrator:4010/internal/v1/vector/products/status", data=b"", headers={"Authorization": f"Bearer {token}"}, method="POST"); response=urllib.request.urlopen(request, timeout=10); assert response.status == 200; print("Backend to AI Orchestrator authentication: OK")'\'''
 
 if [[ -z "${BASE_URL}" ]]; then
   echo

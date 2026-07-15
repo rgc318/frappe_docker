@@ -6,6 +6,7 @@
     "../overrides/compose.redis.yaml",        // Redis
     "../overrides/compose.mariadb.yaml",      // 数据库 (MariaDB 11.8)
     "../overrides/compose.noproxy.yaml",      // 禁用反向代理，方便直连 8000
+    "../overrides/compose.langfuse.yaml",     // 开发测试默认启用 Langfuse
      "docker-compose.yml"
   ],
   "service": "backend",                       // 对应你 compose 里的服务名
@@ -15,16 +16,26 @@
     "websocket",
     "queue-short",
     "queue-long",
+    "queue-ai-vector",
     "scheduler",
+    "ai-orchestrator",
+    "ai-vector",
+    "langfuse-web",
+    "langfuse-worker",
+    "langfuse-postgres",
+    "langfuse-clickhouse",
+    "langfuse-redis",
+    "langfuse-minio",
     "db",
     "redis-cache",
     "redis-queue",
     "mobile-proxy"
   ],
   "workspaceFolder": "/home/frappe/frappe-bench", // 容器内的真实代码路径
+  "initializeCommand": "bash -lc '${localWorkspaceFolder}/sync-ai-gateway-env.sh && ${localWorkspaceFolder}/sync-langfuse-runtime-env.sh'",
   "remoteUser": "frappe",
   "postStartCommand": "bash -lc 'if command -v fc-cache >/dev/null 2>&1; then fc-cache -f /home/frappe/.local/share/fonts/noto; fi; ./env/bin/python -c \"import debugpy\" >/dev/null 2>&1 || ./env/bin/pip install \"debugpy>=1.8.20\"'",
-  "forwardPorts": [8000, 9000, 5678, 18080],  // 转发业务、SocketIO、调试端口和移动端桥接
+  "forwardPorts": [8000, 9000, 4010, 3000, 9090, 5678, 18080],  // 转发业务、SocketIO、AI Orchestrator、Langfuse、调试端口和移动端桥接
   "customizations": {
     "vscode": {
       "extensions": [

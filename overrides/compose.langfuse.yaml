@@ -1,47 +1,10 @@
-x-langfuse-worker-environment: &langfuse-worker-environment
-  NEXTAUTH_URL: ${LANGFUSE_PUBLIC_URL:-http://localhost:3000}
-  DATABASE_URL: ${LANGFUSE_DATABASE_URL:?Run ./setup-ai-observability.sh first}
-  DIRECT_URL: ${LANGFUSE_DATABASE_URL:?Run ./setup-ai-observability.sh first}
-  SALT: ${LANGFUSE_SALT:?Run ./setup-ai-observability.sh first}
-  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?Run ./setup-ai-observability.sh first}
-  TELEMETRY_ENABLED: ${LANGFUSE_TELEMETRY_ENABLED:-false}
-  LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
-  CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
-  CLICKHOUSE_URL: http://langfuse-clickhouse:8123
-  CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
-  CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:?Run ./setup-ai-observability.sh first}
-  CLICKHOUSE_CLUSTER_ENABLED: "false"
-  REDIS_HOST: langfuse-redis
-  REDIS_PORT: "6379"
-  REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:?Run ./setup-ai-observability.sh first}
-  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
-  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
-  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_ROOT_USER:-langfuse}
-  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_ROOT_PASSWORD:?Run ./setup-ai-observability.sh first}
-  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
-  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
-  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
-  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
-  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
-  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_ROOT_USER:-langfuse}
-  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_ROOT_PASSWORD:?Run ./setup-ai-observability.sh first}
-  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_MINIO_PUBLIC_URL:-http://localhost:9090}
-  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
-  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
-  LANGFUSE_ENABLE_BLOB_STORAGE_FILE_LOG: "true"
-  LANGFUSE_S3_EVENT_KEY_MAX_SEGMENT_BYTES: "255"
-  AUTH_DISABLE_SIGNUP: "true"
+x-langfuse-runtime-env: &langfuse-runtime-env
+  - .env.langfuse.runtime.local
 
 services:
   ai-orchestrator:
-    environment:
-      MYAPP_AI_LANGFUSE_HOST: http://langfuse-web:3000
-      MYAPP_AI_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:?Run ./setup-ai-observability.sh first}
-      MYAPP_AI_LANGFUSE_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:?Run ./setup-ai-observability.sh first}
-      MYAPP_AI_LANGFUSE_ENVIRONMENT: ${MYAPP_AI_LANGFUSE_ENVIRONMENT:-development}
-      MYAPP_AI_LANGFUSE_RELEASE: ${MYAPP_AI_LANGFUSE_RELEASE:-local}
-      MYAPP_AI_LANGFUSE_CAPTURE_CONTENT: ${MYAPP_AI_LANGFUSE_CAPTURE_CONTENT:-0}
-      MYAPP_AI_LANGFUSE_TIMEOUT_SECONDS: ${MYAPP_AI_LANGFUSE_TIMEOUT_SECONDS:-5}
+    env_file:
+      - .env.langfuse.gateway.local
 
   langfuse-worker:
     image: docker.io/langfuse/langfuse-worker:${LANGFUSE_VERSION:-3.212.0}
@@ -55,7 +18,7 @@ services:
         condition: service_healthy
       langfuse-clickhouse:
         condition: service_healthy
-    environment: *langfuse-worker-environment
+    env_file: *langfuse-runtime-env
 
   langfuse-web:
     image: docker.io/langfuse/langfuse:${LANGFUSE_VERSION:-3.212.0}
@@ -63,18 +26,7 @@ services:
     depends_on: *langfuse-dependencies
     ports:
       - "127.0.0.1:${LANGFUSE_PORT:-3000}:3000"
-    environment:
-      <<: *langfuse-worker-environment
-      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?Run ./setup-ai-observability.sh first}
-      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-myapp}
-      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-MyApp}
-      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-myapp-ai}
-      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-MyApp-AI-Copilot}
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:?Run ./setup-ai-observability.sh first}
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:?Run ./setup-ai-observability.sh first}
-      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@myapp.local}
-      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-MyApp-AI-Admin}
-      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:?Run ./setup-ai-observability.sh first}
+    env_file: *langfuse-runtime-env
     healthcheck:
       test:
         - CMD
@@ -90,10 +42,7 @@ services:
     image: ${LANGFUSE_CLICKHOUSE_IMAGE:-docker.io/clickhouse/clickhouse-server:26.6.1.1193}
     restart: ${RESTART_POLICY:-unless-stopped}
     user: "101:101"
-    environment:
-      CLICKHOUSE_DB: default
-      CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
-      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:?Run ./setup-ai-observability.sh first}
+    env_file: *langfuse-runtime-env
     volumes:
       - langfuse-clickhouse-data:/var/lib/clickhouse
       - langfuse-clickhouse-logs:/var/log/clickhouse-server
@@ -109,9 +58,7 @@ services:
     restart: ${RESTART_POLICY:-unless-stopped}
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
-    environment:
-      MINIO_ROOT_USER: ${LANGFUSE_MINIO_ROOT_USER:-langfuse}
-      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_ROOT_PASSWORD:?Run ./setup-ai-observability.sh first}
+    env_file: *langfuse-runtime-env
     ports:
       - "127.0.0.1:${LANGFUSE_MINIO_PORT:-9090}:9000"
     volumes:
@@ -126,14 +73,8 @@ services:
   langfuse-redis:
     image: docker.io/redis:${LANGFUSE_REDIS_VERSION:-7.4.9}
     restart: ${RESTART_POLICY:-unless-stopped}
-    command:
-      - redis-server
-      - --requirepass
-      - ${LANGFUSE_REDIS_AUTH:?Run ./setup-ai-observability.sh first}
-      - --maxmemory-policy
-      - noeviction
-    environment:
-      REDIS_PASSWORD: ${LANGFUSE_REDIS_AUTH:?Run ./setup-ai-observability.sh first}
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory-policy noeviction"]
+    env_file: *langfuse-runtime-env
     volumes:
       - langfuse-redis-data:/data
     healthcheck:
@@ -145,12 +86,7 @@ services:
   langfuse-postgres:
     image: docker.io/postgres:${LANGFUSE_POSTGRES_VERSION:-17.10}
     restart: ${RESTART_POLICY:-unless-stopped}
-    environment:
-      POSTGRES_USER: ${LANGFUSE_POSTGRES_USER:-langfuse}
-      POSTGRES_PASSWORD: ${LANGFUSE_POSTGRES_PASSWORD:?Run ./setup-ai-observability.sh first}
-      POSTGRES_DB: ${LANGFUSE_POSTGRES_DB:-langfuse}
-      TZ: UTC
-      PGTZ: UTC
+    env_file: *langfuse-runtime-env
     volumes:
       - langfuse-postgres-data:/var/lib/postgresql/data
     healthcheck:

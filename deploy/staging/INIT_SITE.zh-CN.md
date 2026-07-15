@@ -7,12 +7,18 @@
 - 宿主机目录已经准备好 `frappe_docker`
 - 已复制：
   - `deploy/staging/staging.env.example` -> `deploy/staging/staging.env`
+- 已在 `staging.env` 填写并通过 `validate-staging-env.sh` 校验：
+  - `CUSTOM_IMAGE` / `CUSTOM_TAG`
+  - `MYAPP_AI_IMAGE` / `MYAPP_AI_TAG`
+  - LiteLLM 地址和 Key、随机 AI 内部服务 Token、Frappe site host
+  - Embedding/Qdrant 配置；未完成向量冒烟前保持 `MYAPP_AI_VECTOR_SEARCH_ENABLED=0`
 - staging 容器已经启动：
   - `./deploy/staging/start-staging.sh`
 - 当前镜像已经包含：
   - `frappe`
   - `erpnext`
   - `myapp`
+- AI Orchestrator 镜像已使用与业务镜像相同的发布标签推送到镜像仓库
 
 ## 1. 推荐方式：使用初始化脚本
 

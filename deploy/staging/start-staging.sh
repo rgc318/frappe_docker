@@ -13,6 +13,8 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+ENV_FILE="${ENV_FILE}" "${ROOT_DIR}/deploy/staging/validate-staging-env.sh"
+
 PROXY_OVERRIDE="${ROOT_DIR}/overrides/compose.noproxy.yaml"
 if [[ "${STAGING_MODE}" == "https" ]]; then
   PROXY_OVERRIDE="${ROOT_DIR}/overrides/compose.https.yaml"

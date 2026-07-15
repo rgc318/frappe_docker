@@ -26,6 +26,7 @@ for file in "${ROOT_DIR}/.env" "${AI_ENV_FILE}" "${LANGFUSE_ENV_FILE}"; do
     exit 1
   fi
 done
+LANGFUSE_ENV_FILE="${LANGFUSE_ENV_FILE}" "${ROOT_DIR}/sync-langfuse-runtime-env.sh" >/dev/null
 
 compose_restore() {
   LANGFUSE_PORT="${LANGFUSE_PORT}" LANGFUSE_MINIO_PORT="${MINIO_PORT}" \

@@ -13,6 +13,8 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+ENV_FILE="${ENV_FILE}" "${ROOT_DIR}/deploy/staging/validate-staging-env.sh"
+
 SITE_NAME="${SITE_NAME:-}"
 SKIP_MIGRATE="${SKIP_MIGRATE:-0}"
 PROXY_OVERRIDE="${ROOT_DIR}/overrides/compose.noproxy.yaml"

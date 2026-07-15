@@ -8,6 +8,56 @@ x-depends-on-configurator: &depends_on_configurator
     configurator:
       condition: service_completed_successfully
 
+x-ai-gateway-environment: &ai_gateway_environment
+  MYAPP_AI_ORCHESTRATOR_URL: ${MYAPP_AI_ORCHESTRATOR_URL:-http://ai-orchestrator:4010}
+  MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:-staging-ai-service-token-not-configured}
+  MYAPP_AI_VECTOR_SEARCH_ENABLED: ${MYAPP_AI_VECTOR_SEARCH_ENABLED:-0}
+  MYAPP_AI_EMBEDDING_MODEL: ${MYAPP_AI_EMBEDDING_MODEL:-}
+  MYAPP_AI_QDRANT_COLLECTION: ${MYAPP_AI_QDRANT_COLLECTION:-myapp-products-v1}
+  MYAPP_AI_QDRANT_ALIAS: ${MYAPP_AI_QDRANT_ALIAS:-}
+  MYAPP_AI_ENVIRONMENT: ${MYAPP_AI_ENVIRONMENT:-staging}
+  MYAPP_AI_RETENTION_DAYS: ${MYAPP_AI_RETENTION_DAYS:-30}
+
+x-ai-orchestrator-environment: &ai_orchestrator_environment
+  MYAPP_AI_LITELLM_BASE_URL: ${MYAPP_AI_LITELLM_BASE_URL:-http://litellm.invalid}
+  MYAPP_AI_LITELLM_API_KEY: ${MYAPP_AI_LITELLM_API_KEY:-not-configured}
+  MYAPP_AI_MODEL: ${MYAPP_AI_MODEL:-opencode-deepseek-v4-flash}
+  MYAPP_AI_REASONING_EFFORT: ${MYAPP_AI_REASONING_EFFORT:-none}
+  MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:-staging-ai-service-token-not-configured}
+  MYAPP_AI_FRAPPE_BASE_URL: ${MYAPP_AI_FRAPPE_BASE_URL:-http://backend:8000}
+  MYAPP_AI_FRAPPE_SITE_HOST: ${MYAPP_AI_FRAPPE_SITE_HOST:-staging.invalid}
+  MYAPP_AI_POLICY_CACHE_TTL_SECONDS: ${MYAPP_AI_POLICY_CACHE_TTL_SECONDS:-30}
+  MYAPP_AI_TIMEOUT_SECONDS: ${MYAPP_AI_TIMEOUT_SECONDS:-60}
+  MYAPP_AI_REDIS_URL: ${MYAPP_AI_REDIS_URL:-redis://redis-cache:6379/0}
+  MYAPP_AI_REDIS_KEY_PREFIX: ${MYAPP_AI_REDIS_KEY_PREFIX:-myapp-ai:staging}
+  MYAPP_AI_CIRCUIT_FAILURE_THRESHOLD: ${MYAPP_AI_CIRCUIT_FAILURE_THRESHOLD:-3}
+  MYAPP_AI_CIRCUIT_FAILURE_WINDOW_SECONDS: ${MYAPP_AI_CIRCUIT_FAILURE_WINDOW_SECONDS:-60}
+  MYAPP_AI_CIRCUIT_OPEN_SECONDS: ${MYAPP_AI_CIRCUIT_OPEN_SECONDS:-60}
+  MYAPP_AI_CONCURRENCY_LEASE_SECONDS: ${MYAPP_AI_CONCURRENCY_LEASE_SECONDS:-180}
+  MYAPP_AI_HTTP_MAX_CONNECTIONS: ${MYAPP_AI_HTTP_MAX_CONNECTIONS:-200}
+  MYAPP_AI_HTTP_MAX_KEEPALIVE_CONNECTIONS: ${MYAPP_AI_HTTP_MAX_KEEPALIVE_CONNECTIONS:-50}
+  MYAPP_AI_HTTP_KEEPALIVE_EXPIRY_SECONDS: ${MYAPP_AI_HTTP_KEEPALIVE_EXPIRY_SECONDS:-30}
+  MYAPP_AI_HTTP_CONNECT_TIMEOUT_SECONDS: ${MYAPP_AI_HTTP_CONNECT_TIMEOUT_SECONDS:-5}
+  MYAPP_AI_HTTP_POOL_TIMEOUT_SECONDS: ${MYAPP_AI_HTTP_POOL_TIMEOUT_SECONDS:-2}
+  MYAPP_AI_CHAT_CONCURRENCY: ${MYAPP_AI_CHAT_CONCURRENCY:-100}
+  MYAPP_AI_STRUCTURED_CONCURRENCY: ${MYAPP_AI_STRUCTURED_CONCURRENCY:-20}
+  MYAPP_AI_EMBEDDING_CONCURRENCY: ${MYAPP_AI_EMBEDDING_CONCURRENCY:-8}
+  MYAPP_AI_EMBEDDING_MODEL: ${MYAPP_AI_EMBEDDING_MODEL:-}
+  MYAPP_AI_QDRANT_URL: ${MYAPP_AI_QDRANT_URL:-http://ai-vector:6333}
+  MYAPP_AI_QDRANT_COLLECTION: ${MYAPP_AI_QDRANT_COLLECTION:-myapp-products-v1}
+  MYAPP_AI_QDRANT_ALIAS: ${MYAPP_AI_QDRANT_ALIAS:-}
+  MYAPP_AI_VECTOR_TIMEOUT_SECONDS: ${MYAPP_AI_VECTOR_TIMEOUT_SECONDS:-15}
+  MYAPP_AI_VECTOR_SEARCH_ENABLED: ${MYAPP_AI_VECTOR_SEARCH_ENABLED:-0}
+  MYAPP_AI_GOVERNANCE_LIVE_GATE_REPORT_PATH: ${MYAPP_AI_GOVERNANCE_LIVE_GATE_REPORT_PATH:-/var/lib/myapp-ai/governance-reports/live-gate.json}
+  MYAPP_AI_GOVERNANCE_EMBEDDING_GATE_REPORT_PATH: ${MYAPP_AI_GOVERNANCE_EMBEDDING_GATE_REPORT_PATH:-/var/lib/myapp-ai/governance-reports/embedding-gate.json}
+  MYAPP_AI_LANGFUSE_HOST: ${MYAPP_AI_LANGFUSE_HOST:-}
+  MYAPP_AI_LANGFUSE_PUBLIC_KEY: ${MYAPP_AI_LANGFUSE_PUBLIC_KEY:-}
+  MYAPP_AI_LANGFUSE_SECRET_KEY: ${MYAPP_AI_LANGFUSE_SECRET_KEY:-}
+  MYAPP_AI_LANGFUSE_ENVIRONMENT: ${MYAPP_AI_LANGFUSE_ENVIRONMENT:-staging}
+  MYAPP_AI_LANGFUSE_RELEASE: ${MYAPP_AI_LANGFUSE_RELEASE:-}
+  MYAPP_AI_LANGFUSE_CAPTURE_CONTENT: ${MYAPP_AI_LANGFUSE_CAPTURE_CONTENT:-0}
+  MYAPP_AI_LANGFUSE_TIMEOUT_SECONDS: ${MYAPP_AI_LANGFUSE_TIMEOUT_SECONDS:-5}
+
 x-backend-defaults: &backend_defaults
   <<: [*depends_on_configurator, *customizable_image]
   volumes:
@@ -28,6 +78,7 @@ services:
         bench set-config -g redis_cache "redis://$$REDIS_CACHE";
         bench set-config -g redis_queue "redis://$$REDIS_QUEUE";
         bench set-config -g redis_socketio "redis://$$REDIS_QUEUE";
+        bench set-config -g workers '{"ai-vector":{"timeout":900}}' --parse;
         bench set-config -gp socketio_port $$SOCKETIO_PORT;
         bench set-config -g chromium_path /usr/bin/chromium-headless-shell;
     environment:
@@ -47,6 +98,79 @@ services:
       - -c
     command:
       - exec bench serve --port 8000
+    environment:
+      <<: *ai_gateway_environment
+
+  ai-orchestrator:
+    image: ${MYAPP_AI_IMAGE:-myapp-ai}:${MYAPP_AI_TAG:-staging-latest}
+    pull_policy: ${PULL_POLICY:-always}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    environment:
+      <<: *ai_orchestrator_environment
+    volumes:
+      - ../../ai-governance-reports:/var/lib/myapp-ai/governance-reports:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4010/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    depends_on:
+      ai-vector:
+        condition: service_healthy
+
+  ai-vector-init:
+    image: qdrant/qdrant@sha256:0fb8897412abc81d1c0430a899b9a81eb8328aa634e7242d1bc804c1fe8fe863
+    restart: "no"
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    entrypoint: ["sh", "-c"]
+    command: ["mkdir -p /qdrant/storage/snapshots && chown -R 65534:65534 /qdrant/storage"]
+    volumes:
+      - ai-vector-data:/qdrant/storage
+
+  ai-vector:
+    image: qdrant/qdrant@sha256:0fb8897412abc81d1c0430a899b9a81eb8328aa634e7242d1bc804c1fe8fe863
+    restart: ${RESTART_POLICY:-unless-stopped}
+    user: "65534:65534"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      QDRANT__STORAGE__SNAPSHOTS_PATH: /qdrant/storage/snapshots
+      QDRANT__TELEMETRY_DISABLED: "true"
+    volumes:
+      - ai-vector-data:/qdrant/storage
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      ai-vector-init:
+        condition: service_completed_successfully
 
   frontend:
     <<: *customizable_image
@@ -85,6 +209,8 @@ services:
       - -c
     command:
       - exec bench worker --queue short,default
+    environment:
+      <<: *ai_gateway_environment
 
   queue-long:
     <<: *backend_defaults
@@ -94,6 +220,24 @@ services:
       - -c
     command:
       - exec bench worker --queue long,default,short
+    environment:
+      <<: *ai_gateway_environment
+
+  queue-ai-vector:
+    <<: *backend_defaults
+    platform: linux/amd64
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - exec bench worker --queue ai-vector
+    environment:
+      <<: *ai_gateway_environment
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+      ai-orchestrator:
+        condition: service_healthy
 
   scheduler:
     <<: *backend_defaults
@@ -103,6 +247,9 @@ services:
       - -c
     command:
       - exec bench schedule
+    environment:
+      <<: *ai_gateway_environment
 
 volumes:
   sites:
+  ai-vector-data:

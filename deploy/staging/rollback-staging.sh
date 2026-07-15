@@ -28,11 +28,17 @@ if [[ -n "${current_tag}" ]]; then
   echo "Current staging tag: ${current_tag}"
 fi
 
-echo "Switching staging tag to: ${ROLLBACK_TAG}"
+echo "Switching staging application and AI image tags to: ${ROLLBACK_TAG}"
 if grep -q '^CUSTOM_TAG=' "${ENV_FILE}"; then
   sed -i "s/^CUSTOM_TAG=.*/CUSTOM_TAG=${ROLLBACK_TAG}/" "${ENV_FILE}"
 else
   printf '\nCUSTOM_TAG=%s\n' "${ROLLBACK_TAG}" >>"${ENV_FILE}"
+fi
+
+if grep -q '^MYAPP_AI_TAG=' "${ENV_FILE}"; then
+  sed -i "s/^MYAPP_AI_TAG=.*/MYAPP_AI_TAG=${ROLLBACK_TAG}/" "${ENV_FILE}"
+else
+  printf '\nMYAPP_AI_TAG=%s\n' "${ROLLBACK_TAG}" >>"${ENV_FILE}"
 fi
 
 echo "Restarting staging stack with rollback tag..."

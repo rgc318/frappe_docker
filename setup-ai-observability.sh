@@ -82,7 +82,9 @@ mv "${temporary_file}" "${OUTPUT_FILE}"
 trap - EXIT
 chmod 600 "${OUTPUT_FILE}"
 
+"${ROOT_DIR}/sync-langfuse-runtime-env.sh" >/dev/null
+
 echo "Generated ${OUTPUT_FILE} with mode 600; secret values were not printed."
 echo "The local admin login and project API keys are stored in that ignored file."
-echo "Start the stack with:"
-echo "docker compose --env-file .env --env-file .env.ai.local --env-file .env.langfuse.local -f compose.yaml -f overrides/compose.langfuse.yaml up -d --build ai-orchestrator langfuse-web langfuse-worker"
+echo "Langfuse is enabled by default for development. Start the complete stack with:"
+echo "./start-dev.sh"

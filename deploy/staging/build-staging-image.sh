@@ -51,6 +51,8 @@ PY
 
 CUSTOM_IMAGE="$(read_env CUSTOM_IMAGE)"
 CUSTOM_TAG="$(read_env CUSTOM_TAG)"
+MYAPP_AI_IMAGE="$(read_env MYAPP_AI_IMAGE)"
+MYAPP_AI_TAG="$(read_env MYAPP_AI_TAG || printf '%s' "${CUSTOM_TAG}")"
 FRAPPE_BRANCH="${FRAPPE_BRANCH:-$(read_env FRAPPE_BRANCH || printf 'v16.18.3')}"
 FRAPPE_PATH="${FRAPPE_PATH:-$(read_env FRAPPE_PATH || printf 'https://github.com/frappe/frappe')}"
 ERPNEXT_REF="${ERPNEXT_REF:-$(read_app_ref 'frappe/erpnext' || read_env ERPNEXT_BRANCH || printf 'v16.18.3')}"
@@ -62,6 +64,8 @@ NO_PROXY_ARG="${NO_PROXY:-${no_proxy:-}}"
 
 : "${CUSTOM_IMAGE:?CUSTOM_IMAGE is required}"
 : "${CUSTOM_TAG:?CUSTOM_TAG is required}"
+: "${MYAPP_AI_IMAGE:?MYAPP_AI_IMAGE is required}"
+: "${MYAPP_AI_TAG:?MYAPP_AI_TAG is required}"
 
 APPS_JSON_BASE64="$(base64 -w 0 "${APPS_JSON_FILE}")"
 
@@ -80,3 +84,14 @@ docker build \
   "${ROOT_DIR}"
 
 echo "Built image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}"
+
+docker build \
+  --build-arg HTTP_PROXY="${HTTP_PROXY_ARG}" \
+  --build-arg HTTPS_PROXY="${HTTPS_PROXY_ARG}" \
+  --build-arg NO_PROXY="${NO_PROXY_ARG}" \
+  --tag "${MYAPP_AI_IMAGE}:${MYAPP_AI_TAG}" \
+  --target runtime \
+  --file "${ROOT_DIR}/services/myapp-ai/Dockerfile" \
+  "${ROOT_DIR}/services/myapp-ai"
+
+echo "Built image: ${MYAPP_AI_IMAGE}:${MYAPP_AI_TAG}"

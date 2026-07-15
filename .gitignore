@@ -1,7 +1,10 @@
 # Environment Variables
 .env
 .env.ai.local
+.env.ai.gateway.local
 .env.langfuse.local
+.env.langfuse.runtime.local
+.env.langfuse.gateway.local
 
 # mounted volume
 sites

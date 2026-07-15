@@ -15,6 +15,7 @@ for file in "${ROOT_DIR}/.env" "${AI_ENV_FILE}" "${LANGFUSE_ENV_FILE}"; do
     exit 1
   fi
 done
+LANGFUSE_ENV_FILE="${LANGFUSE_ENV_FILE}" "${ROOT_DIR}/sync-langfuse-runtime-env.sh" >/dev/null
 if ! command -v openssl >/dev/null 2>&1; then
   echo "openssl is required." >&2
   exit 1
@@ -50,6 +51,7 @@ rollback() {
   if [[ "${rotation_complete}" != "1" ]]; then
     mv "${backup_file}" "${AI_ENV_FILE}"
     chmod 600 "${AI_ENV_FILE}"
+    AI_ENV_FILE="${AI_ENV_FILE}" "${ROOT_DIR}/sync-ai-gateway-env.sh" >/dev/null 2>&1 || true
     compose up -d --force-recreate \
       backend queue-short queue-long queue-ai-vector scheduler ai-orchestrator >/dev/null 2>&1 || true
   else
@@ -75,6 +77,8 @@ temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
 os.chmod(temporary, 0o600)
 os.replace(temporary, path)
 PY
+
+AI_ENV_FILE="${AI_ENV_FILE}" "${ROOT_DIR}/sync-ai-gateway-env.sh"
 
 compose up -d --force-recreate \
   backend queue-short queue-long queue-ai-vector scheduler ai-orchestrator

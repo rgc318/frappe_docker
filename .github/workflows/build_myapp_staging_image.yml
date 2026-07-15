@@ -36,6 +36,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/myapp-erpnext
+  AI_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/myapp-ai
   FRAPPE_PATH: https://github.com/frappe/frappe
 
 jobs:
@@ -114,3 +115,29 @@ jobs:
             MYAPP_REF=${{ inputs.myapp_ref }}
             APPS_JSON_BASE64=${{ steps.apps_json.outputs.value }}
             CACHE_BUST=${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Generate AI image metadata
+        id: ai_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.AI_IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ inputs.image_tag }}
+            type=raw,value=latest,enable=${{ inputs.push_latest }}
+            type=sha,format=short
+          labels: |
+            org.opencontainers.image.title=myapp AI orchestrator
+            org.opencontainers.image.description=MyApp AI orchestration service for staging deployment
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.rgc.frappe_docker_ref=${{ github.ref_name }}
+
+      - name: Build and push AI orchestrator
+        uses: docker/build-push-action@v6
+        with:
+          context: services/myapp-ai
+          file: services/myapp-ai/Dockerfile
+          target: runtime
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.ai_meta.outputs.tags }}
+          labels: ${{ steps.ai_meta.outputs.labels }}

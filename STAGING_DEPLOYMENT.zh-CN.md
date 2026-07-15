@@ -26,8 +26,8 @@
 1. `Lint`
    - 校验根仓库脚本、YAML、JSON、workflow 和基础格式
 2. `Build myapp staging image`
-   - 由 GitHub Actions 构建包含 `myapp` 的镜像
-   - 推送到 `GHCR`
+   - 由 GitHub Actions 同时构建包含 `myapp` 的 ERPNext 镜像和独立 AI Orchestrator 镜像
+   - 两个镜像使用同一发布标签并推送到 `GHCR`
 3. `Deploy staging stack`
    - 由 GitHub Actions 通过 SSH 登录测试服务器
    - 拉取最新镜像
@@ -44,6 +44,9 @@
 - 测试服务器只保留 `frappe_docker` 部署骨架
 - 测试服务器不再映射 `apps/myapp` 源码目录
 - `myapp` 通过镜像烘焙进入 bench
+- AI Orchestrator 使用独立镜像；staging Compose 同时启动 Qdrant、一次性卷初始化和专用 `ai-vector` Worker
+- Backend/Worker 只接收 Gateway 所需 AI 配置，LiteLLM/Langfuse Provider 密钥只进入 Orchestrator
+- 部署前 `validate-staging-env.sh` 对镜像、Provider、内部 Token、向量设置和 Langfuse 配置失败关闭
 - `myapp` 的 Python 依赖由 `apps/myapp/pyproject.toml` 管理，镜像构建阶段会刷新 `apps/frappe` 与 `apps/myapp` 的 editable 安装并执行 `pip check`
 - `rgc-backend-kit` 已发布到公共 PyPI，staging 镜像会通过 `myapp` 依赖自动安装，不需要在服务器或容器中手动安装 JWT 工具包
 - 第一次部署时允许“容器已起来但站点尚未初始化”

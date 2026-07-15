@@ -18,6 +18,7 @@ for file in "${ROOT_DIR}/.env" "${AI_ENV_FILE}" "${LANGFUSE_ENV_FILE}"; do
     exit 1
   fi
 done
+LANGFUSE_ENV_FILE="${LANGFUSE_ENV_FILE}" "${ROOT_DIR}/sync-langfuse-runtime-env.sh" >/dev/null
 
 compose() {
   DOCKER_CONFIG="${DOCKER_CONFIG}" docker compose \

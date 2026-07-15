@@ -34,20 +34,35 @@ frappe_docker/
 
 ### Local myapp Development
 
-This workspace includes a project-specific `myapp` development setup. Use `./start-dev.sh` to start the local stack with the same compose files used by the dev workflow:
+This workspace includes a project-specific `myapp` development setup. Use `./start-dev.sh` to start the local stack with the same compose files used by the dev workflow. Development and test stacks enable the local Langfuse observability stack by default, together with the AI Orchestrator, Qdrant and the dedicated `ai-vector` worker:
 
 ```bash
 ./start-dev.sh
 ```
 
+First-time AI setup:
+
+```bash
+cp .env.ai.example .env.ai.local
+# Configure LiteLLM, the internal service token and vector settings.
+./setup-ai-observability.sh
+./start-dev.sh
+```
+
+`sync-ai-gateway-env.sh` copies only Gateway-safe variables into the ignored `.env.ai.gateway.local`. `sync-langfuse-runtime-env.sh` generates one runtime file for the bundled Langfuse services and a separate restricted file containing only the Orchestrator trace endpoint and project keys. Backend and Frappe workers never receive LiteLLM or Langfuse secrets. Use `./start-dev.sh --without-observability` only when local observability is intentionally disabled. Use `./stop.sh` for development, `./stop.sh --prod` for `start-prod.sh`, and avoid `-v` unless AI vector and observability data should also be deleted.
+
 The script expands to:
 
 ```bash
 docker compose \
+  --env-file .env \
+  --env-file .env.ai.local \
+  --env-file .env.langfuse.local \
   -f compose.yaml \
   -f overrides/compose.redis.yaml \
   -f overrides/compose.mariadb.yaml \
   -f overrides/compose.noproxy.yaml \
+  -f overrides/compose.langfuse.yaml \
   up -d
 ```
 
@@ -65,6 +80,8 @@ When the stack is started through VS Code Dev Containers, use the Dev Container 
 - Do not add `-v` unless you intentionally want to delete Docker volumes.
 
 The Dev Container `backend` service is intentionally kept idle. It installs/refreshes `myapp`, ensures `debugpy` is available for VS Code debugging, and then keeps the container alive. It does not run `bench serve` automatically. Pressing F5 in VS Code starts `bench serve --port 8000` from `.vscode/launch.json`; this avoids the `Address already in use` error caused by starting a second server on port `8000`.
+
+Before Compose starts, the Dev Container prepares the restricted AI and Langfuse runtime environment files. Its `runServices` includes the AI Orchestrator, Qdrant, the `ai-vector` worker and all six bundled Langfuse services by default. Run `./setup-ai-observability.sh` once before the first Dev Container build; if the secret file is missing, initialization stops with that instruction instead of starting a partially configured stack. Langfuse UI is forwarded on port `3000` and MinIO API on `9090`.
 
 `debugpy` is a development/debugging dependency. It should not be listed in `apps/myapp/pyproject.toml` under normal runtime `dependencies`, otherwise every service that runs `pip install -e apps/myapp` will try to install it on startup. Keep it in the app's dev dependency section or install it only from the Dev Container startup path.
 

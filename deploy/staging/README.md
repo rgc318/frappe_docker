@@ -10,10 +10,13 @@ Files:
   - copy to `apps.staging.json` and define the apps baked into the image
 - `compose.staging.yaml`
   - staging-only compose base that does not bind-mount `apps/myapp`
+  - includes the AI Orchestrator, Qdrant, its one-shot volume initializer, and the dedicated `ai-vector` worker
 - `compose.mariadb.staging.yaml`
   - staging-only MariaDB override that does not publish database ports to the host
 - `build-staging-image.sh`
-  - builds the custom image that already contains `myapp`
+  - builds both the custom image containing `myapp` and the AI Orchestrator image
+- `validate-staging-env.sh`
+  - fails closed on missing AI images, provider configuration, short service tokens, placeholders, incomplete vector settings, or partial Langfuse credentials
 - `start-staging.sh`
   - starts the staging stack
 - `deploy-staging.sh`
@@ -56,8 +59,22 @@ Suggested image reference in `staging.env`:
 ```bash
 CUSTOM_IMAGE=ghcr.io/<github-owner>/myapp-erpnext
 CUSTOM_TAG=staging-latest
+MYAPP_AI_IMAGE=ghcr.io/<github-owner>/myapp-ai
+MYAPP_AI_TAG=staging-latest
 PULL_POLICY=always
 ```
+
+The build workflow publishes the ERPNext and AI Orchestrator images with the same release tag. Deploy and rollback update both `CUSTOM_TAG` and `MYAPP_AI_TAG`; `check-staging.sh` verifies the Orchestrator health response and authenticated Backend-to-Orchestrator communication.
+
+Before starting staging, configure these AI values in the ignored `deploy/staging/staging.env`:
+
+- LiteLLM base URL and API key
+- a random internal service token of at least 32 characters
+- Frappe site host and AI environment
+- Embedding/Qdrant alias settings; keep vector search disabled until smoke tests pass
+- optional external Langfuse host/public/secret key; configure all three together or leave all three empty
+
+The staging Backend and workers receive only Gateway-safe values. LiteLLM and Langfuse provider credentials are injected only into `ai-orchestrator`. The bundled local Langfuse Compose stack is not used for staging; connect staging to a separately governed Langfuse deployment when observability is required.
 
 For release verification, prefer a unique `CUSTOM_TAG` such as `staging-20260526-bff502e`.
 The staging compose file intentionally persists only `sites`; the Python virtualenv comes

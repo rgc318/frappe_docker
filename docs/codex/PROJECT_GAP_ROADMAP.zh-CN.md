@@ -1,6 +1,6 @@
 # 项目差距与交付路线图
 
-更新时间：2026-07-14
+更新时间：2026-07-15
 
 本文档是当前项目“哪些已完成、哪些仍未满足企业级需求”的统一索引。具体接口和领域规则仍分别以各模块技术设计为准；历史交接记录只描述当时状态，不作为当前完成度判断依据。
 
@@ -12,7 +12,7 @@
 | 企业级业务治理 | 约 75% | 用户、打印、幂等和审计较完整；信用、批次、盘点审批仍缺失 |
 | Web 管理端 | 约 85% | 核心业务页面齐全，仍有逆向链路、模板清理和浏览器验收缺口 |
 | 移动作业端 | 约 80% | 销售采购移动流程较丰富，仍需发布验收、扫码作业和安全能力收口 |
-| AI Copilot | 整体约 91% | 只读工具、三类草稿、本地 Langfuse、固定评测、真实 Embedding、582 个商品向量索引和中文语义质量验收已贯通；生产观测运维、治理任务、模型策略管理台和高并发生产化待完成 |
+| AI Copilot | 本地功能约 98% | 只读工具、三类草稿、模型治理、数据任务、OTLP/Langfuse、固定评测、真实 Embedding、582 个商品向量索引、高并发门禁和恢复演练已贯通；剩余集中在生产级异步观测、HA/Secret/SSO/告警、真实 staging 和外部 v2 Provider |
 | 生产上线准备 | 约 70% | 已有部署脚本和说明，仍需 staging、备份恢复、监控及真实设备演练 |
 
 当前不应再视为缺失的模块：
@@ -135,13 +135,15 @@
 
 ### 3.7 AI Copilot 平台化与单据草稿
 
-当前只读 Phase A、三类核心业务草稿、本地 Langfuse 和固定评测主链路已经可用，剩余：
+当前本地可实施的 AI 主链路已经基本完成：只读工具、三类核心业务草稿、模型策略/预算/灰度/降级、Prompt 与 Embedding 发布治理、商品数据任务、OTLP trace/score、固定评测、共享异步连接池、分布式限流/预算/熔断、独立向量队列、专项压测、Qdrant snapshot，以及 Langfuse PostgreSQL/ClickHouse/MinIO 联合备份恢复均有实现和验证证据。
 
-- 把本地 Langfuse 验收升级为生产观测运维：PostgreSQL/ClickHouse/MinIO 联合备份恢复、告警、SSO/访问治理、成本看板、密钥轮换，以及 legacy ingestion 向 OTLP traces 迁移。
-- 商品向量检索基础设施、索引更新/删除治理、权限后过滤、混合 rerank、真实 `erp-embedding`、582 个商品批量索引和 10/10 中文语义质量验收已完成；剩余是生产 Qdrant snapshot/卷备份恢复、容量与延迟基线、更大人工标注集，以及清理历史 HTTP 测试商品带来的检索噪声。
-- 数据整理建议任务、人工审批、执行分离和审计。
-- 模型策略、预算、灰度、降级和 Prompt 版本管理台；详细设计基线见 `apps/myapp/AI_MODEL_GOVERNANCE_TECH_DESIGN.zh-CN.md`。
-- AI 高并发生产化：异步连接池、分布式限流/背压、独立向量队列、多副本、SSE Stream Gateway、Qdrant 高可用和专项压测；详细设计基线见 `apps/myapp/AI_HIGH_CONCURRENCY_TECH_DESIGN.zh-CN.md`。
+剩余范围：
+
+- 把 Orchestrator 直接等待 Langfuse OTLP 写入升级为批处理/有界队列或 OpenTelemetry Collector，避免观测端慢响应增加 AI 请求尾延迟，并补充丢弃、重试、积压和写入失败指标。
+- 完成正式生产 Secret Manager、Langfuse Project Key/恢复根密钥轮换、SSO/RBAC、成本看板、告警负责人和保留策略；本地 env、初始化账号或单机健康不能替代这些外部部署项。
+- 将单节点 Compose 基线升级为生产多副本/负载均衡与托管 PostgreSQL、ClickHouse、Redis、对象存储或等价 HA 方案，并在真实 staging 完成故障摘除、容量和恢复验收。
+- 修复外部 `erp-embedding` v2 Provider 的 `float + str` 故障后，构建、评测和受控发布新 collection；在线 v1 alias 在此之前保持不变。
+- 扩大人工标注的中文检索质量集，清理历史 HTTP 测试商品噪声，并建立生产数据质量与检索回归门禁。
 
 验收标准：AI 不创建正式单据，不泄露越权数据；回答和草稿均可追溯；模型或 Prompt 升级通过固定评测；成本、失败和用户反馈可观测。
 
@@ -192,7 +194,7 @@
 5. 批次与保质期。
 6. 客户/供应商及仓库深度治理。
 7. 报表钻取、导出和性能。
-8. AI 商品真实 Embedding 与语义质量验收、生产观测运维、治理任务和模型策略管理台。
+8. AI 生产异步观测、HA/Secret/SSO/告警、真实 staging 与 v2 Embedding Provider 收口。
 9. 条码仓储作业和高级用户治理。
 10. 模板清理、E2E、前端错误监控和大批量导入。
 

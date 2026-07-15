@@ -12,15 +12,6 @@ x-depends-on-configurator: &depends_on_configurator
     configurator:
       condition: service_completed_successfully
 
-x-ai-backend-environment: &ai_backend_environment
-  MYAPP_AI_ORCHESTRATOR_URL: ${MYAPP_AI_ORCHESTRATOR_URL:-http://ai-orchestrator:4010}
-  MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:-local-development-ai-service-token}
-  MYAPP_AI_VECTOR_SEARCH_ENABLED: ${MYAPP_AI_VECTOR_SEARCH_ENABLED:-0}
-  MYAPP_AI_EMBEDDING_MODEL: ${MYAPP_AI_EMBEDDING_MODEL:-}
-  MYAPP_AI_QDRANT_COLLECTION: ${MYAPP_AI_QDRANT_COLLECTION:-myapp-products-v1}
-  MYAPP_AI_QDRANT_ALIAS: ${MYAPP_AI_QDRANT_ALIAS:-}
-  MYAPP_AI_ENVIRONMENT: ${MYAPP_AI_ENVIRONMENT:-development}
-
 x-backend-defaults: &backend_defaults
   <<: [*depends_on_configurator, *customizable_image]
   #  extra_hosts:
@@ -65,8 +56,9 @@ services:
     ports:
       - "5678:5678"
       - "8000:8000"
+    env_file:
+      - .env.ai.gateway.local
     environment:
-      <<: *ai_backend_environment
       ENABLE_PYCHARM_DEBUG: "1"
     entrypoint:
       - bash
@@ -100,6 +92,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    depends_on:
+      ai-vector:
+        condition: service_healthy
 
   ai-vector-init:
     image: qdrant/qdrant@sha256:0fb8897412abc81d1c0430a899b9a81eb8328aa634e7242d1bc804c1fe8fe863
@@ -183,8 +178,8 @@ services:
     entrypoint:
       - bash
       - -c
-    environment:
-      <<: *ai_backend_environment
+    env_file:
+      - .env.ai.gateway.local
     command:
       - >
         ./env/bin/pip install -e apps/myapp;
@@ -196,8 +191,8 @@ services:
     entrypoint:
       - bash
       - -c
-    environment:
-      <<: *ai_backend_environment
+    env_file:
+      - .env.ai.gateway.local
     command:
       - >
         ./env/bin/pip install -e apps/myapp;
@@ -209,12 +204,17 @@ services:
     entrypoint:
       - bash
       - -c
-    environment:
-      <<: *ai_backend_environment
+    env_file:
+      - .env.ai.gateway.local
     command:
       - >
         ./env/bin/pip install -e apps/myapp;
         exec bench worker --queue ai-vector
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+      ai-orchestrator:
+        condition: service_healthy
 
   scheduler:
     <<: *backend_defaults
@@ -222,8 +222,8 @@ services:
     entrypoint:
       - bash
       - -c
-    environment:
-      <<: *ai_backend_environment
+    env_file:
+      - .env.ai.gateway.local
     command:
       - >
         ./env/bin/pip install -e apps/myapp;
