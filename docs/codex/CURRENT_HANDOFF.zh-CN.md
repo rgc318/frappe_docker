@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-15 16:19 CST
+更新时间：2026-07-15 19:16 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -22,7 +22,7 @@
 - Web `/administration/ai/data-tasks` 已实现 service camelCase 映射、独立权限、菜单/路由、管理入口重定向、ProTable 筛选、缺失描述扫描、手工字段建议、前值/建议值/证据对比、审批/驳回、执行和回滚。最终 `npm run tsc`、Biome、20 套/139 项 Jest 通过；仍有项目既有 Jest open handle 提示，但退出码为 0。
 - 正式生产仍需在 Secret Manager/正式环境完成 Langfuse Project Key、恢复根密钥、SSO 和正式轮换；这些外部部署项不能用本地开发密钥伪造完成。
 - 本轮分仓库提交：Backend `d8747fc feat: complete AI governance and data tasks`；Web `8f4410d feat: add AI governance workbenches`；父仓库 `0e71b8a3 feat: complete AI production readiness milestone`，并已把 `apps/myapp` gitlink 更新到 `d8747fc`。
-- Backend 和 Web 工作区均干净。父仓库仅保留既有未跟踪 `.codex`；`backups/ai/`、`.env.ai.local`、`.env.langfuse.local` 均受忽略且未提交或输出。
+- Backend 与 Web 工作区均干净。Web 查询默认公司修复已提交为 `dcde5a9 fix: stop default company filtering searches`；父仓库 AI 启动、部署、Dev Container、staging 和 Langfuse 默认启用配置已提交为 `e1310344 feat: complete AI development deployment configuration`。父仓库只保留本交接文件待提交及既有未跟踪 `.codex`；`.env.ai.local`、`.env.ai.gateway.local`、`.env.langfuse.local` 和派生运行时文件均受忽略且不得输出或提交。
 - Mobile `frontend/myapp-mobile` 保留本轮开始前已有的五个未提交文件，本轮不得修改、回滚或提交。
 
 ## AI 企业级收口最终验收
@@ -33,6 +33,31 @@
 - 外部阻塞：`erp-embedding` v2 Provider `float + str`；生产 Secret Manager、SSO 和正式密钥轮换。在线 v1 collection 和现有 AI 主链路不因该阻塞回退。
 
 ## 本轮工作总结
+
+### 2026-07-15 开发与 Dev Container 默认启用 Langfuse
+
+- `start-dev.sh` 已改为默认启用 bundled Langfuse；只有显式传入 `--without-observability` 才关闭。首次缺少 `.env.langfuse.local` 时会失败并提示运行 `./setup-ai-observability.sh`，不会以半配置状态继续启动。
+- Dev Container 默认 Compose 组合已加入 `overrides/compose.langfuse.yaml`，`runServices` 加入 Web、Worker、PostgreSQL、ClickHouse、Redis、MinIO 六个服务，并转发 3000/9090。初始化阶段同时同步 AI Gateway 与 Langfuse 运行时配置。
+- 新增 `sync-langfuse-runtime-env.sh`：从权限 `0600` 的 `.env.langfuse.local` 生成完整 bundled-stack 运行时文件和 Orchestrator 最小观测文件。真实 Compose 解析确认 Backend 不含 Langfuse 变量，Orchestrator 只有 Host/Project Key/环境等观测字段，不含数据库、PostgreSQL 或 MinIO 密钥。
+- 当前已运行的 Dev Container 采用定向方式新增六个 Langfuse 服务并只重建 Orchestrator，没有重建 Backend。Langfuse v3.212.0 health 为 `OK`，Orchestrator 为 healthy 且 `litellm_configured=true`、`langfuse_configured=true`、`vector_search_configured=true`；四个依赖存储均 healthy，Worker 正常运行。Backend 容器 ID 仍为原实例并保持运行。
+- 验证通过：相关 shell `bash -n`、普通开发完整组合、Dev Container 无额外 `--env-file` 组合、带测试占位变量的本地 prod 组合、staging 示例组合 `docker compose config --quiet`，Dev Container JSONC 关键默认项断言，以及三个仓库 `diff --check`。staging 未引入本地 bundled Langfuse，继续使用外部受控配置。
+- AI 完成度事实源已同步校正：四个原始收口 Wave 均已完成，本地功能基线约 98%；下一阶段只处理异步 OTLP、生产 HA/Secret/SSO/告警、真实 staging、v2 Embedding 外部阻塞和检索数据质量，不重复开发已完成的模型治理、Data Task、草稿、评测或向量 v1 主链路。
+- 本轮提交：Web `dcde5a9`；父仓库 `e1310344`。Backend 无代码改动，父仓库子模块指针未变化。
+
+### 2026-07-15 Web 查询取消自动默认公司
+
+- 真实排查确认数据库仍有 854 条 Sales Order，订单没有被清空；浏览器访问日志显示订单页先收到含数据响应，随后偏好加载触发的默认公司请求返回空列表并覆盖前一结果。
+- 已全局审计 Web 搜索面并移除工作区默认公司注入：销售/采购订单、发票/收发货通用列表、待确认、收付款、库存现状/流水/预警、商品/仓库列表、财务、经营报表和 Dashboard 首次均查询权限范围内全部公司。
+- 商品和库存详情不再从工作区偏好隐式补公司；库存列表只有用户主动选择公司时才把该公司带入详情链接。销售/采购新建、库存盘点/转仓/调整、仓库新增、工作偏好设置和 AI 草稿继续保留录入所需默认公司。
+- 新增 `src/__tests__/search-default-company.test.ts`，15 项断言阻止搜索页面重新引入 `initialValue: defaultCompany`、公司默认参数、偏好驱动的 ProTable remount 或详情隐式公司。验证：`npm run tsc`、`npm run biome:lint`、Web 全量 Jest 21 套/154 项、`git diff --check` 全部通过。
+
+### 2026-07-15 AI 启动、Dev Container 与 staging 部署收口
+
+- 新增 `sync-ai-gateway-env.sh`，从 `.env.ai.local` 只同步 Orchestrator URL、内部 Token、向量开关/别名、环境和保留期到权限 `0600` 的忽略文件 `.env.ai.gateway.local`；Backend、Worker、Scheduler 不再获得 LiteLLM/Langfuse Provider 密钥。实际 Compose 解析确认 Backend 与 Orchestrator Token 一致、向量开关均为 `1`，Backend 不包含 LiteLLM Key。
+- `start-dev.sh` 在开发/测试阶段默认纳入完整 Langfuse 栈，仍可用 `--without-observability` 显式关闭；`start-prod.sh` 保持原有自动判断，staging 继续使用外部受控 Langfuse。Dev Container 默认启动六个 Langfuse 服务并转发 3000/9090。新增 Langfuse 运行时 env 同步，把完整 bundled-stack 配置与 Orchestrator 最小观测配置拆分，Backend/Worker 不获得相关密钥。
+- staging `compose.staging.yaml` 已加入独立 AI Orchestrator 镜像、Qdrant 初始化/持久服务、`ai-vector` Worker、共享 Gateway 配置和安全/健康限制；LiteLLM/Langfuse Provider 凭据只进入 Orchestrator。`staging.env.example`、启动/部署/初始化、回滚和健康检查已同步更新。
+- staging 构建 workflow 与本地构建脚本现在同时构建 `myapp-erpnext` 和 `myapp-ai`，使用同一发布标签；部署与回滚同步修改 `CUSTOM_TAG` / `MYAPP_AI_TAG`。新增 `validate-staging-env.sh`，对占位符、缺失镜像/Provider、短 Token、向量依赖和不完整 Langfuse 凭据失败关闭；健康检查验证 Orchestrator `/health` 和 Backend→Orchestrator 认证。
+- 已验证：所有修改 shell 脚本 `bash -n`；本地基础、本地完整 Langfuse、Dev Container、staging 示例及现有旧 staging env 的 `docker compose config --quiet`；staging 有效合成 env 校验通过、模板占位符按预期拒绝；两个 GitHub Actions workflow YAML 可解析；父仓库 `git diff --check` 通过。未重启当前运行容器，未执行真实 staging pull/up；远端部署前必须把新增 AI 值填入服务器忽略文件 `deploy/staging/staging.env`。
 
 ### 2026-07-15 AI 企业级收口：高并发、恢复与 Data Task
 
