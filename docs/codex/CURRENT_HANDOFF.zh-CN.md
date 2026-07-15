@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-15 15:52 CST
+更新时间：2026-07-15 16:19 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,7 +8,7 @@
 
 ## 当前最终状态
 
-- AI 企业级收口 Goal 的本地实现、验证、文档和分仓库交付条件已满足，待本轮父仓库提交后可标记 `complete`。外部 v2 Embedding Provider 和正式生产 Secret/SSO 项作为已记录部署依赖，不误报完成。
+- AI 企业级收口 Goal 已正式标记为 `complete`。本地实现、真实验证、文档和分仓库交付均已完成；外部 v2 Embedding Provider 和正式生产 Secret/SSO 项作为已记录部署依赖，不误报完成。
 - 模型治理已覆盖注册、治理元数据、不可变策略版本、预算、灰度、失败关闭评测门禁、双人审批、System Manager 发布/回滚、运行时策略解析、Redis 原子限流/预算/熔断和每日用量聚合。Web `/administration/ai/models` 已实现模型、策略、用量和 Embedding release 管理。
 - Embedding 发布治理已实现候选构建、验证、审批、alias 原子发布与回滚控制面。在线 `myapp-products-live → myapp-products-v1` 保持 582 points / 1024 维健康；新的 v2 单条和批量请求仍被外部 LiteLLM/Provider `unsupported operand type(s) for +: 'float' and 'str'` 阻断，不得宣称 v2 已构建或发布。
 - Orchestrator 已使用 lifespan 共享 LiteLLM/Qdrant/Langfuse `AsyncClient`，Chat、structured、Embedding 使用独立 semaphore，稳定返回 `AI_LOCAL_CONCURRENCY_LIMITED` / `AI_EMBEDDING_CONCURRENCY_LIMITED`。当前 Orchestrator 全测基线为 74 项通过。
@@ -21,7 +21,8 @@
 - Backend 最终 AI/Data Task/Gateway 单元集合 171 项通过，`bench --site localhost migrate` 再次成功；真实临时商品完成 `review_required → approved → executed → rolled_back`，执行后描述更新、回滚后恢复，三个身份分离，临时商品/用户/任务/审计均已清理。
 - Web `/administration/ai/data-tasks` 已实现 service camelCase 映射、独立权限、菜单/路由、管理入口重定向、ProTable 筛选、缺失描述扫描、手工字段建议、前值/建议值/证据对比、审批/驳回、执行和回滚。最终 `npm run tsc`、Biome、20 套/139 项 Jest 通过；仍有项目既有 Jest open handle 提示，但退出码为 0。
 - 正式生产仍需在 Secret Manager/正式环境完成 Langfuse Project Key、恢复根密钥、SSO 和正式轮换；这些外部部署项不能用本地开发密钥伪造完成。
-- 本轮分仓库提交：Backend `d8747fc feat: complete AI governance and data tasks`；Web `8f4410d feat: add AI governance workbenches`；父仓库为包含本交接、Orchestrator/运维成果和后端 gitlink 的当前 HEAD。父仓库 `.codex`、`backups/ai/`、`.env.ai.local`、`.env.langfuse.local` 均未提交或输出。
+- 本轮分仓库提交：Backend `d8747fc feat: complete AI governance and data tasks`；Web `8f4410d feat: add AI governance workbenches`；父仓库 `0e71b8a3 feat: complete AI production readiness milestone`，并已把 `apps/myapp` gitlink 更新到 `d8747fc`。
+- Backend 和 Web 工作区均干净。父仓库仅保留既有未跟踪 `.codex`；`backups/ai/`、`.env.ai.local`、`.env.langfuse.local` 均受忽略且未提交或输出。
 - Mobile `frontend/myapp-mobile` 保留本轮开始前已有的五个未提交文件，本轮不得修改、回滚或提交。
 
 ## AI 企业级收口最终验收
@@ -40,7 +41,7 @@
 - 完成 Qdrant snapshot、Langfuse PostgreSQL/ClickHouse/MinIO 联合备份、隔离恢复演练和内部服务 Token 轮换；恢复证据、清理结果和生产待办已写入运行手册。
 - 完成 `MyApp AI Data Task` Backend：迁移、角色、服务、Gateway、审批/执行分离、漂移检查、幂等、回滚、审计和真实临时商品回归。
 - 完成 Web `/administration/ai/data-tasks`：领域 service、权限、路由、菜单、服务端列表、扫描、创建、详情对比、审批、执行和回滚；TypeScript、Biome 和聚焦 Jest 已通过。
-- 最终验证：Orchestrator 74 项、Backend 171 项、Web 20 套/139 项通过；迁移、三个仓库 `diff --check`、敏感扫描和临时压测资源清理均完成。Backend `d8747fc`、Web `8f4410d` 已提交；父仓库提交包含剩余运维/报告/文档和后端 gitlink。外部 v2 Embedding Provider 故障作为明确例外保留。
+- 最终验证：Orchestrator 74 项、Backend 171 项、Web 20 套/139 项通过；迁移、三个仓库 `diff --check`、敏感扫描和临时压测资源清理均完成。Backend `d8747fc`、Web `8f4410d`、父仓库 `0e71b8a3` 已提交。外部 v2 Embedding Provider 故障作为明确例外保留。
 
 ### 2026-07-14 AI 商品向量检索真实启用与验收
 
