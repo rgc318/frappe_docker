@@ -1,0 +1,35 @@
+{
+  "schema": "myapp-ai-restore-drill-v1",
+  "project": "myapp-ai-restore-20260715t062000z",
+  "isolated_restore": true,
+  "expected_counts": {
+    "postgres_projects": 1,
+    "clickhouse_traces": 116,
+    "clickhouse_observations": 116,
+    "minio_objects": 540
+  },
+  "actual_counts": {
+    "postgres_projects": 1,
+    "clickhouse_traces": 116,
+    "clickhouse_observations": 116,
+    "minio_objects": 540,
+    "langfuse_api_traces": 116
+  },
+  "qdrant": {
+    "collection": "myapp-products-restore-20260715t062000z",
+    "points_count": 582,
+    "indexed_vectors_count": 0,
+    "vector_size": 1024
+  },
+  "checks": {
+    "postgres_projects": true,
+    "clickhouse_traces": true,
+    "clickhouse_observations": true,
+    "minio_objects": true,
+    "langfuse_api_trace_count": true,
+    "qdrant_points": true,
+    "qdrant_vector_size": true
+  },
+  "passed": true,
+  "temporary_resources_removed_on_exit": true
+}

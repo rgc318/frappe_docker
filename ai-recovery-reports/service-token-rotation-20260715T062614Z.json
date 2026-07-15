@@ -1,0 +1,17 @@
+{
+  "schema": "myapp-ai-service-token-rotation-v1",
+  "old_token_fingerprint": "f64980d191db",
+  "new_token_fingerprint": "4c13dbc2e1fe",
+  "old_token_status": 401,
+  "new_token_status": 200,
+  "services_recreated": [
+    "backend",
+    "queue-short",
+    "queue-long",
+    "queue-ai-vector",
+    "scheduler",
+    "ai-orchestrator"
+  ],
+  "passed": true,
+  "secrets_recorded": false
+}

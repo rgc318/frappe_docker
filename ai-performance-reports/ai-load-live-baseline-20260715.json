@@ -1,0 +1,79 @@
+{
+  "schema": "myapp-ai-load-report-v1",
+  "generated_at": "2026-07-15T05:55:10.756532+00:00",
+  "mode": "smoke",
+  "provider_kind": "live",
+  "rounds": 3,
+  "synthetic_data_only": true,
+  "captures_prompt_or_output": false,
+  "scenarios": {
+    "chat": [
+      {
+        "concurrency": 2,
+        "requests": 6,
+        "successes": 6,
+        "error_rate": 0.0,
+        "elapsed_seconds": 18.075,
+        "throughput_rps": 0.332,
+        "latency_ms": {
+          "min": 3724.26,
+          "mean": 5046.99,
+          "p50": 4322.46,
+          "p95": 7668.48,
+          "p99": 8162.48,
+          "max": 8285.97
+        },
+        "successful_latency_ms": {
+          "min": 3724.26,
+          "mean": 5046.99,
+          "p50": 4322.46,
+          "p95": 7668.48,
+          "p99": 8162.48,
+          "max": 8285.97
+        },
+        "rejected_latency_ms": null,
+        "first_token_ms": null,
+        "status_counts": {
+          "200": 6
+        },
+        "error_codes": {}
+      }
+    ],
+    "sse": [
+      {
+        "concurrency": 2,
+        "requests": 6,
+        "successes": 6,
+        "error_rate": 0.0,
+        "elapsed_seconds": 25.051,
+        "throughput_rps": 0.24,
+        "latency_ms": {
+          "min": 3874.57,
+          "mean": 7081.35,
+          "p50": 7438.3,
+          "p95": 8878.22,
+          "p99": 8886.92,
+          "max": 8889.09
+        },
+        "successful_latency_ms": {
+          "min": 3874.57,
+          "mean": 7081.35,
+          "p50": 7438.3,
+          "p95": 8878.22,
+          "p99": 8886.92,
+          "max": 8889.09
+        },
+        "rejected_latency_ms": null,
+        "first_token_ms": {
+          "p50": 7037.56,
+          "p95": 8808.23,
+          "p99": 8825.24
+        },
+        "status_counts": {
+          "200": 6
+        },
+        "error_codes": {}
+      }
+    ]
+  }
+}
