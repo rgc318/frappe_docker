@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-15 19:52 CST
+更新时间：2026-07-15 22:46 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,31 +8,42 @@
 
 ## 当前最终状态
 
-- AI 企业级收口 Goal 已正式标记为 `complete`。本地实现、真实验证、文档和分仓库交付均已完成；外部 v2 Embedding Provider 和正式生产 Secret/SSO 项作为已记录部署依赖，不误报完成。
+- 剩余 AI 企业级收口 Goal 的本地可实施范围已完成：异步 OTLP、Langfuse Secret 最小化、三环境部署契约、检索噪声治理、30 条中文质量门禁、真实数据清理、Provider 复测、文档和分仓库提交均已交付。正式 Secret Manager/SSO/TLS/HA/staging 和外部 v2 Provider 仍作为明确部署依赖，不误报本地完成等于生产上线。
 - 模型治理已覆盖注册、治理元数据、不可变策略版本、预算、灰度、失败关闭评测门禁、双人审批、System Manager 发布/回滚、运行时策略解析、Redis 原子限流/预算/熔断和每日用量聚合。Web `/administration/ai/models` 已实现模型、策略、用量和 Embedding release 管理。
-- Embedding 发布治理已实现候选构建、验证、审批、alias 原子发布与回滚控制面。在线 `myapp-products-live → myapp-products-v1` 保持 582 points / 1024 维健康；新的 v2 单条和批量请求仍被外部 LiteLLM/Provider `unsupported operand type(s) for +: 'float' and 'str'` 阻断，不得宣称 v2 已构建或发布。
-- Orchestrator 已使用 lifespan 共享 LiteLLM/Qdrant/Langfuse `AsyncClient`，Chat、structured、Embedding 使用独立 semaphore，稳定返回 `AI_LOCAL_CONCURRENCY_LIMITED` / `AI_EMBEDDING_CONCURRENCY_LIMITED`。当前 Orchestrator 全测基线为 74 项通过。
+- Embedding 发布治理已实现候选构建、验证、审批、alias 原子发布与回滚控制面。2026-07-15 已从在线 `myapp-products-live → myapp-products-v1` 移除 439 个明确 `HTTP-` 测试 points，当前 143 points / 1024 维，alias 未变化、剩余 payload 无 `HTTP-`、SKU001～SKU010 全部存在；582 个 ERP Item 和 854 个 Sales Order 未修改。
+- Orchestrator 已使用 lifespan 共享 LiteLLM/Qdrant/Langfuse `AsyncClient`，Chat、structured、Embedding 使用独立 semaphore，稳定返回 `AI_LOCAL_CONCURRENCY_LIMITED` / `AI_EMBEDDING_CONCURRENCY_LIMITED`。新增版本化中文检索质量 runner 后，当前 Orchestrator test target 为 80 项通过。
 - 可复现压测脚本和 SLO 基线已完成：合成 Chat 100 并发 200/200、p95 1122ms；SSE 200 并发 400/400、首 Token p95 2339ms、总 p95 2420ms；structured 20 并发 40/40、p95 300ms；Embedding 32/64/128 全通过。真实低价 Provider Chat/SSE 各 6/6，但 p95 约 7.67s / 8.88s；检索并发 16 开始出现 12.5% 429，均已记录为容量边界。
 - Qdrant 压测真实暴露 `Too many open files`，`compose.yaml` 已为 Qdrant 增加 `nofile soft/hard=65536`。压测报告保存在 `ai-performance-reports/`，基线见 `AI_PERFORMANCE_SLO_BASELINE.zh-CN.md`。
 - Langfuse generation/trace 已迁移到 `/api/public/otel/v1/traces`，使用 32 位 hex trace ID；feedback/eval score 保留 score ingestion。真实查询确认 generation、`erp-readonly-v5` Prompt 版本、输入/输出哈希摘要和 feedback 均已落库。
 - `backup-ai-state.sh`、`restore-ai-state-drill.sh`、`qdrant_snapshot.py` 和恢复运行手册已完成。真实隔离恢复核对 PostgreSQL projects=1、ClickHouse traces/observations=116/116、MinIO objects=540、Langfuse API traces=116、Qdrant=582 points/1024 维，临时 Compose project、卷和 collection 已清理。
 - 内部 AI 服务 Token 已真实轮换：旧 Token 401、新 Token 200；`.env.ai.local` 已更新且不得输出或提交，Backend、Queues、Scheduler、Orchestrator 已重建健康。备份位于忽略目录 `backups/ai/20260715T061700Z`，约 264 MiB，不得提交。
 - Backend Data Task 已实现七个 Gateway API、`AI Data Steward` / `AI Data Approver` 角色、发起/审批/执行分离、源数据漂移检查、幂等执行、安全回滚和哈希审计。首期只允许 Item 的 `item_name`、`description`、`brand`、`item_group`，禁止价格、库存和正式交易字段。
-- Backend 最终 AI/Data Task/Gateway 单元集合 171 项通过，`bench --site localhost migrate` 再次成功；真实临时商品完成 `review_required → approved → executed → rolled_back`，执行后描述更新、回滚后恢复，三个身份分离，临时商品/用户/任务/审计均已清理。
+- Backend 当前 AI/Data Task/Gateway 单元集合 178 项通过；排除项不 upsert、Item Hook 转删除、补偿/重建不重新加入、候选 collection 过滤、语义候选二次过滤、dry-run、幂等清理和 critical 审计均有覆盖。既有真实 Data Task 生命周期与迁移证据保持有效。
 - Web `/administration/ai/data-tasks` 已实现 service camelCase 映射、独立权限、菜单/路由、管理入口重定向、ProTable 筛选、缺失描述扫描、手工字段建议、前值/建议值/证据对比、审批/驳回、执行和回滚。最终 `npm run tsc`、Biome、20 套/139 项 Jest 通过；仍有项目既有 Jest open handle 提示，但退出码为 0。
-- 正式生产仍需在 Secret Manager/正式环境完成 Langfuse Project Key、恢复根密钥、SSO 和正式轮换；这些外部部署项不能用本地开发密钥伪造完成。
+- 正式生产仍需在 Secret Manager/正式环境完成 Langfuse Project Key、恢复根密钥、SSO/TLS、HA 数据服务、告警负责人和真实 staging 演练；这些外部部署项不能用本地开发密钥或单机 Compose 伪造完成。
 - 本轮分仓库提交：Backend `d8747fc feat: complete AI governance and data tasks`；Web `8f4410d feat: add AI governance workbenches`；父仓库 `0e71b8a3 feat: complete AI production readiness milestone`，并已把 `apps/myapp` gitlink 更新到 `d8747fc`。
-- Backend 与 Web 工作区均干净。Web 查询默认公司修复已提交为 `dcde5a9`；父仓库启动/部署配置为 `e1310344`。新 Goal 的异步 OTLP 里程碑已提交：Backend 设计 `70b09c5`，父仓库实现与 gitlink `2b5b9ed9`。父仓库只保留本交接文件待提交及既有未跟踪 `.codex`；本地 Secret 和派生运行时文件均受忽略且不得输出或提交。
+- 本轮检索质量治理提交：Backend `c4a6af3 feat: govern AI vector retrieval quality`；父仓库 `62bae6ee feat: complete AI retrieval quality governance`，并已把 `apps/myapp` gitlink 更新到 `c4a6af3`。Backend/Web 工作区干净；父仓库只保留本交接文件待提交及既有未跟踪 `.codex`；本地 Secret、派生运行时文件和真实失败报告均受忽略且不得提交。
 - Mobile `frontend/myapp-mobile` 保留本轮开始前已有的五个未提交文件，本轮不得修改、回滚或提交。
 
 ## AI 企业级收口最终验收
 
-- 已完成：功能审计与追踪矩阵；模型治理 Backend/Orchestrator/Web；Embedding 发布控制面；高并发 P0 与压测；OTLP；备份恢复与内部 Token 轮换；Data Task Backend/Web。
-- 最终自动化：Orchestrator 当前源码镜像 77 项、Backend 171 项、Web 21 套/154 项全部通过；站点迁移成功。
-- 最终仓库门禁：三个仓库 `diff --check` 通过；敏感扫描仅命中 `.env.langfuse.example` 的 `replace-with-random-value` 占位符；`myapp-ai-mock` / `myapp-ai-loadtest` 已停止并自动移除。
-- 外部阻塞：`erp-embedding` v2 Provider `float + str`；生产 Secret Manager、SSO 和正式密钥轮换。在线 v1 collection 和现有 AI 主链路不因该阻塞回退。
+- 已完成：功能审计与追踪矩阵；模型治理 Backend/Orchestrator/Web；Embedding 发布控制面；高并发 P0 与压测；OTLP；备份恢复与内部 Token 轮换；Data Task Backend/Web；向量测试噪声治理和版本化中文检索门禁。
+- 最终自动化：Orchestrator 当前源码镜像 80 项、Backend AI/Data Task/Gateway 178 项、Web 最近完整基线 21 套/154 项全部通过；站点迁移既有证据保持有效。
+- 最终仓库门禁：父仓库/Backend/Web `diff --check` 通过，敏感扫描无真实 Key/Token；真实失败报告和 `.env.*.local` 均被忽略。父仓库只剩 `.codex`，Mobile 只剩本轮开始前的 5 个用户改动。
+- 外部阻塞再次确认：`/v1/models` 只列出 `erp-embedding`；v1 `/v1/embeddings` HTTP 500 `float + str`，v2 HTTP 400 模型不存在。30 条中文质量用例全部由 Orchestrator 返回 HTTP 502，失败报告保存在忽略目录 `ai-governance-reports/product-retrieval-v1-current.json`；未创建 v2 collection，在线 v1 alias 不变。
 
 ## 本轮工作总结
+
+### 2026-07-15 剩余 AI Goal：检索质量治理与 Provider 复测
+
+- 新增 `MYAPP_AI_VECTOR_EXCLUDED_ITEM_PREFIXES`，development/staging 初始仅配置明确测试前缀 `HTTP-`。规则贯穿增量同步、Item Hook、小时补偿、管理员重建、候选 collection 构建/重试和语义候选二次过滤；排除只影响 AI 索引，不删除、不停用 ERP Item。
+- 新增 `cleanup_excluded_ai_product_vectors_v1` Gateway POST：System Manager 权限、默认 dry-run、最大 5000、正式执行必须原因和幂等键、内部按 100 条删除、状态标记 `deleted`、critical AI 审计，响应固定证明 `erp_items_changed=0`。
+- 真实 dry-run：ERP Item 582、Sales Order 854、基准 SKU 10；`HTTP-` 命中 439，其中状态 indexed 384；Qdrant 582 points / 1024 维，alias `myapp-products-live → myapp-products-v1`。
+- 真实清理：删除请求 439，Qdrant points 582 → 143；清理后 Item 582、Sales Order 854、基准 SKU 10、alias 和维度均不变。直接 scroll 复核 143 个 payload 中 `HTTP-` 为 0，SKU001～SKU010 全部存在。
+- 新增 `product-retrieval-zh-cn-v1` 版本化数据集：SKU001～SKU010 各三条直接名称、用途表达、模糊描述，共 30 条。`python -m myapp_ai.retrieval_quality` 检查 Top-1/Top-3、Provider 错误、排除候选泄漏和 p50/p95，默认禁止 live，真实失败关闭。
+- 真实门禁 30/30 均 HTTP 502，Top-1/Top-3 为 0、Provider error=30、排除泄漏=0、p95=5856.216ms。直连复测确认 v1 HTTP 500 `unsupported operand type(s) for +: 'float' and 'str'`，v2 HTTP 400 不存在；未创建或发布 v2 collection。
+- 验证：Backend AI/Data Task/Gateway 178 项通过；Orchestrator test target 80 项通过；开发+Langfuse+Dev Container 与 staging Compose 解析、shell 语法、三个仓库 `diff --check` 和敏感扫描通过。新 Orchestrator runtime 镜像已重建并健康，`retrieval_quality_ready`、Langfuse Dispatcher、向量与治理健康字段正常。queue-short、queue-long、queue-ai-vector 和 scheduler 已定向重建并确认加载 `HTTP-` 排除配置；为避免中断用户 Dev Container，会话中的 Backend 容器未重建，下次 Dev Container 启动会由 initializeCommand 自动加载同一派生 env。
+- 提交：Backend `c4a6af3`；父仓库 `62bae6ee`。正式 Secret Manager、SSO/TLS、HA/告警、真实 staging 和 Provider 修复仍需对应外部平台完成，当前文档已给出失败关闭契约与运行证据。
 
 ### 2026-07-15 剩余 AI Goal：异步 Langfuse OTLP Dispatcher
 
