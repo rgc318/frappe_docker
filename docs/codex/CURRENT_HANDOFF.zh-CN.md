@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-15 19:36 CST
+更新时间：2026-07-15 19:52 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -41,6 +41,9 @@
 - `/health.langfuse_delivery` 已暴露 Worker、队列容量/深度、入队、发送、批次成功/失败、重试、丢弃和通用错误状态。新增批处理、慢端不阻塞、队列满和重试成功测试，Orchestrator 全量从 74 增至 77 项并全部通过。
 - 当前 Orchestrator 已基于新源码重建；真实最小 Chat 返回 200 和 trace ID，随后后台指标为 `queued_total=1`、`sent_total=1`、`queue_depth=0`、`retry_total=0`、`dropped_total=0`。Backend 容器 ID/启动时间未变化。
 - 本里程碑提交：Backend `70b09c5 docs: define asynchronous AI observability delivery`；父仓库 `2b5b9ed9 feat: decouple AI generation observability delivery`。下一步是 Langfuse bundled stack 分服务 Secret 最小化和 development/staging/production 部署契约。
+- bundled Langfuse Secret 最小化已提交为父仓库 `36056716 feat: enforce least-privilege Langfuse deployment`：Web/Worker 应用、Web 初始化、PostgreSQL、ClickHouse、Redis、MinIO、Orchestrator 分别使用独立 `0600` 派生文件。真实 Compose 键集合确认四个存储容器只获得自身凭据，Worker 无初始化管理员密码，Orchestrator 无存储密钥，Backend 无 Langfuse Secret。
+- 六个 Langfuse 容器已使用原持久卷重建并全部健康；重建前后 PostgreSQL projects=1、ClickHouse traces=122、MinIO objects=552 完全一致。`start-prod.sh` 默认不再启动 bundled Langfuse，只有显式 `--with-observability` 才允许单节点例外。
+- 新增 `AI_DEPLOYMENT_ENVIRONMENTS.zh-CN.md`，明确 development、staging、production 的拓扑、Secret、HA、TLS、SSO/RBAC、告警、保留、恢复和外部依赖边界。下一步完成本里程碑验证/提交后，推进检索数据质量门禁和 v2 Provider 复测。
 
 ### 2026-07-15 开发与 Dev Container 默认启用 Langfuse
 
