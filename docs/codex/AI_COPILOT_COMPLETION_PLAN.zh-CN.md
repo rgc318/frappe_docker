@@ -23,7 +23,11 @@
 4. 在外部 Provider 修复后完成 v2 Embedding collection 构建、扩大质量集、审批发布与回滚；修复前保持在线 v1 alias，不以模拟结果代替真实发布。
 5. 清理历史测试商品噪声并建立持续的数据质量、检索质量、成本和用户反馈门禁。
 
-当前 Goal 进度：第 1 项已完成第一阶段实现和真实验证。Orchestrator generation OTLP 已使用有界后台批处理 Dispatcher，77 项全测通过；真实调用确认请求成功后后台 `queued_total=1`、`sent_total=1` 且无重试/丢弃。后续继续推进 Secret 最小化和三环境生产部署契约。
+当前 Goal 进度：
+
+- 第 1 项已完成第一阶段实现和真实验证。Orchestrator generation OTLP 已使用有界后台批处理 Dispatcher，77 项全测通过；真实调用确认请求成功后后台 `queued_total=1`、`sent_total=1` 且无重试/丢弃。
+- 第 2 项本地可实施部分已完成：bundled Langfuse 拆分 Web、应用、PostgreSQL、ClickHouse、Redis、MinIO 和 Orchestrator 专属 `0600` env；真实重建前后 projects=1、traces=122、objects=552 保持一致。三环境契约已形成，`start-prod.sh` 默认不启动 bundled Langfuse。
+- 第 2/3 项剩余需要正式 Secret Manager、SSO/RBAC、TLS、告警平台、托管/HA 数据服务和真实 staging 环境，不能在本地伪造完成。后续继续推进可本地完成的检索数据质量门禁与外部 v2 Provider 复测。
 
 ## 1. 不可变边界
 

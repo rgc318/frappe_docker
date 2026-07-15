@@ -49,7 +49,7 @@ cp .env.ai.example .env.ai.local
 ./start-dev.sh
 ```
 
-`sync-ai-gateway-env.sh` copies only Gateway-safe variables into the ignored `.env.ai.gateway.local`. `sync-langfuse-runtime-env.sh` generates one runtime file for the bundled Langfuse services and a separate restricted file containing only the Orchestrator trace endpoint and project keys. Backend and Frappe workers never receive LiteLLM or Langfuse secrets. Use `./start-dev.sh --without-observability` only when local observability is intentionally disabled. Use `./stop.sh` for development, `./stop.sh --prod` for `start-prod.sh`, and avoid `-v` unless AI vector and observability data should also be deleted.
+`sync-ai-gateway-env.sh` copies only Gateway-safe variables into the ignored `.env.ai.gateway.local`. `sync-langfuse-runtime-env.sh` generates separate `0600` files for Langfuse Web, PostgreSQL, ClickHouse, Redis, MinIO and the Orchestrator project keys; storage containers receive only their own credentials. Backend and Frappe workers never receive LiteLLM or Langfuse secrets. Use `./start-dev.sh --without-observability` only when local observability is intentionally disabled. `./start-prod.sh` does not start bundled Langfuse by default; production should connect to an externally governed deployment, while `--with-observability` is an explicit single-node exception. Use `./stop.sh` for development, `./stop.sh --prod` for `start-prod.sh`, and avoid `-v` unless AI vector and observability data should also be deleted.
 
 The script expands to:
 
@@ -95,6 +95,8 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y f
 The Dev Container maps `/usr/share/fonts/opentype/noto` into `/home/frappe/.local/share/fonts/noto` and refreshes the font cache on start. Staging images already install `fontconfig` and `fonts-noto-cjk` in `images/custom/myapp-staging/Containerfile`, so the workflow does not need a separate change for local font mounting.
 
 ## Documentation
+
+The development, staging and production AI/Langfuse deployment contract is documented in [`docs/codex/AI_DEPLOYMENT_ENVIRONMENTS.zh-CN.md`](docs/codex/AI_DEPLOYMENT_ENVIRONMENTS.zh-CN.md).
 
 **The official documentation for `frappe_docker` is maintained in the `docs/` folder in this repository.**
 

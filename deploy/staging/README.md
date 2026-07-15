@@ -76,6 +76,8 @@ Before starting staging, configure these AI values in the ignored `deploy/stagin
 
 The staging Backend and workers receive only Gateway-safe values. LiteLLM and Langfuse provider credentials are injected only into `ai-orchestrator`. The bundled local Langfuse Compose stack is not used for staging; connect staging to a separately governed Langfuse deployment when observability is required.
 
+The full development/staging/production AI deployment and secret-boundary contract is documented in `docs/codex/AI_DEPLOYMENT_ENVIRONMENTS.zh-CN.md`.
+
 For release verification, prefer a unique `CUSTOM_TAG` such as `staging-20260526-bff502e`.
 The staging compose file intentionally persists only `sites`; the Python virtualenv comes
 from the image and is not mounted as a long-lived Docker volume.

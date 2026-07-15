@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-WITH_OBSERVABILITY=auto
+WITH_OBSERVABILITY=no
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -33,7 +33,7 @@ COMPOSE_ARGS=(
   -f "${ROOT_DIR}/overrides/compose.https.yaml"
 )
 
-if [[ "${WITH_OBSERVABILITY}" == yes || ( "${WITH_OBSERVABILITY}" == auto && -f "${ROOT_DIR}/.env.langfuse.local" ) ]]; then
+if [[ "${WITH_OBSERVABILITY}" == yes ]]; then
   if [[ ! -f "${ROOT_DIR}/.env.langfuse.local" ]]; then
     echo "Missing .env.langfuse.local; run ./setup-ai-observability.sh first." >&2
     exit 1

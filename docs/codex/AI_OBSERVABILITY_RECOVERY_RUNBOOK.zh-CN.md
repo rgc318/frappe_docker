@@ -111,8 +111,11 @@ cd /home/rgc318/python-project/frappe_docker
 - Web/MinIO 只绑定 loopback；PostgreSQL、ClickHouse、Redis 和 MinIO Console 不发布宿主机端口。
 - 生产接入 SSO 前，管理员账号必须使用唯一强密码、最小管理员人数和定期访问复核。
 - AI Auditor 只读检查 trace/score/发布审计，不获得模型策略修改或用户管理权限。
+- bundled 开发栈使用分服务 `0600` 派生 env：PostgreSQL、ClickHouse、Redis、MinIO 只获得自身凭据，Worker 不获得初始化管理员密码，Orchestrator 只获得 Project Key 和投递参数。
 
 当前已完成内部服务 Token 真实轮换。Langfuse Project Key 和恢复根密钥的生产轮换仍需在正式 Secret Manager/SSO 环境执行，不能在本地通过修改初始化变量伪造完成。
+
+开发、staging、生产的边界和验收条件见 `docs/codex/AI_DEPLOYMENT_ENVIRONMENTS.zh-CN.md`。`start-prod.sh` 默认不纳入 bundled Langfuse；`--with-observability` 只用于明确接受单节点风险的受控场景。
 
 ## 7. 故障与回滚
 

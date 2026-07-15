@@ -5,6 +5,11 @@
 .env.langfuse.local
 .env.langfuse.runtime.local
 .env.langfuse.gateway.local
+.env.langfuse.web.local
+.env.langfuse.postgres.local
+.env.langfuse.clickhouse.local
+.env.langfuse.redis.local
+.env.langfuse.minio.local
 
 # mounted volume
 sites

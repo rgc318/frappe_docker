@@ -26,7 +26,9 @@ services:
     depends_on: *langfuse-dependencies
     ports:
       - "127.0.0.1:${LANGFUSE_PORT:-3000}:3000"
-    env_file: *langfuse-runtime-env
+    env_file:
+      - .env.langfuse.runtime.local
+      - .env.langfuse.web.local
     healthcheck:
       test:
         - CMD
@@ -42,7 +44,8 @@ services:
     image: ${LANGFUSE_CLICKHOUSE_IMAGE:-docker.io/clickhouse/clickhouse-server:26.6.1.1193}
     restart: ${RESTART_POLICY:-unless-stopped}
     user: "101:101"
-    env_file: *langfuse-runtime-env
+    env_file:
+      - .env.langfuse.clickhouse.local
     volumes:
       - langfuse-clickhouse-data:/var/lib/clickhouse
       - langfuse-clickhouse-logs:/var/log/clickhouse-server
@@ -58,7 +61,8 @@ services:
     restart: ${RESTART_POLICY:-unless-stopped}
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
-    env_file: *langfuse-runtime-env
+    env_file:
+      - .env.langfuse.minio.local
     ports:
       - "127.0.0.1:${LANGFUSE_MINIO_PORT:-9090}:9000"
     volumes:
@@ -74,7 +78,8 @@ services:
     image: docker.io/redis:${LANGFUSE_REDIS_VERSION:-7.4.9}
     restart: ${RESTART_POLICY:-unless-stopped}
     command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory-policy noeviction"]
-    env_file: *langfuse-runtime-env
+    env_file:
+      - .env.langfuse.redis.local
     volumes:
       - langfuse-redis-data:/data
     healthcheck:
@@ -86,7 +91,8 @@ services:
   langfuse-postgres:
     image: docker.io/postgres:${LANGFUSE_POSTGRES_VERSION:-17.10}
     restart: ${RESTART_POLICY:-unless-stopped}
-    env_file: *langfuse-runtime-env
+    env_file:
+      - .env.langfuse.postgres.local
     volumes:
       - langfuse-postgres-data:/var/lib/postgresql/data
     healthcheck:

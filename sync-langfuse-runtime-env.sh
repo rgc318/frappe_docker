@@ -5,6 +5,11 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_FILE="${LANGFUSE_ENV_FILE:-${ROOT_DIR}/.env.langfuse.local}"
 RUNTIME_FILE="${LANGFUSE_RUNTIME_ENV_FILE:-${ROOT_DIR}/.env.langfuse.runtime.local}"
+WEB_FILE="${LANGFUSE_WEB_ENV_FILE:-${ROOT_DIR}/.env.langfuse.web.local}"
+POSTGRES_FILE="${LANGFUSE_POSTGRES_ENV_FILE:-${ROOT_DIR}/.env.langfuse.postgres.local}"
+CLICKHOUSE_FILE="${LANGFUSE_CLICKHOUSE_ENV_FILE:-${ROOT_DIR}/.env.langfuse.clickhouse.local}"
+REDIS_FILE="${LANGFUSE_REDIS_ENV_FILE:-${ROOT_DIR}/.env.langfuse.redis.local}"
+MINIO_FILE="${LANGFUSE_MINIO_ENV_FILE:-${ROOT_DIR}/.env.langfuse.minio.local}"
 GATEWAY_FILE="${LANGFUSE_GATEWAY_ENV_FILE:-${ROOT_DIR}/.env.langfuse.gateway.local}"
 
 if [[ $# -gt 0 ]]; then
@@ -18,14 +23,27 @@ if [[ ! -f "${SOURCE_FILE}" ]]; then
   exit 1
 fi
 
-python3 - "${SOURCE_FILE}" "${RUNTIME_FILE}" "${GATEWAY_FILE}" <<'PY'
+python3 - \
+  "${SOURCE_FILE}" \
+  "${RUNTIME_FILE}" \
+  "${WEB_FILE}" \
+  "${POSTGRES_FILE}" \
+  "${CLICKHOUSE_FILE}" \
+  "${REDIS_FILE}" \
+  "${MINIO_FILE}" \
+  "${GATEWAY_FILE}" <<'PY'
 from pathlib import Path
 import os
 import sys
 
 source = Path(sys.argv[1])
 runtime_output = Path(sys.argv[2])
-gateway_output = Path(sys.argv[3])
+web_output = Path(sys.argv[3])
+postgres_output = Path(sys.argv[4])
+clickhouse_output = Path(sys.argv[5])
+redis_output = Path(sys.argv[6])
+minio_output = Path(sys.argv[7])
+gateway_output = Path(sys.argv[8])
 
 defaults = {
     "LANGFUSE_PUBLIC_URL": "http://localhost:3000",
@@ -93,14 +111,12 @@ runtime = {
     "LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES": "false",
     "CLICKHOUSE_MIGRATION_URL": "clickhouse://langfuse-clickhouse:9000",
     "CLICKHOUSE_URL": "http://langfuse-clickhouse:8123",
-    "CLICKHOUSE_DB": "default",
     "CLICKHOUSE_USER": values["LANGFUSE_CLICKHOUSE_USER"],
     "CLICKHOUSE_PASSWORD": values["LANGFUSE_CLICKHOUSE_PASSWORD"],
     "CLICKHOUSE_CLUSTER_ENABLED": "false",
     "REDIS_HOST": "langfuse-redis",
     "REDIS_PORT": "6379",
     "REDIS_AUTH": values["LANGFUSE_REDIS_AUTH"],
-    "REDIS_PASSWORD": values["LANGFUSE_REDIS_AUTH"],
     "LANGFUSE_S3_EVENT_UPLOAD_BUCKET": "langfuse",
     "LANGFUSE_S3_EVENT_UPLOAD_REGION": "auto",
     "LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID": values["LANGFUSE_MINIO_ROOT_USER"],
@@ -118,6 +134,8 @@ runtime = {
     "LANGFUSE_ENABLE_BLOB_STORAGE_FILE_LOG": "true",
     "LANGFUSE_S3_EVENT_KEY_MAX_SEGMENT_BYTES": "255",
     "AUTH_DISABLE_SIGNUP": "true",
+}
+web = {
     "NEXTAUTH_SECRET": values["LANGFUSE_NEXTAUTH_SECRET"],
     "LANGFUSE_INIT_ORG_ID": values["LANGFUSE_INIT_ORG_ID"],
     "LANGFUSE_INIT_ORG_NAME": values["LANGFUSE_INIT_ORG_NAME"],
@@ -128,13 +146,25 @@ runtime = {
     "LANGFUSE_INIT_USER_EMAIL": values["LANGFUSE_INIT_USER_EMAIL"],
     "LANGFUSE_INIT_USER_NAME": values["LANGFUSE_INIT_USER_NAME"],
     "LANGFUSE_INIT_USER_PASSWORD": values["LANGFUSE_INIT_USER_PASSWORD"],
-    "MINIO_ROOT_USER": values["LANGFUSE_MINIO_ROOT_USER"],
-    "MINIO_ROOT_PASSWORD": values["LANGFUSE_MINIO_ROOT_PASSWORD"],
+}
+postgres = {
     "POSTGRES_USER": values["LANGFUSE_POSTGRES_USER"],
     "POSTGRES_PASSWORD": values["LANGFUSE_POSTGRES_PASSWORD"],
     "POSTGRES_DB": values["LANGFUSE_POSTGRES_DB"],
     "TZ": "UTC",
     "PGTZ": "UTC",
+}
+clickhouse = {
+    "CLICKHOUSE_DB": "default",
+    "CLICKHOUSE_USER": values["LANGFUSE_CLICKHOUSE_USER"],
+    "CLICKHOUSE_PASSWORD": values["LANGFUSE_CLICKHOUSE_PASSWORD"],
+}
+redis = {
+    "REDIS_PASSWORD": values["LANGFUSE_REDIS_AUTH"],
+}
+minio = {
+    "MINIO_ROOT_USER": values["LANGFUSE_MINIO_ROOT_USER"],
+    "MINIO_ROOT_PASSWORD": values["LANGFUSE_MINIO_ROOT_PASSWORD"],
 }
 gateway = {
     "MYAPP_AI_LANGFUSE_HOST": "http://langfuse-web:3000",
@@ -163,8 +193,20 @@ def write_env(path: Path, rows: dict[str, str]) -> None:
     os.replace(temporary, path)
 
 write_env(runtime_output, runtime)
+write_env(web_output, web)
+write_env(postgres_output, postgres)
+write_env(clickhouse_output, clickhouse)
+write_env(redis_output, redis)
+write_env(minio_output, minio)
 write_env(gateway_output, gateway)
 PY
 
-chmod 600 "${RUNTIME_FILE}" "${GATEWAY_FILE}"
-echo "Synchronized Langfuse runtime and restricted Orchestrator environments."
+chmod 600 \
+  "${RUNTIME_FILE}" \
+  "${WEB_FILE}" \
+  "${POSTGRES_FILE}" \
+  "${CLICKHOUSE_FILE}" \
+  "${REDIS_FILE}" \
+  "${MINIO_FILE}" \
+  "${GATEWAY_FILE}"
+echo "Synchronized least-privilege Langfuse service and Orchestrator environments."
