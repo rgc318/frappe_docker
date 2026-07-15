@@ -7,6 +7,7 @@
 - `MYAPP_AI_QDRANT_ALIAS` 是在线检索和增量写入的稳定引用；物理 collection 名称必须版本化且不可复用。
 - 新 Embedding 模型、维度或向量空间必须新建 collection，全量补建后才能切换 alias。
 - 候选构建使用独立 `MyApp AI Vector Release` 和逐商品 `MyApp AI Vector Build Item`，不得覆盖当前在线索引状态。
+- 在线和候选构建必须使用同一 `MYAPP_AI_VECTOR_EXCLUDED_ITEM_PREFIXES`；排除项不得计入候选总点数或质量集候选。
 - 发布前必须满足：注册模型健康、数据区域/留存已复核、全量商品构建完成、Qdrant 点数精确一致、维度有效、受控 full gate 报告匹配、双人审批。
 - Alias 发布与回滚只允许 `System Manager` 执行，必须填写原因并产生 critical 审计。
 
@@ -14,7 +15,7 @@
 
 - 稳定 alias：`myapp-products-live`
 - 当前物理 collection：`myapp-products-v1`
-- 2026-07-15 真实核对：582 points，vector size 1024，alias 访问同样返回 582 points。
+- 2026-07-15 质量治理后真实核对：ERP Item 582、Sales Order 854；在线 alias `myapp-products-live → myapp-products-v1` 保持不变，143 points / 1024 维，`HTTP-` payload 为 0，SKU001～SKU010 全部存在。
 - 当前外部 `erp-embedding` 仍可能返回 `unsupported operand type(s) for +: 'float' and 'str'`。在供应商配置修复和新 full gate 证据存在前，不得创建“已完成”或发布 v2 的结论。
 
 ## 3. Full Gate 报告
@@ -43,12 +44,14 @@ Orchestrator 只读取部署侧只读挂载的 `MYAPP_AI_GOVERNANCE_EMBEDDING_GA
 
 1. 在模型注册表维护新的不可变 Embedding 别名，完成区域、留存和健康复核。
 2. 确认 Backend 与 Orchestrator 都配置同一 `MYAPP_AI_QDRANT_ALIAS`。
-3. 在 `/administration/ai/models` 的“Embedding 发布”创建候选版本，指定新物理 collection。
-4. 独立 `ai-vector` Worker 按 64 商品一批补建；失败项保留错误并可重试。
-5. 上传由受控评测生成的 full gate 报告，执行“校验门禁”。
-6. `AI Model Approver` 审批；生产起草人与审批人不得相同。
-7. `System Manager` 发布。Orchestrator 使用 Qdrant `/collections/aliases` 单请求删除旧映射并创建新映射，原子切换。
-8. 保留旧物理 collection 至回滚窗口结束；备份和质量观察完成前不得删除。
+3. 先 dry-run 并执行 `cleanup_excluded_ai_product_vectors_v1`，确认只移除明确测试前缀的向量且 ERP Item/历史交易数量不变。
+4. 运行 30 条版本化中文检索质量集，确认无排除候选泄漏；Provider 错误时停止发布。
+5. 在 `/administration/ai/models` 的“Embedding 发布”创建候选版本，指定新物理 collection。
+6. 独立 `ai-vector` Worker 按 64 商品一批补建；失败项保留错误并可重试。
+7. 上传由受控评测生成的 full gate 报告，执行“校验门禁”。
+8. `AI Model Approver` 审批；生产起草人与审批人不得相同。
+9. `System Manager` 发布。Orchestrator 使用 Qdrant `/collections/aliases` 单请求删除旧映射并创建新映射，原子切换。
+10. 保留旧物理 collection 至回滚窗口结束；备份和质量观察完成前不得删除。
 
 ## 5. 回滚与恢复
 

@@ -235,3 +235,19 @@ litellm_settings:
 重启 LiteLLM 后分别验证一个聊天别名和 Embedding 别名。不要只检查 `/v1/models`，因为模型注册成功不代表 Chat 路由已经可调用。
 
 如果业务侧 API Key 对 `/config/list` 等管理端点返回 403，必须由 LiteLLM 管理员在服务端修复，不能通过普通推理 Key 修改全局配置。
+
+## 10. LiteLLM Embedding 因 timeout 类型错误全量失败
+
+现象：
+
+- `/v1/models` 正常返回并只列出 `erp-embedding`。
+- `erp-embedding` 的 `/v1/embeddings` 返回 HTTP 500：`unsupported operand type(s) for +: 'float' and 'str'`。
+- 堆栈位于 `anyio.fail_after` 的 `current_time() + delay`，说明供应商连接 timeout 被解析为字符串，而不是数值。
+- `erp-embedding-v2` 返回 HTTP 400 模型不存在。
+
+处理原则：
+
+- 这是 LiteLLM/供应商路由配置问题，不是 Frappe、Qdrant、向量文档或 Langfuse 故障。
+- 由 LiteLLM 管理员检查该 Embedding 模型组的 `timeout`、`connect_timeout`、`request_timeout` 等字段，确保 YAML/数据库中的值为数值而不是带引号字符串，并重启后复测单条与批量 Embedding。
+- `/v1/models` 中没有 v2 别名时，不得创建 v2 collection、候选 release 或伪造 full-gate 报告。
+- 故障期间保持在线 alias 指向已验证 v1 collection；真实检索质量门禁应失败关闭并保留 HTTP 502 报告。

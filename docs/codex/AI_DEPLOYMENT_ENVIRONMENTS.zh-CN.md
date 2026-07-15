@@ -7,7 +7,7 @@
 ## 1. 共同不可变边界
 
 - Web/Mobile 只调用 Frappe Gateway，不直连 Orchestrator、LiteLLM、Langfuse 或 Qdrant。
-- Frappe Backend/Worker 只获得 Gateway URL、内部服务 Token、向量开关/alias、环境和保留期，不获得模型供应商或 Langfuse 存储密钥。
+- Frappe Backend/Worker 只获得 Gateway URL、内部服务 Token、向量开关/alias、排除商品前缀、环境和保留期，不获得模型供应商或 Langfuse 存储密钥。
 - Orchestrator 可以获得 LiteLLM Key、Langfuse Project Key 和 Qdrant 地址，但不得获得 Langfuse PostgreSQL、ClickHouse、Redis、MinIO 根密钥。
 - generation OTLP 使用有界异步批处理 Dispatcher；观测失败、队列满或重试耗尽不得阻断 AI/ERP 主链路。
 - 默认 `MYAPP_AI_LANGFUSE_CAPTURE_CONTENT=0`。原文采集必须经过数据分类、保留、访问、跨境和删除策略评审。
@@ -18,6 +18,7 @@
 用途：个人开发、功能联调、固定评测、故障注入和恢复演练。
 
 - `./start-dev.sh` 和 Dev Container 默认启动 bundled Langfuse、AI Orchestrator、Qdrant 与专用 `ai-vector` Worker。
+- development 默认以 `MYAPP_AI_VECTOR_EXCLUDED_ITEM_PREFIXES=HTTP-` 排除明确 HTTP 测试商品；扩展前缀前必须审计历史交易引用。
 - bundled Langfuse 是单节点六服务组合，不代表生产 HA。
 - Web 和 MinIO 只绑定 loopback；PostgreSQL、ClickHouse、Redis 和 MinIO Console 不发布宿主机端口。
 - `.env.langfuse.local` 是被忽略的恢复根配置；`sync-langfuse-runtime-env.sh` 原子生成权限 `0600` 的分服务文件：

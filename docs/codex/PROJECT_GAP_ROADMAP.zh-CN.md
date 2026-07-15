@@ -142,7 +142,7 @@
 - 完成正式生产 Secret Manager、Langfuse Project Key/恢复根密钥轮换、SSO/RBAC、成本看板、告警负责人和保留策略；本地 env、初始化账号或单机健康不能替代这些外部部署项。
 - 将单节点 Compose 基线升级为生产多副本/负载均衡与托管 PostgreSQL、ClickHouse、Redis、对象存储或等价 HA 方案，并在真实 staging 完成故障摘除、容量和恢复验收。
 - 修复外部 `erp-embedding` v2 Provider 的 `float + str` 故障后，构建、评测和受控发布新 collection；在线 v1 alias 在此之前保持不变。
-- 扩大人工标注的中文检索质量集，清理历史 HTTP 测试商品噪声，并建立生产数据质量与检索回归门禁。
+- 已完成 30 条版本化中文检索质量集、runner 和历史 `HTTP-` 测试商品向量清理；后续只需在 Provider 恢复后取得真实通过报告，并继续用真实运营反馈扩展人工标注集。
 
 验收标准：AI 不创建正式单据，不泄露越权数据；回答和草稿均可追溯；模型或 Prompt 升级通过固定评测；成本、失败和用户反馈可观测。
 

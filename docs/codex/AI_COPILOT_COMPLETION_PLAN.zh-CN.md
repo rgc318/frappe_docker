@@ -27,7 +27,9 @@
 
 - 第 1 项已完成第一阶段实现和真实验证。Orchestrator generation OTLP 已使用有界后台批处理 Dispatcher，77 项全测通过；真实调用确认请求成功后后台 `queued_total=1`、`sent_total=1` 且无重试/丢弃。
 - 第 2 项本地可实施部分已完成：bundled Langfuse 拆分 Web、应用、PostgreSQL、ClickHouse、Redis、MinIO 和 Orchestrator 专属 `0600` env；真实重建前后 projects=1、traces=122、objects=552 保持一致。三环境契约已形成，`start-prod.sh` 默认不启动 bundled Langfuse。
-- 第 2/3 项剩余需要正式 Secret Manager、SSO/RBAC、TLS、告警平台、托管/HA 数据服务和真实 staging 环境，不能在本地伪造完成。后续继续推进可本地完成的检索数据质量门禁与外部 v2 Provider 复测。
+- 第 5 项本地收口已完成：新增 `MYAPP_AI_VECTOR_EXCLUDED_ITEM_PREFIXES=HTTP-` 全链路过滤、管理员 dry-run/幂等清理 API、critical 审计和 30 条版本化中文检索质量 runner。真实清理只从 Qdrant 移除 439 个测试 points；ERP Item 582、Sales Order 854、alias、1024 维和 SKU001～SKU010 均保持。
+- 外部 Provider 已再次复测：`erp-embedding` HTTP 500 `float + str`，`erp-embedding-v2` HTTP 400 不存在；30/30 真实质量用例均 HTTP 502，失败报告已保留。因此不创建 v2 collection，在线 v1 维持 143 个非排除 points。
+- 第 2/3 项剩余需要正式 Secret Manager、SSO/RBAC、TLS、告警平台、托管/HA 数据服务和真实 staging 环境，不能在本地伪造完成。
 
 ## 1. 不可变边界
 
