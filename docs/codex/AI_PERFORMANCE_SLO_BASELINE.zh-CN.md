@@ -21,32 +21,32 @@
 
 全量合成矩阵每档执行两轮：
 
-| 场景 | 最高档结果 | p95 | 结论 |
-|---|---:|---:|---|
-| Chat | 100 并发，200/200 成功 | 1122.27 ms | 单副本共享连接池无错误 |
-| SSE | 200 并发，400/400 完成 | 首 Token 2338.62 ms；总时延 2419.92 ms | 无无界排队或流泄漏 |
-| 销售草稿 | 20 并发，40/40 成功 | 299.56 ms | structured 独立池有效 |
-| 检索 | 20/50/100 过载档 | 成功请求最高 p95 403.74 ms | 超出容量时稳定返回 `AI_EMBEDDING_CONCURRENCY_LIMITED` |
-| Embedding | 32/64/128 每批均成功 | 43.49 / 55.40 / 80.45 ms | 稳态批量路径通过；冷创建约 1195 ms |
+| 场景      |             最高档结果 |                                    p95 | 结论                                                  |
+| --------- | ---------------------: | -------------------------------------: | ----------------------------------------------------- |
+| Chat      | 100 并发，200/200 成功 |                             1122.27 ms | 单副本共享连接池无错误                                |
+| SSE       | 200 并发，400/400 完成 | 首 Token 2338.62 ms；总时延 2419.92 ms | 无无界排队或流泄漏                                    |
+| 销售草稿  |    20 并发，40/40 成功 |                              299.56 ms | structured 独立池有效                                 |
+| 检索      |       20/50/100 过载档 |             成功请求最高 p95 403.74 ms | 超出容量时稳定返回 `AI_EMBEDDING_CONCURRENCY_LIMITED` |
+| Embedding |   32/64/128 每批均成功 |               43.49 / 55.40 / 80.45 ms | 稳态批量路径通过；冷创建约 1195 ms                    |
 
 检索容量校准每档执行五轮：
 
 | 提供并发 | 成功/总数 | 错误率 | 成功请求 p95 |
-|---:|---:|---:|---:|
-| 4 | 20/20 | 0% | 78.84 ms |
-| 8 | 40/40 | 0% | 76.23 ms |
-| 12 | 60/60 | 0% | 105.78 ms |
-| 16 | 70/80 | 12.5% | 128.29 ms |
+| -------: | --------: | -----: | -----------: |
+|        4 |     20/20 |     0% |     78.84 ms |
+|        8 |     40/40 |     0% |     76.23 ms |
+|       12 |     60/60 |     0% |    105.78 ms |
+|       16 |     70/80 |  12.5% |    128.29 ms |
 
 因此单副本初始受支持的检索提供并发为 12；16 及以上属于过载验证档，429 是预期背压信号，不是扩容证明。
 
 真实低价 Provider 最终小样本：
 
-| 场景 | 样本 | 成功率 | p50 | p95 |
-|---|---:|---:|---:|---:|
-| Chat，并发 2 | 6 | 100% | 4322.46 ms | 7668.48 ms |
-| SSE，并发 2 | 6 | 100% | 7438.30 ms | 8878.22 ms |
-| SSE 首 Token | 6 | 100% | 7037.56 ms | 8808.23 ms |
+| 场景         | 样本 | 成功率 |        p50 |        p95 |
+| ------------ | ---: | -----: | ---------: | ---------: |
+| Chat，并发 2 |    6 |   100% | 4322.46 ms | 7668.48 ms |
+| SSE，并发 2  |    6 |   100% | 7438.30 ms | 8878.22 ms |
+| SSE 首 Token |    6 |   100% | 7037.56 ms | 8808.23 ms |
 
 在最终基线前曾出现一次 2 路 SSE 中 1 路快速 `AI_SERVICE_UNAVAILABLE`，随后 2/2 和 6/6 重跑均通过。该瞬时供应商/流式失败不删除、不伪装为成功，继续纳入告警和后续付费 staging 基线。
 
@@ -60,18 +60,18 @@
 
 以下为单副本 P0 的发布门槛。正式生产多副本 SLO 必须由 staging 完整付费矩阵重新校准。
 
-| SLI | 初始 SLO | 适用容量 |
-|---|---|---|
-| Orchestrator Chat 可用性 | 月度被接纳请求成功率 ≥ 99.5% | 单副本提供并发 ≤ 100；不含客户端 4xx |
-| Chat 服务层延迟 | 合成 Provider p95 ≤ 1500 ms | 单副本提供并发 ≤ 100 |
-| SSE 完成率 | 月度被接纳流完成率 ≥ 99.5% | 单副本提供并发 ≤ 200 |
-| SSE 服务层首 Token | 合成 Provider p95 ≤ 3000 ms | 单副本提供并发 ≤ 200 |
-| Structured 草稿 | 成功率 ≥ 99.5%，p95 ≤ 500 ms | 单副本提供并发 ≤ 20 |
-| 商品向量检索 | 成功率 ≥ 99.5%，p95 ≤ 250 ms | 单副本提供并发 ≤ 12 |
-| 过载拒绝 | 100% 返回稳定 429 + `Retry-After`，拒绝 p95 ≤ 500 ms | 超出支持容量时 |
-| 批量 Embedding | 32/64/128 每批成功率 ≥ 99%，稳态 p95 ≤ 2 s | 独立 ai-vector 队列 |
-| 真实 Provider Chat | 暂定 p95 ≤ 15 s，成功率 ≥ 99% | 仅低并发；待 staging ≥100 样本确认 |
-| 真实 Provider SSE 首 Token | 暂定 p95 ≤ 15 s，完成率 ≥ 99% | 仅低并发；待 staging ≥100 样本确认 |
+| SLI                        | 初始 SLO                                             | 适用容量                             |
+| -------------------------- | ---------------------------------------------------- | ------------------------------------ |
+| Orchestrator Chat 可用性   | 月度被接纳请求成功率 ≥ 99.5%                         | 单副本提供并发 ≤ 100；不含客户端 4xx |
+| Chat 服务层延迟            | 合成 Provider p95 ≤ 1500 ms                          | 单副本提供并发 ≤ 100                 |
+| SSE 完成率                 | 月度被接纳流完成率 ≥ 99.5%                           | 单副本提供并发 ≤ 200                 |
+| SSE 服务层首 Token         | 合成 Provider p95 ≤ 3000 ms                          | 单副本提供并发 ≤ 200                 |
+| Structured 草稿            | 成功率 ≥ 99.5%，p95 ≤ 500 ms                         | 单副本提供并发 ≤ 20                  |
+| 商品向量检索               | 成功率 ≥ 99.5%，p95 ≤ 250 ms                         | 单副本提供并发 ≤ 12                  |
+| 过载拒绝                   | 100% 返回稳定 429 + `Retry-After`，拒绝 p95 ≤ 500 ms | 超出支持容量时                       |
+| 批量 Embedding             | 32/64/128 每批成功率 ≥ 99%，稳态 p95 ≤ 2 s           | 独立 ai-vector 队列                  |
+| 真实 Provider Chat         | 暂定 p95 ≤ 15 s，成功率 ≥ 99%                        | 仅低并发；待 staging ≥100 样本确认   |
+| 真实 Provider SSE 首 Token | 暂定 p95 ≤ 15 s，完成率 ≥ 99%                        | 仅低并发；待 staging ≥100 样本确认   |
 
 月度错误预算：
 
@@ -82,15 +82,15 @@
 
 ## 5. 告警与责任角色
 
-| 事件 | Warning | Critical | 主责 | 协同/审批 |
-|---|---|---|---|---|
-| Chat/SSE/草稿 5 分钟错误率 | > 1% | > 5% | AI Platform Operations | AI Model Manager |
-| 支持容量内本地 429 | > 0.5% | > 2% | AI Platform Operations | Backend Operations |
-| SSE 首 Token p95 | > 15 s | > 30 s | AI Model Manager | Provider/LiteLLM Owner |
-| Qdrant `nofile` 使用率 | > 70% | > 85% 或出现 `Too many open files` | Vector Platform Operations | Infrastructure Operations |
-| Qdrant 检索 p95 | > 250 ms | > 500 ms | Vector Platform Operations | AI Platform Operations |
-| ai-vector 队列最老任务 | > 5 min | > 15 min | Backend Operations | AI Model Manager |
-| 月度错误预算消耗 | > 50% | > 100% | AI Platform Operations | AI Model Approver / AI Auditor |
+| 事件                       | Warning  | Critical                           | 主责                       | 协同/审批                      |
+| -------------------------- | -------- | ---------------------------------- | -------------------------- | ------------------------------ |
+| Chat/SSE/草稿 5 分钟错误率 | > 1%     | > 5%                               | AI Platform Operations     | AI Model Manager               |
+| 支持容量内本地 429         | > 0.5%   | > 2%                               | AI Platform Operations     | Backend Operations             |
+| SSE 首 Token p95           | > 15 s   | > 30 s                             | AI Model Manager           | Provider/LiteLLM Owner         |
+| Qdrant `nofile` 使用率     | > 70%    | > 85% 或出现 `Too many open files` | Vector Platform Operations | Infrastructure Operations      |
+| Qdrant 检索 p95            | > 250 ms | > 500 ms                           | Vector Platform Operations | AI Platform Operations         |
+| ai-vector 队列最老任务     | > 5 min  | > 15 min                           | Backend Operations         | AI Model Manager               |
+| 月度错误预算消耗           | > 50%    | > 100%                             | AI Platform Operations     | AI Model Approver / AI Auditor |
 
 责任角色必须在生产值班系统中映射到具名 on-call；当前仓库只定义职责，不虚构人员姓名。预算耗尽后暂停非紧急模型/Prompt/Embedding 发布，紧急回滚仍由 System Manager 执行并保留审计。
 

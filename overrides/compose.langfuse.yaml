@@ -77,13 +77,18 @@ services:
   langfuse-redis:
     image: docker.io/redis:${LANGFUSE_REDIS_VERSION:-7.4.9}
     restart: ${RESTART_POLICY:-unless-stopped}
-    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory-policy noeviction"]
+    command:
+      [
+        "sh",
+        "-c",
+        'exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory-policy noeviction',
+      ]
     env_file:
       - .env.langfuse.redis.local
     volumes:
       - langfuse-redis-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" ping | grep PONG']
       interval: 3s
       timeout: 5s
       retries: 20

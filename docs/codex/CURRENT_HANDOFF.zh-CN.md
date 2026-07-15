@@ -516,6 +516,7 @@
   - Web `frontend/myapp-web`：`4bd3002 feat: enrich print template menu`
   - 父仓库：提交本交接文档和 `apps/myapp` 子模块指针；提交号以父仓库当前 HEAD 为准。
 - 提交后仓库预期状态：
+
   - `apps/myapp` clean。
   - `frontend/myapp-web` clean。
   - 父仓库除既有未跟踪 `.codex` 外 clean。

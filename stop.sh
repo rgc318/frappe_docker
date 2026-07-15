@@ -73,7 +73,7 @@ devcontainer)
   ;;
 esac
 
-if [[ "${WITH_OBSERVABILITY}" == yes || ( "${WITH_OBSERVABILITY}" == auto && -f "${ROOT_DIR}/.env.langfuse.local" ) ]]; then
+if [[ "${WITH_OBSERVABILITY}" == yes || ("${WITH_OBSERVABILITY}" == auto && -f "${ROOT_DIR}/.env.langfuse.local") ]]; then
   if [[ ! -f "${ROOT_DIR}/.env.langfuse.local" ]]; then
     echo "Missing .env.langfuse.local; cannot resolve the observability stack." >&2
     exit 1
@@ -94,7 +94,7 @@ if [[ "${REMOVE_ORPHANS}" == true ]]; then
 fi
 
 printf 'Stopping %s stack' "${MODE}"
-if [[ "${WITH_OBSERVABILITY}" == yes || ( "${WITH_OBSERVABILITY}" == auto && -f "${ROOT_DIR}/.env.langfuse.local" ) ]]; then
+if [[ "${WITH_OBSERVABILITY}" == yes || ("${WITH_OBSERVABILITY}" == auto && -f "${ROOT_DIR}/.env.langfuse.local") ]]; then
   printf ' with AI observability'
 fi
 printf '.\n'

@@ -40,7 +40,7 @@ repos:
       - id: codespell
         args:
           - -L
-          - "ro"
+          - "ro,ProTable"
 
   - repo: local
     hooks:

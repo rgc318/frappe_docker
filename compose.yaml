@@ -87,7 +87,13 @@ services:
     ports:
       - "127.0.0.1:${MYAPP_AI_ORCHESTRATOR_PORT:-4010}:4010"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4010/health', timeout=3)"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:4010/health', timeout=3)",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -108,7 +114,10 @@ services:
     security_opt:
       - no-new-privileges:true
     entrypoint: ["sh", "-c"]
-    command: ["mkdir -p /qdrant/storage/snapshots && chown -R 65534:65534 /qdrant/storage"]
+    command:
+      [
+        "mkdir -p /qdrant/storage/snapshots && chown -R 65534:65534 /qdrant/storage",
+      ]
     volumes:
       - ai-vector-data:/qdrant/storage
 
@@ -133,7 +142,13 @@ services:
     tmpfs:
       - /tmp:size=64m,mode=1777
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -96,16 +96,16 @@ Web：
 
 ## 3. 需求—证据追踪矩阵
 
-| 要求 | 权威设计 | 主要实现位置 | 完成证据 |
-|---|---|---|---|
-| 模型注册与健康 | `AI_MODEL_GOVERNANCE_TECH_DESIGN.zh-CN.md` §4.1 | Backend governance service/Gateway | 迁移、权限单测、真实 LiteLLM 同步与健康查询 |
-| 策略审批发布回滚 | 同上 §4.2-§6 | Backend + Orchestrator + Web | 双人审批、幂等发布、灰度稳定、回滚真实链路 |
-| 预算/降级/熔断 | 同上 §7 | Orchestrator + usage aggregation | 预算拒绝、同能力降级、熔断/半开测试与指标 |
-| Embedding 切换 | 同上 §8 | Backend vector governance + Qdrant | 双 collection 补建、质量门禁、原子切换和回滚 |
-| 高并发 P0 | `AI_HIGH_CONCURRENCY_TECH_DESIGN.zh-CN.md` §4-§13 | Orchestrator + Compose + workers | 压测报告、429、连接池、独立队列、故障注入 |
-| 生产观测与恢复 | `AI_TECH_DESIGN.zh-CN.md` §10 | OTLP + Langfuse/Qdrant 运维脚本 | 联合备份恢复、告警、密钥轮换演练报告 |
-| 数据治理任务 | `AI_TECH_DESIGN.zh-CN.md` §6.4 | Backend task service/Gateway + Web | 生命周期、双人审批、幂等执行、审计与回滚测试 |
-| 安全边界 | `AI_TECH_DESIGN.zh-CN.md` §2/§7 | 全链路 | 无越权、无直连、无 AI 正式写入、敏感信息扫描 |
+| 要求             | 权威设计                                          | 主要实现位置                       | 完成证据                                     |
+| ---------------- | ------------------------------------------------- | ---------------------------------- | -------------------------------------------- |
+| 模型注册与健康   | `AI_MODEL_GOVERNANCE_TECH_DESIGN.zh-CN.md` §4.1   | Backend governance service/Gateway | 迁移、权限单测、真实 LiteLLM 同步与健康查询  |
+| 策略审批发布回滚 | 同上 §4.2-§6                                      | Backend + Orchestrator + Web       | 双人审批、幂等发布、灰度稳定、回滚真实链路   |
+| 预算/降级/熔断   | 同上 §7                                           | Orchestrator + usage aggregation   | 预算拒绝、同能力降级、熔断/半开测试与指标    |
+| Embedding 切换   | 同上 §8                                           | Backend vector governance + Qdrant | 双 collection 补建、质量门禁、原子切换和回滚 |
+| 高并发 P0        | `AI_HIGH_CONCURRENCY_TECH_DESIGN.zh-CN.md` §4-§13 | Orchestrator + Compose + workers   | 压测报告、429、连接池、独立队列、故障注入    |
+| 生产观测与恢复   | `AI_TECH_DESIGN.zh-CN.md` §10                     | OTLP + Langfuse/Qdrant 运维脚本    | 联合备份恢复、告警、密钥轮换演练报告         |
+| 数据治理任务     | `AI_TECH_DESIGN.zh-CN.md` §6.4                    | Backend task service/Gateway + Web | 生命周期、双人审批、幂等执行、审计与回滚测试 |
+| 安全边界         | `AI_TECH_DESIGN.zh-CN.md` §2/§7                   | 全链路                             | 无越权、无直连、无 AI 正式写入、敏感信息扫描 |
 
 ## 4. 分仓库交付边界
 

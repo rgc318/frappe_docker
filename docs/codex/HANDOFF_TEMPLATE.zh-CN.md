@@ -67,9 +67,9 @@ git -C frontend/myapp-web diff --check
 
 ## 下一步建议
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## 最新提交
 
