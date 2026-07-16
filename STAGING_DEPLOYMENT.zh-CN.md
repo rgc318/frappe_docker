@@ -907,6 +907,25 @@ bench --site localhost backup --with-files
   - `bench --site <site> set-maintenance-mode off`
 - 若手动恢复，也应在恢复完成后显式关闭维护模式
 
+### 14.11 代理恢复后不要整体回退构建加固
+
+现象：
+
+- 本地构建最初失败时，宿主代理确实已经失效。
+- 代理恢复后，容易把同一轮构建修改全部视为临时绕过。
+
+结论：
+
+- 代理恢复只消除了一个外部故障，不代表构建链路中的其他问题不存在。
+- 恢复代理后的完整构建仍实际遇到 Git/GnuTLS 瞬时中断、Frappe v16.18.3 资产构建期 Redis 依赖，以及逐 app 安装导致的 Python 依赖版本漂移。
+- 因此保留显式代理覆盖/清空、有限重试、BuildKit cache、分阶段资产构建、builder 临时 Redis、uv 联合解析和 import/`pip check` 门禁。
+- 上述机制默认不要求工作站代理；CI 可继续在不设置 `BUILD_*_PROXY` 的情况下正常构建。
+- 若未来升级 Frappe 后准备移除临时 Redis，必须先通过完整无缓存镜像构建，并确认最终 runtime 镜像仍不包含 `redis-server`。
+
+长期诊断与回退准则见：
+
+- `docs/codex/KNOWN_ISSUES.zh-CN.md` 的“代理恢复后是否回退 staging 镜像构建加固”
+
 ---
 
 ## 15. 当前建议

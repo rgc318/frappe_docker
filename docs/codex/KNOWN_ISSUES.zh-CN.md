@@ -255,3 +255,34 @@ litellm_settings:
 - 故障期间保持在线 alias 指向已验证 v1 collection；真实检索质量门禁应失败关闭并保留 HTTP 502 报告。
 
 恢复验收不能只看 LiteLLM 控制台“连接成功”。必须从实际 MyApp Orchestrator 路径验证：字符串单条、数组单条、批量 `/v1/embeddings`、当前 alias 检索和完整中文质量门禁。控制台指定 deployment 成功但业务 Key/model group 仍失败时，检查多副本配置刷新、同别名重复 deployment、Virtual Key 路由和容器内 `api_base` 可达性。
+
+## 11. 代理恢复后是否回退 staging 镜像构建加固
+
+现象：
+
+- 本地 staging 镜像构建最初因宿主代理失效而无法访问 GitHub 或 PyPI。
+- 代理恢复后，容易误认为同一轮加入的代理覆盖、重试、缓存和构建期依赖处理都只是临时绕过，应整体回退。
+
+结论：
+
+- 不应因为代理恢复而整体回退 `fix: harden staging image builds`。
+- 代理失效只是最初触发条件；代理恢复后的完整构建仍独立复现过 Git/GnuTLS 瞬时中断、Frappe v16 资产构建的 Redis 依赖，以及逐 app 安装造成的 Python 依赖解析漂移。
+- 应按每项机制解决的问题和验证证据判断是否保留，不按最初故障标签整体撤销。
+
+当前应保留：
+
+- `BUILD_HTTP_PROXY`、`BUILD_HTTPS_PROXY`、`BUILD_NO_PROXY`：允许构建显式覆盖或用空值清除宿主机继承的失效代理，并避免 HTTP 代理错误地优先取 HTTPS 代理。
+- `BUILD_NETWORK`：Linux 本地构建需要访问只监听宿主 `127.0.0.1` 的代理时，可显式选择 `host`；默认仍为 `default`。
+- `bench init` 最多三次有限重试：处理已实际出现的 Git/GnuTLS 瞬时失败，达到上限后仍失败关闭，不会无限重试。
+- uv/Yarn BuildKit cache 与精简日志：减少重复下载和代理压力，并保留真正的失败原因。
+- `bench init --skip-assets` 后独立 `bench build`：把源码/依赖初始化与资产构建分开，便于定位失败阶段。
+- builder 内回环临时 Redis：满足当前 Frappe v16.18.3 资产构建要求；只监听 `127.0.0.1:13311`、禁用持久化、构建后关闭，且不会进入最终 runtime 镜像。
+- Frappe、ERPNext、myapp 的 uv 联合解析及 import/`pip check` 门禁：避免逐 app 安装把共享依赖升级到不兼容版本，并阻止缺包或冲突镜像进入部署。
+
+允许后续移除的条件：
+
+- 升级 Frappe 后，应先用完整、无缓存的 staging 镜像构建确认 `bench build` 不再访问 Redis，才可移除 builder 临时 Redis。
+- 只有在替代方案仍覆盖显式代理清空、瞬时网络失败和依赖一致性门禁时，才可调整对应机制。
+- 不得通过删除 import 或 `pip check` 门禁来掩盖发布分支缺依赖；应修复 app release ref 或依赖声明。
+
+相关操作说明见 `STAGING_DEPLOYMENT.zh-CN.md` 的“本地构建代理边界”和 `deploy/staging/README.md`。

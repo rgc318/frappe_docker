@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-16 15:54 CST
+更新时间：2026-07-16 16:37 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,6 +8,7 @@
 
 ## 当前最终状态
 
+- 2026-07-16 完成 staging 构建代理故障复盘：不整体回退 `bdd00ed9 fix: harden staging image builds`。代理失效是最初外部故障，但代理恢复后仍独立复现 Git/GnuTLS 瞬时失败、Frappe v16.18.3 构建期 Redis 需求和逐 app Python resolver 漂移；显式代理覆盖/清空、有限重试、BuildKit cache、分阶段资产构建、builder 临时 Redis、uv 联合解析及 import/`pip check` 门禁均有独立保留理由。长期判断准则已补入 `KNOWN_ISSUES.zh-CN.md`，部署复盘已补入 `STAGING_DEPLOYMENT.zh-CN.md`。
 - 2026-07-16 完成 Compose、启动/停止/部署/回滚、当前 Dev Container、独立 AI、staging ERP/AI 镜像和 Backend→AI 的完整本地验收。development、development+Langfuse、Dev Container、production、production+Langfuse、staging internal/HTTPS、pwd、CI、AI standalone/integration 共 11 组 Compose 均可解析；相关 Shell 语法及脚本参数分支全部通过。
 - staging ERP 镜像构建已修复代理、瞬时 Git 失败、构建期 Redis、重复依赖下载和逐 app resolver 漂移：本地构建支持 `BUILD_HTTP_PROXY` / `BUILD_HTTPS_PROXY` / `BUILD_NO_PROXY` / `BUILD_NETWORK`，`bench init` 最多重试三次，uv/Yarn 使用 BuildKit cache，资产构建使用 builder 内回环临时 Redis，三个 app 最终由 uv 联合解析并执行 import 与 `pip check` 门禁。合成 `myapp develop` 清单已实际构建 `myapp-erpnext-validation:codex-validation` 和 `myapp-ai-validation:codex-validation`，成品镜像冒烟通过。
 - 当前发布清单 `deploy/staging/apps.staging.json` 仍引用 `myapp main`；该分支尚未包含当前 `rgc-backend-kit` 依赖，真实 main 构建被 import 门禁正确拒绝。发布前必须先把 Backend `develop` 的已验收提交合入/标记到 release ref，再使用该不可变 ref 构建，不能通过删除门禁或在镜像中临时补包绕过。
@@ -44,6 +45,14 @@
 - Provider 恢复已确认：`erp-embedding` 字符串单条、数组单条和两条批量均 HTTP 200、1024 维；当前运行 Orchestrator 的真实检索返回 200。30 条质量门禁通过，最新报告保存在忽略目录 `ai-governance-reports/product-retrieval-v1-current.json`。新的 v2 alias/collection 尚未配置或发布；如果底层模型权重变化，必须按新向量空间完整发布流程处理。
 
 ## 本轮工作总结
+
+### 2026-07-16 staging 构建代理故障复盘与文档固化
+
+- 复核 `bdd00ed9 fix: harden staging image builds` 后确认不应整体回退：代理恢复后的完整构建仍验证了有限重试、构建期临时 Redis、uv 联合解析和 import/`pip check` 门禁的必要性。
+- `docs/codex/KNOWN_ISSUES.zh-CN.md` 新增长期判断准则，明确各项构建加固解决的问题、默认行为和未来允许移除的验证条件。
+- `STAGING_DEPLOYMENT.zh-CN.md` 新增部署复盘，明确 CI 无需工作站代理，显式代理变量只影响本地 Docker build，且最终 runtime 镜像不包含 builder 临时 Redis。
+- 本次提交前重新执行 Markdown Prettier、codespell、尾随空白/文件结尾、脚本 shebang/可执行位、`bash -n`、shfmt、ShellCheck 和各仓库 `diff --check`，均通过；完整镜像、Compose 与测试结论沿用同日已完成且记录在顶部的验收结果。
+- 仓库边界保持不变：父仓库只处理本次文档；Backend、AI、Web 无改动，Mobile 既有 5 项用户修改不触碰，`.codex` 不提交。
 
 ### 2026-07-16 AI 独立交付、工程治理与文档完善
 
