@@ -26,7 +26,7 @@
 - Web `/administration/ai/data-tasks` 已实现 service camelCase 映射、独立权限、菜单/路由、管理入口重定向、ProTable 筛选、缺失描述扫描、手工字段建议、前值/建议值/证据对比、审批/驳回、执行和回滚。最终 `npm run tsc`、Biome、20 套/139 项 Jest 通过；仍有项目既有 Jest open handle 提示，但退出码为 0。
 - 正式生产仍需在 Secret Manager/正式环境完成 Langfuse Project Key、恢复根密钥、SSO/TLS、HA 数据服务、告警负责人和真实 staging 演练；这些外部部署项不能用本地开发密钥或单机 Compose 伪造完成。
 - 本轮分仓库提交：Backend `d8747fc feat: complete AI governance and data tasks`；Web `8f4410d feat: add AI governance workbenches`；父仓库 `0e71b8a3 feat: complete AI production readiness milestone`，并已把 `apps/myapp` gitlink 更新到 `d8747fc`。
-- 本轮检索质量治理提交：Backend `c4a6af3 feat: govern AI vector retrieval quality`；父仓库 `62bae6ee feat: complete AI retrieval quality governance`。Provider 恢复文档提交：Backend `9ba54f1 docs: record embedding provider recovery`；父仓库 `fc6268af docs: update embedding recovery status`，gitlink 已同步。AI 独立交付最新提交为 `052819e`；父仓库将同步该 gitlink 和新的独立/组合部署边界。Backend/Web 代码无未提交改动，父仓库 `.codex` 和 Mobile 既有 5 个用户改动继续不处理。本地 Secret、派生运行时文件和真实质量报告均受忽略且不得提交。
+- 本轮检索质量治理提交：Backend `c4a6af3 feat: govern AI vector retrieval quality`；父仓库 `62bae6ee feat: complete AI retrieval quality governance`。Provider 恢复文档提交：Backend `9ba54f1 docs: record embedding provider recovery`；父仓库 `fc6268af docs: update embedding recovery status`，gitlink 已同步。AI 独立交付最新提交为 `052819e`；父仓库 `39b86b2a docs: integrate standalone AI delivery` 已同步 gitlink 和新的独立/组合部署边界。Backend/Web 代码无未提交改动，父仓库 `.codex` 和 Mobile 既有 5 个用户改动继续不处理。本地 Secret、派生运行时文件和真实质量报告均受忽略且不得提交。
 - Mobile `frontend/myapp-mobile` 保留本轮开始前已有的五个未提交文件，本轮不得修改、回滚或提交。
 
 ## AI 企业级收口最终验收
@@ -44,7 +44,7 @@
 - 集成门禁：新增 `compose.integration.yaml`、合成 OpenAI/Frappe Provider 和 `standalone_healthcheck.py`，真实验证健康、Bearer Chat、Embedding、Qdrant upsert/search/delete；使用独立 project/14010 端口，完成后清理容器、网络和测试卷，不中断现有 Dev Container。
 - 工程治理：新增 `uv.lock`、`.python-version`、Ruff、pre-commit、ShellCheck、pip-audit、Trivy、CodeQL、Dependabot、CODEOWNERS、PR 模板、MIT License、Security、Contributing 和 Changelog。远程 CI、Security 和 CodeQL 均成功。
 - 文档体系：新增架构、开发、配置、API、部署、安全、观测、向量、测试评测、性能、运维和发布共 13 篇文档及索引；AI 仓库成为服务级事实源，父仓库继续负责完整 ERP/Dev Container/bundled Langfuse/staging/production 组合部署。
-- 提交：AI `7f230f5 feat: complete standalone AI service delivery`、`052819e fix: use published Trivy action release`；`main` 与 `develop` 均已同步。父仓库下一提交同步 gitlink、长期规则、路线图和交接。
+- 提交：AI `7f230f5 feat: complete standalone AI service delivery`、`052819e fix: use published Trivy action release`；`main` 与 `develop` 均已同步。父仓库 `39b86b2a docs: integrate standalone AI delivery` 已同步 gitlink、长期规则、路线图和交接，远程 Lint 成功。
 
 ### 2026-07-16 AI Orchestrator 独立仓库迁移
 
