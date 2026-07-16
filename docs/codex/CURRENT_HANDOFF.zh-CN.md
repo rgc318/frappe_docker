@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-16 22:06 CST
+更新时间：2026-07-17 00:11 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,6 +8,9 @@
 
 ## 当前最终状态
 
+- 2026-07-17 修复 AI 历史会话公司上下文漂移：Web 打开已有会话后保存并使用会话自身公司，新建会话才使用当前工作偏好默认公司；当两者不同时界面明确显示“会话公司”。Backend `_prepare_chat_run` 在调用方省略公司时从持久会话恢复公司，显式传入不同公司仍失败关闭。新增 Web 历史会话回归和 Backend 公司恢复单测。
+- 2026-07-16 AI Web 运行诊断与草稿复核继续完善：Frappe Gateway 的同步回答、SSE 完成事件和三类草稿返回持久 Run 摘要，历史会话补首 Token；Web 右侧检查器现展示状态、后端总耗时、首 Token、Token 分解、Run/Trace、工具执行、警告和显式失败重试。`/ai/drafts` 详情已从原始 JSON 升级为业务字段、商品明细、库存变化、校验结果、不可变版本差异和重新校验恢复，原始数据保留为辅助页签。新增 AI 工作台流式页面测试、运行检查器和草稿复核组件测试。
+- 本轮分仓库提交：Backend `ae1806d feat: improve AI conversation runtime context`；Web `fc7c354 feat: improve AI workspace diagnostics and drafts`；父仓库为本文件所在提交并同步 Backend gitlink。Backend 与 Web 工作区 clean，父仓库仅保留既有 `.codex` 未跟踪状态。
 - 2026-07-16 AI Web 企业级现代化 Goal 已完成本轮功能交付：Web `/ai` 已迁移到 Ant Design Pro 官方 `@ant-design/x` / `@ant-design/x-markdown`，使用全高 Conversations、Bubble、Sender、Welcome、Prompts、Sources 和 Actions 工作区；支持活跃/归档会话、停止 SSE、持久 Run/反馈恢复、分类负反馈和结构化引用卡片。页面仍只经 Frappe Gateway，不直连 Orchestrator/LiteLLM。
 - 新增 `/ai/drafts` 当前用户草稿中心及 Backend `list_ai_drafts_v1`：支持销售/采购/库存调整草稿分页筛选、详情、来源会话、校验、放弃和业务编辑器交接；Repository 查询强制 owner 隔离。`get_ai_conversation_v1` 现返回当前用户 Run 摘要与已保存反馈，页面刷新后不再丢失模型、Token、trace 和反馈状态。
 - AI 治理 Web 已增加独立深链路由：模型、策略、用量、向量、审计和 Data Task；治理概览新增 Orchestrator 可达性、近 7 日请求/错误/成本和向量状态，用量页新增近 30 日 KPI/趋势。审计新增 Backend `list_ai_audit_events_v1` 服务端分页、关键词/动作/对象/优先级/日期筛选。
@@ -54,6 +57,21 @@
 - Provider 恢复已确认：`erp-embedding` 字符串单条、数组单条和两条批量均 HTTP 200、1024 维；当前运行 Orchestrator 的真实检索返回 200。30 条质量门禁通过，最新报告保存在忽略目录 `ai-governance-reports/product-retrieval-v1-current.json`。新的 v2 alias/collection 尚未配置或发布；如果底层模型权重变化，必须按新向量空间完整发布流程处理。
 
 ## 本轮工作总结
+
+### 2026-07-17 AI 历史会话公司上下文漂移修复
+
+- 根因：`/ai` 打开历史会话后只恢复 `conversationId`，发送时仍使用当前工作偏好 `defaultCompany`；当用户偏好与会话原始公司不同时，Backend 正确拒绝并由 Frappe 返回 417 错误页。
+- Web 现恢复 `conversation.company` 并计算有效公司：已有会话优先使用会话公司，新会话使用默认公司；流式请求、三类草稿和手动重试均复用同一有效公司。两者不同时上下文栏以金色标签显示会话公司。
+- Backend `_prepare_chat_run` 在已有会话请求省略 `company` 时从持久会话恢复公司；显式传入不同公司仍保留失败关闭，避免跨公司数据混入同一模型上下文。
+- 已新增回归：Web 验证默认公司为 `Demo Company` 时，历史会话仍以 `Original Company` 调用 SSE；Backend 验证省略公司时 payload 使用持久会话公司。Backend AI repository/service/Gateway 142 项、Web TypeScript、Biome、24 套/165 项 Jest 和 production build 通过；Jest 仍有项目既有 open-handle 提示但退出码为 0。
+
+### 2026-07-16 AI Web 运行诊断、失败恢复与草稿业务复核
+
+- Backend `get_ai_conversation_v1` 的持久 Run 摘要新增 `first_token_ms`；同步 Chat、SSE 最终事件和销售/采购/库存调整草稿返回 `run.status`、`run.latency_ms` 与可选 `run.first_token_ms`，Web 不再用浏览器耗时冒充后端 Run 指标。
+- `/ai` 新增独立运行检查器，覆盖等待、生成中、完成、停止和失败状态，展示模型、总耗时、首 Token、Token 分解、Run、Trace、工具执行结果和流式警告；停止或失败只允许用户主动重试上次问题。
+- `/ai/drafts` 详情新增业务复核、版本历史和原始数据三个页签。业务复核展示公司、客户/供应商、日期、仓库、商品、数量、单位、参考价或库存变化；历史版本恢复继续调用后端重新解析和校验，不直接覆盖当前 payload。
+- 新增 `AiRunInspector`、`AiDraftBusinessReview`、`AiDraftVersionList` 及专项测试，并新增 AI 工作台流式请求页面测试。
+- 当前已验证：Backend AI repository/service/Gateway 141 项通过；Web TypeScript、Biome、24 套/164 项 Jest、production build 和 `npm audit --omit=dev`（0 vulnerabilities）通过；父仓库、Backend 与 Web `diff --check` 通过。
 
 ### 2026-07-16 AI Web 独立设计文档与提交收口
 
