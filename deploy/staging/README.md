@@ -15,6 +15,13 @@ Files:
   - staging-only MariaDB override that does not publish database ports to the host
 - `build-staging-image.sh`
   - builds both the custom image containing `myapp` and the AI Orchestrator image
+  - accepts `BUILD_HTTP_PROXY`, `BUILD_HTTPS_PROXY`, and `BUILD_NO_PROXY` as explicit build-only proxy overrides
+  - accepts `BUILD_NETWORK` (default: `default`); use `host` on Linux when a build must reach a proxy bound to host loopback
+  - the ERP image retries `bench init` up to three times after transient Git/Python dependency download failures
+  - BuildKit caches uv and Yarn downloads across local rebuilds; build logs stay concise enough to preserve the real failure reason
+  - asset compilation runs only after the build-time site config is cleared, so image creation never depends on a runtime Redis service
+  - Frappe v16 asset compilation uses a loopback-only, non-persistent Redis process inside the builder stage; it is stopped before the layer completes and is absent from the runtime image
+  - one cached uv resolution reconciles Frappe, ERPNext, and myapp together after `bench init`; imports plus `pip check` remain the release gate
 - `validate-staging-env.sh`
   - fails closed on missing AI images, provider configuration, short service tokens, placeholders, incomplete vector settings, or partial Langfuse credentials
 - `start-staging.sh`
@@ -47,6 +54,22 @@ Recommended long-term path:
 - let the staging server only:
   - `docker pull`
   - `./deploy/staging/start-staging.sh`
+
+Local build proxy examples:
+
+```bash
+# Ignore inherited host proxy variables for this build.
+BUILD_HTTP_PROXY= BUILD_HTTPS_PROXY= \
+  ./deploy/staging/build-staging-image.sh
+
+# Linux only: let BuildKit reach a proxy listening on host 127.0.0.1.
+BUILD_NETWORK=host \
+BUILD_HTTP_PROXY=http://127.0.0.1:10808 \
+BUILD_HTTPS_PROXY=http://127.0.0.1:10808 \
+  ./deploy/staging/build-staging-image.sh
+```
+
+Do not put proxy credentials in tracked files or command logs. CI should normally build without a workstation proxy.
 
 Workflow:
 

@@ -1,12 +1,19 @@
 # 当前交接状态
 
-更新时间：2026-07-16 08:50 CST
+更新时间：2026-07-16 15:54 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+- 2026-07-16 完成 Compose、启动/停止/部署/回滚、当前 Dev Container、独立 AI、staging ERP/AI 镜像和 Backend→AI 的完整本地验收。development、development+Langfuse、Dev Container、production、production+Langfuse、staging internal/HTTPS、pwd、CI、AI standalone/integration 共 11 组 Compose 均可解析；相关 Shell 语法及脚本参数分支全部通过。
+- staging ERP 镜像构建已修复代理、瞬时 Git 失败、构建期 Redis、重复依赖下载和逐 app resolver 漂移：本地构建支持 `BUILD_HTTP_PROXY` / `BUILD_HTTPS_PROXY` / `BUILD_NO_PROXY` / `BUILD_NETWORK`，`bench init` 最多重试三次，uv/Yarn 使用 BuildKit cache，资产构建使用 builder 内回环临时 Redis，三个 app 最终由 uv 联合解析并执行 import 与 `pip check` 门禁。合成 `myapp develop` 清单已实际构建 `myapp-erpnext-validation:codex-validation` 和 `myapp-ai-validation:codex-validation`，成品镜像冒烟通过。
+- 当前发布清单 `deploy/staging/apps.staging.json` 仍引用 `myapp main`；该分支尚未包含当前 `rgc-backend-kit` 依赖，真实 main 构建被 import 门禁正确拒绝。发布前必须先把 Backend `develop` 的已验收提交合入/标记到 release ref，再使用该不可变 ref 构建，不能通过删除门禁或在镜像中临时补包绕过。
+- 当前运行 AI、Qdrant、Redis、Langfuse 均健康、零重启；Backend/Workers 无 LiteLLM/Langfuse Secret，Orchestrator 无 PostgreSQL/ClickHouse/MinIO 根密钥。Dev Container Backend 按设计保持 `tail -f /dev/null`，需由 VS Code/F5 启动 `bench serve`，因此未启动调试进程时 8000/8080 返回 404 属预期行为。
+- 本轮复验：AI lock/Ruff/pre-commit/pip-audit、Docker 80/80、独立 Compose Chat + vector upsert/search/delete、runtime/tools/staging image、安全与非 root 检查均通过；Backend AI/Data Task/Gateway 178/178 通过，Backend→Orchestrator 认证 HTTP 状态检查通过。隔离 Compose 容器、网络和卷已清理。
+- 真实忽略文件 `deploy/staging/staging.env` 仍缺新增 AI 镜像、Provider、Service Token 和 Frappe site host 等变量；`validate-staging-env.sh` 会按设计失败关闭。本轮只使用 `/tmp` 合成配置测试，未覆盖真实 staging 文件、未启动 staging、未推送验证镜像。
 
 - AI Orchestrator 已从父仓库普通目录迁移为独立公开仓库 `https://github.com/rgc318/myapp-ai`，完整保留 12 个历史里程碑；`main` 与 `develop` 当前均指向 `052819e fix: use published Trivy action release`，主体独立交付提交为 `7f230f5 feat: complete standalone AI service delivery`。父仓库保持原路径 `services/myapp-ai` 子模块，因此原有 Compose、Dev Container 和 staging build context 兼容。
 - AI 仓库现可独立克隆、锁定依赖、开发、测试、构建、启动和运维：新增 `.env.example`、Standalone Compose、Redis/Qdrant、合成 OpenAI/Frappe Provider、Chat 与向量 upsert/search/delete 集成测试、Makefile、启动/停止/健康脚本、uv.lock、Ruff/pre-commit/ShellCheck、依赖审计、Trivy、CodeQL、CODEOWNERS、License、Security/Contributing/Changelog 和 13 篇企业级服务文档。

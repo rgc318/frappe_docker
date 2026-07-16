@@ -63,9 +63,25 @@ FRAPPE_PATH="${FRAPPE_PATH:-$(read_env FRAPPE_PATH || printf 'https://github.com
 ERPNEXT_REF="${ERPNEXT_REF:-$(read_app_ref 'frappe/erpnext' || read_env ERPNEXT_BRANCH || printf 'v16.18.3')}"
 MYAPP_REF="${MYAPP_REF:-$(read_app_ref 'rgc318/myapp' || read_env MYAPP_BRANCH || printf 'main')}"
 CACHE_BUST="${CACHE_BUST:-local-$(date +%s)}"
-HTTP_PROXY_ARG="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-}}}}"
-HTTPS_PROXY_ARG="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-}}}}"
-NO_PROXY_ARG="${NO_PROXY:-${no_proxy:-}}"
+BUILD_NETWORK="${BUILD_NETWORK:-default}"
+
+if [[ -n "${BUILD_HTTP_PROXY+x}" ]]; then
+  HTTP_PROXY_ARG="${BUILD_HTTP_PROXY}"
+else
+  HTTP_PROXY_ARG="${HTTP_PROXY:-${http_proxy:-}}"
+fi
+
+if [[ -n "${BUILD_HTTPS_PROXY+x}" ]]; then
+  HTTPS_PROXY_ARG="${BUILD_HTTPS_PROXY}"
+else
+  HTTPS_PROXY_ARG="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY_ARG}}}"
+fi
+
+if [[ -n "${BUILD_NO_PROXY+x}" ]]; then
+  NO_PROXY_ARG="${BUILD_NO_PROXY}"
+else
+  NO_PROXY_ARG="${NO_PROXY:-${no_proxy:-}}"
+fi
 
 : "${CUSTOM_IMAGE:?CUSTOM_IMAGE is required}"
 : "${CUSTOM_TAG:?CUSTOM_TAG is required}"
@@ -75,6 +91,7 @@ NO_PROXY_ARG="${NO_PROXY:-${no_proxy:-}}"
 APPS_JSON_BASE64="$(base64 -w 0 "${APPS_JSON_FILE}")"
 
 docker build \
+  --network "${BUILD_NETWORK}" \
   --build-arg FRAPPE_BRANCH="${FRAPPE_BRANCH}" \
   --build-arg FRAPPE_PATH="${FRAPPE_PATH}" \
   --build-arg ERPNEXT_REF="${ERPNEXT_REF}" \
@@ -91,6 +108,7 @@ docker build \
 echo "Built image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}"
 
 docker build \
+  --network "${BUILD_NETWORK}" \
   --build-arg HTTP_PROXY="${HTTP_PROXY_ARG}" \
   --build-arg HTTPS_PROXY="${HTTPS_PROXY_ARG}" \
   --build-arg NO_PROXY="${NO_PROXY_ARG}" \

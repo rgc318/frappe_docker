@@ -270,6 +270,36 @@ ssh -i ~/.ssh/github_actions_staging_ci -p 10022 vivy@39.104.204.79
 
 后续也建议保留带日期或 commit 的 tag，便于回滚。
 
+### 5.3 本地构建代理边界
+
+正式发布仍建议由 GitHub Actions 构建。需要在 Linux 本机执行
+`deploy/staging/build-staging-image.sh` 时，脚本支持以下仅作用于 Docker build 的覆盖变量：
+
+- `BUILD_HTTP_PROXY`
+- `BUILD_HTTPS_PROXY`
+- `BUILD_NO_PROXY`
+- `BUILD_NETWORK`，默认 `default`
+
+宿主代理若只监听 `127.0.0.1`，容器默认网络不能访问宿主回环地址。可显式使用：
+
+```bash
+BUILD_NETWORK=host \
+BUILD_HTTP_PROXY=http://127.0.0.1:10808 \
+BUILD_HTTPS_PROXY=http://127.0.0.1:10808 \
+ENV_FILE=deploy/staging/staging.env \
+  ./deploy/staging/build-staging-image.sh
+```
+
+若继承的宿主代理不适用于 Docker Builder，可用空值明确关闭：
+
+```bash
+BUILD_HTTP_PROXY= BUILD_HTTPS_PROXY= \
+ENV_FILE=deploy/staging/staging.env \
+  ./deploy/staging/build-staging-image.sh
+```
+
+代理凭据不得写入 Git 跟踪文件或构建日志。
+
 ---
 
 ## 6. 服务器初始化

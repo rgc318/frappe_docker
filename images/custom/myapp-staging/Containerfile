@@ -18,30 +18,67 @@ RUN git config --global http.version HTTP/1.1 \
     && if [ -n "${HTTP_PROXY}" ]; then git config --global http.proxy "${HTTP_PROXY}"; fi \
     && if [ -n "${HTTPS_PROXY}" ]; then git config --global https.proxy "${HTTPS_PROXY}"; fi
 
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y redis-server \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN if [ -n "${APPS_JSON_BASE64}" ]; then \
     mkdir -p /opt/frappe && echo "${APPS_JSON_BASE64}" | base64 -d > /opt/frappe/apps.json; \
   fi
 
 USER frappe
 
-RUN export APP_INSTALL_ARGS="" && \
+RUN --mount=type=cache,target=/home/frappe/.cache/uv,uid=1000,gid=1000 \
+  --mount=type=cache,target=/home/frappe/.cache/yarn,uid=1000,gid=1000 \
+  set -eu; \
+  export UV_LINK_MODE=copy; \
+  export APP_INSTALL_ARGS=""; \
   echo "Cache bust: ${CACHE_BUST}" && \
   if [ -n "${APPS_JSON_BASE64}" ]; then \
     export APP_INSTALL_ARGS="--apps_path=/opt/frappe/apps.json"; \
-  fi && \
-  bench init ${APP_INSTALL_ARGS}\
-    --frappe-branch=${FRAPPE_BRANCH} \
-    --frappe-path=${FRAPPE_PATH} \
-    --no-procfile \
-    --no-backups \
-    --skip-redis-config-generation \
-    --verbose \
-    /home/frappe/frappe-bench && \
-  cd /home/frappe/frappe-bench && \
-  ./env/bin/pip install --no-cache-dir --force-reinstall -e apps/frappe -e apps/erpnext -e apps/myapp && \
-  ./env/bin/python -c "import importlib.metadata as md; import frappe, erpnext, jwt, rgc_backend_kit, xlsxwriter, myapp; print('frappe', md.version('frappe')); print('erpnext', md.version('erpnext')); print('PyJWT', jwt.__version__); print('rgc-backend-kit', md.version('rgc-backend-kit')); print('xlsxwriter', md.version('XlsxWriter')); print('myapp', md.version('myapp'))" && \
-  ./env/bin/pip check && \
-  echo "{}" > sites/common_site_config.json && \
+  fi; \
+  attempt=1; \
+  until bench init ${APP_INSTALL_ARGS} \
+      --frappe-branch=${FRAPPE_BRANCH} \
+      --frappe-path=${FRAPPE_PATH} \
+      --no-procfile \
+      --no-backups \
+      --skip-redis-config-generation \
+      --skip-assets \
+      /home/frappe/frappe-bench; do \
+    if [ "${attempt}" -ge 3 ]; then \
+      echo "bench init failed after ${attempt} attempts" >&2; \
+      exit 1; \
+    fi; \
+    rm -rf /home/frappe/frappe-bench; \
+    attempt=$((attempt + 1)); \
+    echo "Retrying bench init (${attempt}/3) after transient dependency download failure..." >&2; \
+    sleep $((attempt * 5)); \
+  done; \
+  cd /home/frappe/frappe-bench; \
+  echo "{}" > sites/common_site_config.json; \
+  uv pip install \
+    --upgrade \
+    --python /home/frappe/frappe-bench/env/bin/python \
+    -e apps/frappe \
+    -e apps/erpnext \
+    -e apps/myapp; \
+  redis-server \
+    --bind 127.0.0.1 \
+    --port 13311 \
+    --save "" \
+    --appendonly no \
+    --daemonize yes \
+    --dir /tmp \
+    --pidfile /tmp/myapp-build-redis.pid \
+    --logfile /tmp/myapp-build-redis.log; \
+  trap 'redis-cli -p 13311 shutdown nosave >/dev/null 2>&1 || true' EXIT; \
+  redis-cli -p 13311 ping | grep -q PONG; \
+  bench build; \
+  redis-cli -p 13311 shutdown nosave; \
+  trap - EXIT; \
+  ./env/bin/python -c "import importlib.metadata as md; import frappe, erpnext, jwt, rgc_backend_kit, xlsxwriter, myapp; print('frappe', md.version('frappe')); print('erpnext', md.version('erpnext')); print('PyJWT', jwt.__version__); print('rgc-backend-kit', md.version('rgc-backend-kit')); print('xlsxwriter', md.version('XlsxWriter')); print('myapp', md.version('myapp'))"; \
+  ./env/bin/pip check; \
   find apps -mindepth 1 -path "*/.git" | xargs rm -fr
 
 FROM frappe/base:${FRAPPE_BRANCH} AS backend
