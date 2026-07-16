@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-16 00:55 CST
+更新时间：2026-07-16 08:50 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,8 +8,9 @@
 
 ## 当前最终状态
 
-- AI Orchestrator 已从父仓库普通目录迁移为独立公开仓库 `https://github.com/rgc318/myapp-ai`，完整保留 12 个历史里程碑；`main` 与 `develop` 当前均指向 `25e68c7 ci: establish independent AI repository delivery`。父仓库保持原路径 `services/myapp-ai`，但现在以 `develop` 子模块固定提交，因此现有 Compose、Dev Container 和 staging build context 不变。
-- 独立 AI 仓库已补 `.gitignore`、Docker test/runtime CI、GitHub Release/手工 GHCR 发布（provenance + SBOM）、Dependabot 和仓库/交付边界文档。Docker test target 80/80 通过，runtime target 构建通过，远程 GitHub CI 同样成功。
+- AI Orchestrator 已从父仓库普通目录迁移为独立公开仓库 `https://github.com/rgc318/myapp-ai`，完整保留 12 个历史里程碑；`main` 与 `develop` 当前均指向 `052819e fix: use published Trivy action release`，主体独立交付提交为 `7f230f5 feat: complete standalone AI service delivery`。父仓库保持原路径 `services/myapp-ai` 子模块，因此原有 Compose、Dev Container 和 staging build context 兼容。
+- AI 仓库现可独立克隆、锁定依赖、开发、测试、构建、启动和运维：新增 `.env.example`、Standalone Compose、Redis/Qdrant、合成 OpenAI/Frappe Provider、Chat 与向量 upsert/search/delete 集成测试、Makefile、启动/停止/健康脚本、uv.lock、Ruff/pre-commit/ShellCheck、依赖审计、Trivy、CodeQL、CODEOWNERS、License、Security/Contributing/Changelog 和 13 篇企业级服务文档。
+- AI 本地与远程门禁全部通过：Docker 80/80、独立 Compose Chat/向量闭环、Ruff、pre-commit、ShellCheck、pip-audit 无已知漏洞、CI、CodeQL、Security/Trivy 均成功；发布 workflow 支持 amd64/arm64、provenance 和 SBOM。
 - 父仓库已补齐 Backend 与 AI 两个 `.gitmodules` 声明；Dev Container 会在宿主机递归初始化子模块，开发/生产/本地 staging 构建脚本会对缺失 AI 子模块失败并给出恢复命令，staging workflow 会递归检出并把 AI commit 写入 OCI 镜像元数据。
 - 剩余 AI 企业级收口 Goal 的本地可实施范围已完成：异步 OTLP、Langfuse Secret 最小化、三环境部署契约、检索噪声治理、30 条中文质量门禁、真实数据清理、Provider 复测、文档和分仓库提交均已交付。`erp-embedding` 当前已恢复并达到 v1 在线门槛；正式 Secret Manager/SSO/TLS/HA/staging 和新向量空间 full gate 仍作为明确部署依赖，不误报本地完成等于生产上线。
 - 模型治理已覆盖注册、治理元数据、不可变策略版本、预算、灰度、失败关闭评测门禁、双人审批、System Manager 发布/回滚、运行时策略解析、Redis 原子限流/预算/熔断和每日用量聚合。Web `/administration/ai/models` 已实现模型、策略、用量和 Embedding release 管理。
@@ -25,17 +26,25 @@
 - Web `/administration/ai/data-tasks` 已实现 service camelCase 映射、独立权限、菜单/路由、管理入口重定向、ProTable 筛选、缺失描述扫描、手工字段建议、前值/建议值/证据对比、审批/驳回、执行和回滚。最终 `npm run tsc`、Biome、20 套/139 项 Jest 通过；仍有项目既有 Jest open handle 提示，但退出码为 0。
 - 正式生产仍需在 Secret Manager/正式环境完成 Langfuse Project Key、恢复根密钥、SSO/TLS、HA 数据服务、告警负责人和真实 staging 演练；这些外部部署项不能用本地开发密钥或单机 Compose 伪造完成。
 - 本轮分仓库提交：Backend `d8747fc feat: complete AI governance and data tasks`；Web `8f4410d feat: add AI governance workbenches`；父仓库 `0e71b8a3 feat: complete AI production readiness milestone`，并已把 `apps/myapp` gitlink 更新到 `d8747fc`。
-- 本轮检索质量治理提交：Backend `c4a6af3 feat: govern AI vector retrieval quality`；父仓库 `62bae6ee feat: complete AI retrieval quality governance`。Provider 恢复文档提交：Backend `9ba54f1 docs: record embedding provider recovery`；父仓库 `fc6268af docs: update embedding recovery status`，gitlink 已同步。AI 独立仓库提交为 `25e68c7`；父仓库迁移提交已生成并通过本地门禁。Backend/Web 代码无未提交改动，父仓库 `.codex` 和 Mobile 既有 5 个用户改动继续不处理。本地 Secret、派生运行时文件和真实质量报告均受忽略且不得提交。
+- 本轮检索质量治理提交：Backend `c4a6af3 feat: govern AI vector retrieval quality`；父仓库 `62bae6ee feat: complete AI retrieval quality governance`。Provider 恢复文档提交：Backend `9ba54f1 docs: record embedding provider recovery`；父仓库 `fc6268af docs: update embedding recovery status`，gitlink 已同步。AI 独立交付最新提交为 `052819e`；父仓库将同步该 gitlink 和新的独立/组合部署边界。Backend/Web 代码无未提交改动，父仓库 `.codex` 和 Mobile 既有 5 个用户改动继续不处理。本地 Secret、派生运行时文件和真实质量报告均受忽略且不得提交。
 - Mobile `frontend/myapp-mobile` 保留本轮开始前已有的五个未提交文件，本轮不得修改、回滚或提交。
 
 ## AI 企业级收口最终验收
 
 - 已完成：功能审计与追踪矩阵；模型治理 Backend/Orchestrator/Web；Embedding 发布控制面；高并发 P0 与压测；OTLP；备份恢复与内部 Token 轮换；Data Task Backend/Web；向量测试噪声治理和版本化中文检索门禁。
-- 最终自动化：Orchestrator 当前源码镜像 80 项、Backend AI/Data Task/Gateway 178 项、Web 最近完整基线 21 套/154 项全部通过；站点迁移既有证据保持有效。
-- 最终仓库门禁：父仓库/Backend/Web `diff --check` 通过，敏感扫描无真实 Key/Token；真实失败报告和 `.env.*.local` 均被忽略。父仓库只剩 `.codex`，Mobile 只剩本轮开始前的 5 个用户改动。
+- 最终自动化：Orchestrator 当前源码镜像 80 项、Standalone Compose Chat/向量闭环、CI/CodeQL/Security，Backend AI/Data Task/Gateway 178 项、Web 最近完整基线 21 套/154 项全部通过；站点迁移既有证据保持有效。
+- 最终仓库门禁：父仓库/Backend/Web/AI `diff --check` 通过，敏感扫描无真实 Key/Token；真实失败报告和 `.env.*.local` 均被忽略。父仓库只剩 `.codex`，Mobile 只剩本轮开始前的 5 个用户改动。
 - Provider 恢复已确认：`erp-embedding` 字符串单条、数组单条和两条批量均 HTTP 200、1024 维；当前运行 Orchestrator 的真实检索返回 200。30 条质量门禁通过，最新报告保存在忽略目录 `ai-governance-reports/product-retrieval-v1-current.json`。新的 v2 alias/collection 尚未配置或发布；如果底层模型权重变化，必须按新向量空间完整发布流程处理。
 
 ## 本轮工作总结
+
+### 2026-07-16 AI 独立交付、工程治理与文档完善
+
+- 独立运行：新增仓库根 `compose.yaml`，在不依赖 `frappe_docker` 源码的情况下启动 Orchestrator、密码保护 Redis 和固定 digest Qdrant；只发布 loopback 4010，Redis/Qdrant 使用内部网络，Orchestrator/Qdrant 保持非 root、只读 rootfs、空 capabilities 和 `no-new-privileges`。
+- 集成门禁：新增 `compose.integration.yaml`、合成 OpenAI/Frappe Provider 和 `standalone_healthcheck.py`，真实验证健康、Bearer Chat、Embedding、Qdrant upsert/search/delete；使用独立 project/14010 端口，完成后清理容器、网络和测试卷，不中断现有 Dev Container。
+- 工程治理：新增 `uv.lock`、`.python-version`、Ruff、pre-commit、ShellCheck、pip-audit、Trivy、CodeQL、Dependabot、CODEOWNERS、PR 模板、MIT License、Security、Contributing 和 Changelog。远程 CI、Security 和 CodeQL 均成功。
+- 文档体系：新增架构、开发、配置、API、部署、安全、观测、向量、测试评测、性能、运维和发布共 13 篇文档及索引；AI 仓库成为服务级事实源，父仓库继续负责完整 ERP/Dev Container/bundled Langfuse/staging/production 组合部署。
+- 提交：AI `7f230f5 feat: complete standalone AI service delivery`、`052819e fix: use published Trivy action release`；`main` 与 `develop` 均已同步。父仓库下一提交同步 gitlink、长期规则、路线图和交接。
 
 ### 2026-07-16 AI Orchestrator 独立仓库迁移
 

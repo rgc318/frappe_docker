@@ -135,7 +135,7 @@
 
 ### 3.7 AI Copilot 平台化与单据草稿
 
-当前本地可实施的 AI 主链路已经基本完成：只读工具、三类核心业务草稿、模型策略/预算/灰度/降级、Prompt 与 Embedding 发布治理、商品数据任务、OTLP trace/score、有界异步批处理 Dispatcher、固定评测、共享异步连接池、分布式限流/预算/熔断、独立向量队列、专项压测、Qdrant snapshot，以及 Langfuse PostgreSQL/ClickHouse/MinIO 联合备份恢复均有实现和验证证据。
+当前本地可实施的 AI 主链路和独立服务工程基线已经基本完成：只读工具、三类核心业务草稿、模型策略/预算/灰度/降级、Prompt 与 Embedding 发布治理、商品数据任务、OTLP trace/score、有界异步批处理 Dispatcher、固定评测、共享异步连接池、分布式限流/预算/熔断、独立向量队列、专项压测、Qdrant snapshot，以及 Langfuse PostgreSQL/ClickHouse/MinIO 联合备份恢复均有实现和验证证据。AI 独立仓库同时具备依赖锁、Standalone Compose、Redis/Qdrant、合成 Chat/向量集成测试、CI/CodeQL/依赖与镜像安全门禁、GHCR 多架构发布和完整服务文档。
 
 剩余范围：
 

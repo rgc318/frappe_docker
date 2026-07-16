@@ -10,7 +10,7 @@
 - Web 前端主要开发仓库是 `frontend/myapp-web`。
 - Mobile 前端主要开发仓库是 `frontend/myapp-mobile`。
 - `apps/myapp` 是父仓库子模块。后端提交完成后，如需完整提交链路，需要在父仓库提交子模块指针。
-- `services/myapp-ai` 是父仓库子模块。AI 源码、测试、Dockerfile 和仓库 CI 在 AI 仓库提交；Compose、Dev Container、Langfuse/Qdrant 编排和环境部署配置在父仓库提交。AI 提交必须先推送远程，再由父仓库固定新 gitlink。
+- `services/myapp-ai` 是父仓库子模块。AI 源码、依赖锁、Standalone Compose、Redis/Qdrant 集成测试、服务级文档、Dockerfile 和 CI/安全门禁在 AI 仓库提交；完整 ERP Compose、Dev Container、bundled Langfuse、staging/production 和跨服务 Secret 编排在父仓库提交。AI 提交必须先推送远程，再由父仓库固定新 gitlink。
 - `frontend/myapp-web` 不归父仓库跟踪，Web 改动只在 Web 仓库提交。
 - 父仓库 `.codex` 是本地未跟踪目录，不要提交。
 
@@ -184,6 +184,7 @@ docker exec frappe_docker-backend-1 bash -lc '
 git diff --check
 git -C apps/myapp diff --check
 git -C frontend/myapp-web diff --check
+git -C services/myapp-ai diff --check
 ```
 
 提交规则：

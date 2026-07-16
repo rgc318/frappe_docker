@@ -15,7 +15,7 @@ This file is the stable entry point for Codex sessions in this repository. Keep 
 - `apps/myapp` is the main backend code repository and is tracked by the parent repository as a git submodule.
 - Backend code changes should normally be made and committed inside `apps/myapp`.
 - After committing backend changes in `apps/myapp`, update and commit the submodule pointer in the parent repository when the user asks for a complete backend submission.
-- `services/myapp-ai` is the independent AI Orchestrator repository and is tracked by the parent repository as a git submodule. AI source, tests, Dockerfile and repository CI are committed there; Compose, Dev Container, Langfuse/Qdrant orchestration and environment deployment remain in the parent repository.
+- `services/myapp-ai` is the independent AI Orchestrator repository and is tracked by the parent repository as a git submodule. AI source, dependency lock, standalone Compose, Redis/Qdrant integration tests, service documentation, Dockerfile and repository CI/security workflows are committed there. Full ERP Compose, Dev Container, bundled Langfuse, staging/production and cross-service Secret orchestration remain in the parent repository.
 - After committing AI changes in `services/myapp-ai`, push that repository first, then update and commit its submodule pointer in the parent repository.
 - `frontend/myapp-web` is not tracked by the parent repository. Web commits must be made only inside `frontend/myapp-web`.
 - The parent `.codex` directory is existing local untracked state. Do not commit it.
@@ -47,9 +47,8 @@ Read these documents when the task touches the matching area:
 - Backend API source of truth: `apps/myapp/API_GATEWAY.zh-CN.md`
 - Backend auth design: `apps/myapp/JWT_AUTH.zh-CN.md`
 
-### AI Orchestrator: `services/myapp-ai`
+### Backend domain designs
 
-- AI service overview, runtime contract and verification: `services/myapp-ai/README.zh-CN.md`
 - Wholesale/business design baseline: `apps/myapp/WHOLESALE_TECH_DESIGN.zh-CN.md`
 - Purchase flow design: `apps/myapp/PURCHASE_TECH_DESIGN.zh-CN.md`
 - Reports design: `apps/myapp/REPORTS_TECH_DESIGN.zh-CN.md`
@@ -57,6 +56,14 @@ Read these documents when the task touches the matching area:
 - Barcode scanning design: `apps/myapp/BARCODE_SCANNING_TECH_DESIGN.zh-CN.md`
 - Sales status aggregation design: `apps/myapp/SALES_STATUS_AGGREGATION.zh-CN.md`
 - UOM standard catalog: `apps/myapp/UOM_STANDARD_CATALOG.zh-CN.md`
+
+### AI Orchestrator: `services/myapp-ai`
+
+- AI service overview and quick start: `services/myapp-ai/README.zh-CN.md`
+- AI complete documentation index: `services/myapp-ai/docs/README.zh-CN.md`
+- AI standalone deployment: `services/myapp-ai/docs/DEPLOYMENT.zh-CN.md`
+- AI development and testing: `services/myapp-ai/docs/DEVELOPMENT.zh-CN.md`
+- AI configuration and API contracts: `services/myapp-ai/docs/CONFIGURATION.zh-CN.md`, `services/myapp-ai/docs/API_CONTRACT.zh-CN.md`
 
 ### Web Frontend: `frontend/myapp-web`
 
@@ -127,9 +134,14 @@ For backend unit/service changes, run targeted tests in the backend container wi
 For AI Orchestrator changes, run from `services/myapp-ai` when relevant:
 
 ```bash
+uv sync --extra test --extra dev --frozen
+uv run ruff check .
+uv run pre-commit run --all-files
 docker build --target test -t myapp-ai:test .
 docker run --rm myapp-ai:test
 docker build --target runtime -t myapp-ai:runtime .
+# When Compose/runtime integration changes:
+make integration
 ```
 
 Before finishing code changes, run whitespace checks where relevant:

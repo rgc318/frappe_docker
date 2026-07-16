@@ -44,7 +44,17 @@ cd frappe_docker
 git submodule update --init --recursive
 ```
 
-AI source changes belong to `https://github.com/rgc318/myapp-ai`; this parent repository owns the pinned AI revision, Compose, Dev Container and environment deployment configuration.
+AI source changes belong to `https://github.com/rgc318/myapp-ai`. The AI repository now has its own `.env.example`, locked Python development environment, standalone Redis/Qdrant Compose, synthetic Chat/vector integration test, CI/security gates and complete service documentation. This parent repository owns the pinned AI revision plus full ERP Compose, Dev Container, bundled Langfuse and environment deployment configuration.
+
+For AI-only development without the ERP stack:
+
+```bash
+cd services/myapp-ai
+cp .env.example .env
+./scripts/standalone-up.sh
+```
+
+See [`services/myapp-ai/docs/README.zh-CN.md`](services/myapp-ai/docs/README.zh-CN.md) for the independent documentation index.
 
 ```bash
 ./start-dev.sh
@@ -108,7 +118,7 @@ The Dev Container maps `/usr/share/fonts/opentype/noto` into `/home/frappe/.loca
 
 ## Documentation
 
-The development, staging and production AI/Langfuse deployment contract is documented in [`docs/codex/AI_DEPLOYMENT_ENVIRONMENTS.zh-CN.md`](docs/codex/AI_DEPLOYMENT_ENVIRONMENTS.zh-CN.md).
+The AI service's standalone architecture, configuration, API, deployment, security and operations are documented in [`services/myapp-ai/docs/README.zh-CN.md`](services/myapp-ai/docs/README.zh-CN.md). The full ERP development, staging and production AI/Langfuse composition contract remains in [`docs/codex/AI_DEPLOYMENT_ENVIRONMENTS.zh-CN.md`](docs/codex/AI_DEPLOYMENT_ENVIRONMENTS.zh-CN.md).
 
 **The official documentation for `frappe_docker` is maintained in the `docs/` folder in this repository.**
 
