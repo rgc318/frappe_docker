@@ -1,12 +1,21 @@
 # 当前交接状态
 
-更新时间：2026-07-16 16:37 CST
+更新时间：2026-07-16 22:06 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+- 2026-07-16 AI Web 企业级现代化 Goal 已完成本轮功能交付：Web `/ai` 已迁移到 Ant Design Pro 官方 `@ant-design/x` / `@ant-design/x-markdown`，使用全高 Conversations、Bubble、Sender、Welcome、Prompts、Sources 和 Actions 工作区；支持活跃/归档会话、停止 SSE、持久 Run/反馈恢复、分类负反馈和结构化引用卡片。页面仍只经 Frappe Gateway，不直连 Orchestrator/LiteLLM。
+- 新增 `/ai/drafts` 当前用户草稿中心及 Backend `list_ai_drafts_v1`：支持销售/采购/库存调整草稿分页筛选、详情、来源会话、校验、放弃和业务编辑器交接；Repository 查询强制 owner 隔离。`get_ai_conversation_v1` 现返回当前用户 Run 摘要与已保存反馈，页面刷新后不再丢失模型、Token、trace 和反馈状态。
+- AI 治理 Web 已增加独立深链路由：模型、策略、用量、向量、审计和 Data Task；治理概览新增 Orchestrator 可达性、近 7 日请求/错误/成本和向量状态，用量页新增近 30 日 KPI/趋势。审计新增 Backend `list_ai_audit_events_v1` 服务端分页、关键词/动作/对象/优先级/日期筛选。
+- 向量治理已补齐此前 Web 未暴露的 Backend 能力：System Manager 可查看在线索引、待处理/失败/排除计数，补建待处理、重试失败，并按 dry-run → 原因确认清理明确排除向量；清理契约固定 `erp_items_changed=0`。Data Task 序列化新增后端 `actions.allowed/reason`，Web 不再只按本地状态推导审批、执行和回滚。
+- Web 主题基线更新为 Ant Design 6 主色、固定 Header、统一圆角与页面间距，移除模板业务页背景图；新增依赖仅为官方 `@ant-design/x` 2.8 和 `@ant-design/x-markdown` 2.8，没有引入第三方后台模板或第二套样式系统。
+- 本轮验证：Web TypeScript、Biome、21 套/159 项 Jest、生产 build 通过，`/ai`、`/ai/drafts`、`/administration/ai/audit` 开发路由 HTTP 200；Backend AI/Data Task/治理/向量/Gateway 184 项通过。真实站点只读冒烟确认草稿列表、运行概览和审计分页执行成功，Orchestrator、Embedding、向量、运行治理和 Langfuse 均返回已配置/可达。Web/Backend/父仓库 `diff --check` 通过。
+- Web 已通过精确 `overrides` 处理 4 个间接生产依赖问题：`lodash` / `lodash-es` 固定到 4.18.1，受影响的 `path-to-regexp 8.x` 固定到 8.4.0，受影响的 `yaml 1.x` 固定到 1.10.3；`npm audit --omit=dev` 从 3 high + 1 moderate 降为 0。TypeScript、Biome、21 套/159 项 Jest 和 production build 全部通过；未使用 `npm audit fix --force`。完整开发依赖审计仍包含旧 Umi/Pro CLI 工具链告警，应与生产依赖口径分开治理。
+- 本轮代码与设计文档已完成分仓库提交：Backend `1b7cfd4 feat: align AI web governance contracts`，Web `2eb4f09 feat: modernize enterprise AI workspaces`。Backend 与 Web 工作区 clean，分别较远端 ahead 1；父仓库本次提交更新 Backend gitlink、AGENTS 文档索引和本交接，仍保留既有 `.codex` 本地未跟踪状态且不得提交。
 
 - 2026-07-16 完成 staging 构建代理故障复盘：不整体回退 `bdd00ed9 fix: harden staging image builds`。代理失效是最初外部故障，但代理恢复后仍独立复现 Git/GnuTLS 瞬时失败、Frappe v16.18.3 构建期 Redis 需求和逐 app Python resolver 漂移；显式代理覆盖/清空、有限重试、BuildKit cache、分阶段资产构建、builder 临时 Redis、uv 联合解析及 import/`pip check` 门禁均有独立保留理由。长期判断准则已补入 `KNOWN_ISSUES.zh-CN.md`，部署复盘已补入 `STAGING_DEPLOYMENT.zh-CN.md`。
 - 2026-07-16 完成 Compose、启动/停止/部署/回滚、当前 Dev Container、独立 AI、staging ERP/AI 镜像和 Backend→AI 的完整本地验收。development、development+Langfuse、Dev Container、production、production+Langfuse、staging internal/HTTPS、pwd、CI、AI standalone/integration 共 11 组 Compose 均可解析；相关 Shell 语法及脚本参数分支全部通过。
@@ -45,6 +54,23 @@
 - Provider 恢复已确认：`erp-embedding` 字符串单条、数组单条和两条批量均 HTTP 200、1024 维；当前运行 Orchestrator 的真实检索返回 200。30 条质量门禁通过，最新报告保存在忽略目录 `ai-governance-reports/product-retrieval-v1-current.json`。新的 v2 alias/collection 尚未配置或发布；如果底层模型权重变化，必须按新向量空间完整发布流程处理。
 
 ## 本轮工作总结
+
+### 2026-07-16 AI Web 独立设计文档与提交收口
+
+- Web 新增 `AI_WEB_FRONTEND_DESIGN.zh-CN.md` 作为 AI 前端设计事实来源，集中记录信息架构、Ant Design X/ProComponents 选型、三栏工作台、POST + JWT SSE、会话/Run/反馈恢复、结构化 citation、三类草稿交接、治理深链路、角色权限、异常恢复、安全、性能和验收门禁。
+- `WEB_DEVELOPMENT.zh-CN.md` 与 `DEVELOPMENT_PLAN.zh-CN.md` 已建立设计文档入口；父仓库 `AGENTS.md` Required Context Index 已加入该文档，后续 AI Web 修改必须同步核对。
+- Backend 已提交 `1b7cfd4 feat: align AI web governance contracts`：包括当前用户草稿分页、会话 Run/反馈恢复、治理概览、审计服务端分页、Data Task allowed/reason 及测试和 API 文档。
+- Web 已提交 `2eb4f09 feat: modernize enterprise AI workspaces`：包括 Ant Design X AI 工作台、草稿中心、模型/策略/用量/向量/审计深链路、领域 Service 对齐、现代主题和四个生产间接依赖修复。
+- 提交后复验：Backend AI/Data Task/模型治理/向量/Gateway 184 项通过；Web TypeScript、Biome、21 套/159 项 Jest、production build 和 `npm audit --omit=dev`（0 vulnerabilities）通过；各仓库 `diff --check` 通过。Jest 仍显示既有 open-handle 提示，但退出码为 0。
+
+### 2026-07-16 AI Web 企业级现代化与前后端能力对齐
+
+- 官方组件：核对 Ant Design Pro 2026-07 官方 Chatbot 基线，接入 `@ant-design/x` 与 `@ant-design/x-markdown`；保留现有 Frappe JWT POST SSE 和领域 Service，不复制官方示例的外部 Provider 直连。
+- AI 助手：重构全高工作区、会话分组/归档、示例能力、停止生成、Markdown、结构化来源、反馈和右侧 Run 检查器；现有三类结构化草稿编辑、版本历史和业务编辑器交接保持兼容。
+- 草稿中心：Backend 新增 owner-scoped `list_ai_drafts_v1`，Web 新增 `/ai/drafts`；会话详情同步返回 Run 与 feedback，使历史状态可恢复。
+- 治理中心：新增模型/策略/用量/向量/审计独立路由；概览聚合 runtime/7 日 usage/vector/data-task 指标，用量增加 30 日趋势；审计从固定最近 20 条升级为分页查询。
+- 向量与 Data Task：补齐索引状态、重建、排除向量预检/清理；Data Task 操作资格由 Backend 返回 `actions.allowed/reason`，继续由后端强制职责分离。
+- 验证：Web `npm run tsc`、`npm run biome:lint`、`npm test -- --runInBand`（21/159）、`npm run build`；Backend AI/Gateway 184 项；真实 bench execute 和本地 8001 路由冒烟均通过。Jest 仍可能在聚焦运行时显示项目既有 open-handle 提示，但完整测试本次正常退出码 0。
 
 ### 2026-07-16 staging 构建代理故障复盘与文档固化
 

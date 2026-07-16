@@ -69,6 +69,7 @@ Read these documents when the task touches the matching area:
 
 - Web development rules: `frontend/myapp-web/WEB_DEVELOPMENT.zh-CN.md`
 - Web development plan: `frontend/myapp-web/DEVELOPMENT_PLAN.zh-CN.md`
+- AI Web frontend design: `frontend/myapp-web/AI_WEB_FRONTEND_DESIGN.zh-CN.md`
 - Web request result contract: `frontend/myapp-web/REQUEST_RESULT_CONTRACT.zh-CN.md`
 - Web project README: `frontend/myapp-web/README.zh-CN.md`
 - Web template/development notes: `frontend/myapp-web/DEVELOPMENT.md`
