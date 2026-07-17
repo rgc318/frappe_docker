@@ -8,6 +8,9 @@
 
 ## 当前最终状态
 
+- 2026-07-17 AI 可感知流式与工作台界面继续完善：真实 Orchestrator 直连在 124ms 返回 `started`、3.32s 返回首段、共 28 个 1–3 字符增量；同一模型经 Frappe 的样本在 19ms 返回 `run_started`，但首段波动到 17.66s，证明代理未缓冲、主要等待来自当前唯一 Chat 模型 `opencode-deepseek-v4-flash` 的首字波动。Backend SSE 新增 `run_progress` 的 `context_ready / generating / model_started / streaming` 阶段，最终 `completed.stream` 返回增量段数和字符数；重启后真实 Frappe 样本返回 20 个增量、首 Token 12.41s、总耗时 12.69s。
+- Web `/ai` 已从三栏监控式布局改为会话侧栏 + 居中对话区双栏，Run 诊断进入右侧 Drawer，移动端会话进入左侧 Drawer；首段到达前显示阶段、客户端计时和“内容到达后逐段展示”，首段后显示持续流式状态。浮动 Sender、品牌栏、权限边界和消息区视觉已更新，开发态 Ant Design Pro `SettingDrawer` 已移除。结构化销售/采购/库存草稿仍只在严格 JSON 与 Frappe 业务校验完成后整体展示，但等待期间明确显示结构化生成与校验阶段。
+- 本轮提交：Backend `779247f feat: expose AI streaming progress`；Web `5743b5c feat: modernize AI streaming workspace`。验证包括 Backend AI Repository/Service/Gateway 142 项、Web TypeScript、Biome、24 套/166 项 Jest、production build、`npm audit --omit=dev` 0 漏洞、`/ai` HTTP 200 和三个代码仓库 `diff --check`；Web 提交钩子已再次执行 Biome，父仓库提交前会复验。
 - 2026-07-17 修复 AI 历史会话公司上下文漂移：Web 打开已有会话后保存并使用会话自身公司，新建会话才使用当前工作偏好默认公司；当两者不同时界面明确显示“会话公司”。Backend `_prepare_chat_run` 在调用方省略公司时从持久会话恢复公司，显式传入不同公司仍失败关闭。新增 Web 历史会话回归和 Backend 公司恢复单测。
 - 2026-07-16 AI Web 运行诊断与草稿复核继续完善：Frappe Gateway 的同步回答、SSE 完成事件和三类草稿返回持久 Run 摘要，历史会话补首 Token；Web 右侧检查器现展示状态、后端总耗时、首 Token、Token 分解、Run/Trace、工具执行、警告和显式失败重试。`/ai/drafts` 详情已从原始 JSON 升级为业务字段、商品明细、库存变化、校验结果、不可变版本差异和重新校验恢复，原始数据保留为辅助页签。新增 AI 工作台流式页面测试、运行检查器和草稿复核组件测试。
 - 本轮分仓库提交：Backend `ae1806d feat: improve AI conversation runtime context`；Web `fc7c354 feat: improve AI workspace diagnostics and drafts`；父仓库为本文件所在提交并同步 Backend gitlink。Backend 与 Web 工作区 clean，父仓库仅保留既有 `.codex` 未跟踪状态。
