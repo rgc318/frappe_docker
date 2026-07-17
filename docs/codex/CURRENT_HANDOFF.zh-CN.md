@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-17 00:11 CST
+更新时间：2026-07-17 11:05 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,8 +8,13 @@
 
 ## 当前最终状态
 
+- 2026-07-17 修复 AI 工作台“看似不流式、不能切公司、业务查询无上下文”问题：首段前状态现在明确显示权限/公司确认、等待首个 Token 和客户端已等待时间，首 Token 到达后显示实时输出；不再把 Provider 首字等待描述成“思考”或“内容到达后逐段显示”。新会话增加 Company 远程选择器并以工作偏好为初值，历史会话公司保持锁定，跨公司必须新建会话。
+- Web 默认场景改为 `auto`，由 Frappe 根据用户问题解析实际 `general / product_search / order_query / report_summary`。单据查询现支持销售订单、销售发票、采购订单和采购发票的单类型或混合查询；每种类型分别执行 DocType/记录权限、公司、日期、状态、金额、排序和数量限制。未明确日期的“最新”查询覆盖全部日期，不再默认限制近 30 天。
+- 用户截图原句“查询最新的5条销售订单和销售发票，以及采购订单”已走真实登录与 SSE 验证：工具分别返回销售订单 5、销售发票 4、采购订单 5，结构化 citation 和正文均成功；缩短的每类 1 条复测返回三类真实引用、425 个 SSE 增量块，回答和警告均不再包含“只读试运行”或“只读”措辞。
+- AI 查询 Prompt 升级为 `erp-readonly-v6`，能力描述改为“当前账号权限和公司范围内的受控业务查询”，正式业务写操作仍必须由用户在 ERP 页面确认。运行 Orchestrator 镜像已重建，`/health` 返回 v6；Backend 也已重启并真实端到端通过。本地提交为 AI `c42549f feat: clarify governed AI query prompt`、Backend `723eae7 feat: auto-route AI business document queries`、Web `f7838b5 feat: improve AI company and query controls`。
+- 验证：Web TypeScript、Biome、24 套/167 项 Jest、production build、production audit 0 漏洞；Backend AI Repository/Service/Gateway 146 项；AI Ruff、Pre-commit、80 项 pytest、test 镜像 80 项均通过，三个仓库 `diff --check` 通过。Prompt v6 只完成真实定向 live 冒烟，尚未重跑 21 项付费 live full-gate；生产策略/Prompt 正式发布前必须补 full-gate。AI `c42549f` 已 push 到 `origin/develop`，父仓库本次提交同步 Backend/AI 子模块指针和本交接。
 - 2026-07-17 AI 可感知流式与工作台界面继续完善：真实 Orchestrator 直连在 124ms 返回 `started`、3.32s 返回首段、共 28 个 1–3 字符增量；同一模型经 Frappe 的样本在 19ms 返回 `run_started`，但首段波动到 17.66s，证明代理未缓冲、主要等待来自当前唯一 Chat 模型 `opencode-deepseek-v4-flash` 的首字波动。Backend SSE 新增 `run_progress` 的 `context_ready / generating / model_started / streaming` 阶段，最终 `completed.stream` 返回增量段数和字符数；重启后真实 Frappe 样本返回 20 个增量、首 Token 12.41s、总耗时 12.69s。
-- Web `/ai` 已从三栏监控式布局改为会话侧栏 + 居中对话区双栏，Run 诊断进入右侧 Drawer，移动端会话进入左侧 Drawer；首段到达前显示阶段、客户端计时和“内容到达后逐段展示”，首段后显示持续流式状态。浮动 Sender、品牌栏、权限边界和消息区视觉已更新，开发态 Ant Design Pro `SettingDrawer` 已移除。结构化销售/采购/库存草稿仍只在严格 JSON 与 Frappe 业务校验完成后整体展示，但等待期间明确显示结构化生成与校验阶段。
+- Web `/ai` 已从三栏监控式布局改为会话侧栏 + 居中对话区双栏，Run 诊断进入右侧 Drawer，移动端会话进入左侧 Drawer；首 Token 到达前显示阶段和客户端计时，首 Token 到达后显示实时输出状态。浮动 Sender、品牌栏、权限边界和消息区视觉已更新，开发态 Ant Design Pro `SettingDrawer` 已移除。结构化销售/采购/库存草稿仍只在严格 JSON 与 Frappe 业务校验完成后整体展示，但等待期间明确显示结构化生成与校验阶段。
 - 本轮提交：Backend `779247f feat: expose AI streaming progress`；Web `5743b5c feat: modernize AI streaming workspace`。验证包括 Backend AI Repository/Service/Gateway 142 项、Web TypeScript、Biome、24 套/166 项 Jest、production build、`npm audit --omit=dev` 0 漏洞、`/ai` HTTP 200 和三个代码仓库 `diff --check`；Web 提交钩子已再次执行 Biome，父仓库提交前会复验。
 - 2026-07-17 修复 AI 历史会话公司上下文漂移：Web 打开已有会话后保存并使用会话自身公司，新建会话才使用当前工作偏好默认公司；当两者不同时界面明确显示“会话公司”。Backend `_prepare_chat_run` 在调用方省略公司时从持久会话恢复公司，显式传入不同公司仍失败关闭。新增 Web 历史会话回归和 Backend 公司恢复单测。
 - 2026-07-16 AI Web 运行诊断与草稿复核继续完善：Frappe Gateway 的同步回答、SSE 完成事件和三类草稿返回持久 Run 摘要，历史会话补首 Token；Web 右侧检查器现展示状态、后端总耗时、首 Token、Token 分解、Run/Trace、工具执行、警告和显式失败重试。`/ai/drafts` 详情已从原始 JSON 升级为业务字段、商品明细、库存变化、校验结果、不可变版本差异和重新校验恢复，原始数据保留为辅助页签。新增 AI 工作台流式页面测试、运行检查器和草稿复核组件测试。
@@ -60,6 +65,34 @@
 - Provider 恢复已确认：`erp-embedding` 字符串单条、数组单条和两条批量均 HTTP 200、1024 维；当前运行 Orchestrator 的真实检索返回 200。30 条质量门禁通过，最新报告保存在忽略目录 `ai-governance-reports/product-retrieval-v1-current.json`。新的 v2 alias/collection 尚未配置或发布；如果底层模型权重变化，必须按新向量空间完整发布流程处理。
 
 ## 本轮工作总结
+
+### 2026-07-17 AI 工作台公司、自动路由与真实单据查询收口
+
+- 用户反馈与根因：
+  - 首 Token 前的 10～20 秒等待被界面描述为“建立安全会话”或“内容到达后逐段显示”，容易被误解为模型思考或伪流式；实际 Frappe 在约 19ms 返回 `run_started`，Provider 首 Token 存在显著波动，首 Token 后会返回数百个真实 `message_delta`。
+  - 新会话只显示工作偏好默认公司，没有工作台内公司选择；历史会话又必须保持原公司边界，不能直接改写。
+  - 默认 `general` 场景不会调用业务工具；原 `order_query` 只支持销售或采购订单单选，并显式拒绝混合语义，也没有销售/采购发票工具，因此用户的混合查询只能得到“没有业务上下文”。
+  - Orchestrator `erp-readonly-v5` Prompt 使用“只读试运行”措辞，模型会重复该说明，让用户误以为查询能力尚不可用。
+- Backend：
+  - 新增 `auto` 场景和确定性 `_infer_ai_scenario`，根据当前问题解析通用、商品、单据或报表场景；解析后的实际场景进入 Message、Run、Prompt 和 Orchestrator，不把页面关键词判断当作事实来源。
+  - 单据 DSL 支持销售订单、销售发票、采购订单、采购发票的一个或多个实体；订单复用现有订单工作台服务，发票复用 `list_business_documents_v1`，每类结果再次执行 DocType、记录级权限、公司、日期、状态、金额、排序和数量过滤。
+  - 未明确日期的“最新”查询使用全部日期范围；明确今天、本周、本月、上月或近 N 天时才应用日期边界。混合查询按每种单据类型分别应用数量上限。
+  - SSE 阶段文案调整为“已确认当前账号权限与公司范围”“等待首个 Token”“首个 Token 已到达，正在实时输出”，保留 `completed.stream.delta_count / streamed_chars` 作为真实增量证据。
+- Web：
+  - 默认场景改为“自动识别”，仍允许用户显式选择通用、商品、单据、报表和三类草稿。
+  - 新会话使用 `RemoteLinkSelect doctype="Company"` 选择查询公司，默认值来自工作偏好；历史会话显示锁定公司，切换公司必须新建会话。
+  - 首 Token 前展示“首个响应尚未返回”和已等待时间，首 Token 后展示“实时输出中”；安全边界改为“按当前账号权限查询，写操作需确认”。
+- AI Orchestrator：
+  - 查询 Prompt 升级为 `erp-readonly-v6`，能力说明改为当前账号权限和公司范围内的受控业务查询；创建、提交、取消、付款、退款和库存调整仍必须由用户在正式业务页面确认。
+  - 运行镜像已重建，`/health` 返回四个查询场景均为 v6；定向真实查询的正文和 warning 均不再出现“只读试运行”或“只读”措辞。
+- 真实验收：
+  - 原始问题“查询最新的5条销售订单和销售发票，以及采购订单”自动执行 `search_sales_orders`、`list_sales_invoices`、`search_purchase_orders`，真实返回 5 条销售订单、4 条销售发票和 5 条采购订单。
+  - 每类 1 条的缩短复测返回三类 citation、425 个增量块、860 个流式字符；工具、公司、单号、日期、状态、金额和链接均来自受控结构化结果。
+  - Web TypeScript、Biome、24 套/167 项 Jest、production build、production audit 0 漏洞；Backend 146 项；AI Ruff、Pre-commit、80 项 pytest 和 test 镜像 80 项全部通过。
+- 提交与发布边界：
+  - AI `c42549f feat: clarify governed AI query prompt` 已 push 到 `origin/develop`。
+  - Backend `723eae7 feat: auto-route AI business document queries`、Web `f7838b5 feat: improve AI company and query controls` 已本地提交。
+  - Prompt v6 已完成真实定向 live 冒烟，但尚未执行 21 项付费 live full-gate；生产策略/Prompt 正式发布前必须补 full-gate，不能用定向冒烟替代发布门禁。
 
 ### 2026-07-17 AI 历史会话公司上下文漂移修复
 
