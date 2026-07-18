@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-17 11:05 CST
+更新时间：2026-07-18 09:40 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,6 +8,21 @@
 
 ## 当前最终状态
 
+### 2026-07-18 AI 工作台与商品草稿交付收口
+
+- 分仓库提交和远端推送均已完成：Backend `cf7837d feat: add structured AI results and product setup drafts` 已推送 `origin/develop`；AI Orchestrator `2da8e7c feat: add governed AI product setup drafts` 已推送 `origin/develop`，并通过远端引用直接确认；Web `cf16894 feat: improve AI workspace results and product drafts` 已推送 `origin/main`。父仓库本文件所在提交同步 Backend/AI 子模块指针和最终交接状态。
+- 本轮最终功能包含：AI 工作台固定视口高度与内部唯一滚动容器、`business-result-set-v1` 结构化单据结果、历史会话恢复 `auto` 防场景污染、Frappe 统一意图解析，以及 `product_setup_draft` 从 Orchestrator 严格 Schema、Frappe 权限/主数据校验、不可变草稿版本到 Web 编辑和商品页人工交接的完整链路。AI 只生成和校验草稿，不直接创建 Item、Item Price 或库存单据。
+- 最终验证口径：Backend AI/Repository/Gateway 151 项通过；Web TypeScript、Biome、6 套/78 项定向 Jest 和 production build 通过；AI Ruff、Pre-commit、81 项 pytest、22 项 offline full gate 通过；四仓库 `git diff --check` 通过。提交钩子另对 Web 18 个暂存文件执行 Biome 写入检查并成功完成。
+- 运行态已验证：Orchestrator `/health` 返回 `product_setup_draft=product-setup-draft-v1`；F5 重启后的真实 JWT HTTP 场景解析返回 `product_setup_draft`，商品草稿可恢复；Web `/ai` 与 `/master-data/products` 均 HTTP 200。真实草稿 `AI-DRAFT-c9ac496e9377463ebe2cb6c3ce85aa6c` 当前版本 2，正确保存“传承结晶 / 1000 个 / 标准售价 9999 CNY”，由于缺少叶子仓库和独立库存估值价保持 `ready_for_handoff=false`，且未创建正式业务数据。
+- 提交完成后的仓库状态：Backend、AI Orchestrator、Web 工作区 clean；父仓库只保留既有未跟踪 `.codex`，不得提交。已知非阻塞风险：现有 HS256 HMAC Secret 长度为 30 bytes，低于建议的 32 bytes，需后续按 Secret 轮换流程处理；本轮未在文档或提交中记录 Secret/JWT。`erp-readonly-v7` 的付费 live full gate 仍未执行，正式发布新 Prompt 策略前需要补跑。
+
+- 2026-07-17 修复 AI 历史会话场景污染并新增商品建档结构化草稿。重新打开会话不再把上一轮实际 `order_query` 恢复为固定 UI 场景，而是回到 `auto`；发送前由新增 Frappe `resolve_ai_scenario_v1` 统一识别只读查询或四类写意图，Web 不复制关键词规则。“添加一个新的商品叫做传承结晶，1000个，售价9999元每个”现稳定路由到 `product_setup_draft`，不再执行订单查询。
+- 商品建档 Prompt 为 `product-setup-draft-v1`，Orchestrator 新增 `/internal/v1/drafts/product-setup` 严格 Schema；Frappe 重新校验 Item/Item Price/Stock Entry 权限、名称编码重复、分类、品牌、UOM、公司仓库、币种、售价、初始库存和估值价，持久化 `product_setup` 草稿、版本和审计。售价与库存估值价严格分离，初始库存必须补叶子仓库和估值价后才能交接；Web 草稿卡片/编辑器/草稿中心已接入，交接到 `/master-data/products` 并预填既有 `create_product_v2` 表单，最终仍由用户主动保存。
+- 验证：Backend AI/Repository/Gateway 151 项；Web TypeScript、Biome、6 套/78 项定向 Jest、production build；AI Ruff、Pre-commit、81 项 pytest 和 22 项 offline full gate 全通过。Orchestrator 已按当前 Compose 重建，`/health` 返回 `product_setup_draft=product-setup-draft-v1`。Backend F5 重启后，真实 JWT HTTP `resolve_ai_scenario_v1` 返回 `product_setup_draft`，`get_ai_draft_v1` 成功恢复商品草稿；Web `/ai` 与 `/master-data/products` 均 HTTP 200。真实 Frappe→Orchestrator 调用已生成 `AI-DRAFT-c9ac496e9377463ebe2cb6c3ce85aa6c`（版本 2），正确提取“传承结晶 / 1000 个 / 标准售价 9999”，并因缺少仓库和独立估值价保持 `ready_for_handoff=false`；没有创建 Item、Item Price 或库存单据。
+- 2026-07-17 二次定位并修复结构化结果升级后长会话无法滚动。首轮遗漏了 `PageContainer` 自动插入的 `.ant-pro-grid-content` 与 `.ant-pro-grid-content-children` 两层无高度包装，导致内层 `height: 100%` 无可解析基准，工作台继续随消息内容伸缩；同时 `Bubble.List` 的 `autoScroll`、滚动锁定和手动滚动实际作用于内部 `.ant-bubble-list-scroll-box`，不能由外层 messages 代管。现已按 Ant Design X 官方固定父容器/Flex 建议，把 PageContainer 固定为视口扣除 56px 全局 Header，补齐 GridContent、children-container、workspace、main、messages 的连续 Flex 高度链与 `min-height: 0`；messages 使用 `overflow: hidden`，`Bubble.List` 根节点与内部 scroll-box 占满剩余高度，唯一纵向滚动归内部 scroll-box。同步更新 `ai-scroll-layout.test.ts` 和 Web 设计文档。Web TypeScript、Biome、3 套/11 项定向 Jest 和 production build 通过。
+- 2026-07-17 AI 工作台开始按“结构化结果优先”优化：单据查询新增持久化 `business-result-set-v1` citation 元数据，记录公司、日期、状态、排序、每类上限、请求/返回数量和 `success / partial / empty`。Web 领域 Service 合成为 `AiBusinessResultSet`，按销售订单、销售发票、采购订单、采购发票使用 `Tabs + ProTable` 展示；旧历史会话缺少元数据时仍可从逐单据 citation 恢复分组。
+- 单据 citation 在模型首 Token 前到达后立即显示业务表格，并提示“业务结果已返回，正在生成摘要”；模型正文移到结果之后，不再同时重复展示业务来源列表、逐条卡片和 Markdown 明细。状态、金额和未结金额复用共享展示工具；结构化结果宽度扩大，AI 工作区取消全局 Footer 并改为单一内部滚动。
+- 查询 Prompt 升级为 `erp-readonly-v7`：保留 v6 的权限、公司和正式写操作边界，新增结构化结果不重复复述约束，摘要最多三个要点。模型上下文不再包含逐单据字段，只包含查询范围和返回数量；`success` 明确只表示结果覆盖，不代表业务健康。同步修正确定性日期范围结束日、共享名词“销售和采购订单/发票”解析以及旧评测数据漂移。验证：Web TypeScript、Biome、25 套/170 项 Jest、production build；Backend AI/Repository/评测/治理/向量/Gateway 190 项；AI Ruff、Pre-commit、80 项 pytest；父仓库、Web、Backend、AI `diff --check` 全部通过。Orchestrator 已定向重建，`/health` 返回 v7；VS Code F5 Backend 已于 15:33 CST 重启。真实 JWT + HTTP SSE 查询“最新 1 条销售订单”依次返回 `run_started → context/tool → business_result_set/单据 citation → model stream → completed`，结果集版本为 `business-result-set-v1`、无 error、73 个增量、首 Token 19.572 秒、总耗时 20.227 秒；摘要只说明查询范围和数量。v7 付费 live full-gate 尚未执行。
 - 2026-07-17 修复 AI 工作台“看似不流式、不能切公司、业务查询无上下文”问题：首段前状态现在明确显示权限/公司确认、等待首个 Token 和客户端已等待时间，首 Token 到达后显示实时输出；不再把 Provider 首字等待描述成“思考”或“内容到达后逐段显示”。新会话增加 Company 远程选择器并以工作偏好为初值，历史会话公司保持锁定，跨公司必须新建会话。
 - Web 默认场景改为 `auto`，由 Frappe 根据用户问题解析实际 `general / product_search / order_query / report_summary`。单据查询现支持销售订单、销售发票、采购订单和采购发票的单类型或混合查询；每种类型分别执行 DocType/记录权限、公司、日期、状态、金额、排序和数量限制。未明确日期的“最新”查询覆盖全部日期，不再默认限制近 30 天。
 - 用户截图原句“查询最新的5条销售订单和销售发票，以及采购订单”已走真实登录与 SSE 验证：工具分别返回销售订单 5、销售发票 4、采购订单 5，结构化 citation 和正文均成功；缩短的每类 1 条复测返回三类真实引用、425 个 SSE 增量块，回答和警告均不再包含“只读试运行”或“只读”措辞。
