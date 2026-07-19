@@ -10,7 +10,7 @@ x-depends-on-configurator: &depends_on_configurator
 
 x-ai-gateway-environment: &ai_gateway_environment
   MYAPP_AI_ORCHESTRATOR_URL: ${MYAPP_AI_ORCHESTRATOR_URL:-http://ai-orchestrator:4010}
-  MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:-staging-ai-service-token-not-configured}
+  MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:?MYAPP_AI_SERVICE_TOKEN is required}
   MYAPP_AI_VECTOR_SEARCH_ENABLED: ${MYAPP_AI_VECTOR_SEARCH_ENABLED:-0}
   MYAPP_AI_EMBEDDING_MODEL: ${MYAPP_AI_EMBEDDING_MODEL:-}
   MYAPP_AI_QDRANT_COLLECTION: ${MYAPP_AI_QDRANT_COLLECTION:-myapp-products-v1}
@@ -21,10 +21,10 @@ x-ai-gateway-environment: &ai_gateway_environment
 
 x-ai-orchestrator-environment: &ai_orchestrator_environment
   MYAPP_AI_LITELLM_BASE_URL: ${MYAPP_AI_LITELLM_BASE_URL:-http://litellm.invalid}
-  MYAPP_AI_LITELLM_API_KEY: ${MYAPP_AI_LITELLM_API_KEY:-not-configured}
+  MYAPP_AI_LITELLM_API_KEY: ${MYAPP_AI_LITELLM_API_KEY:?MYAPP_AI_LITELLM_API_KEY is required}
   MYAPP_AI_MODEL: ${MYAPP_AI_MODEL:-opencode-deepseek-v4-flash}
   MYAPP_AI_REASONING_EFFORT: ${MYAPP_AI_REASONING_EFFORT:-none}
-  MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:-staging-ai-service-token-not-configured}
+  MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:?MYAPP_AI_SERVICE_TOKEN is required}
   MYAPP_AI_FRAPPE_BASE_URL: ${MYAPP_AI_FRAPPE_BASE_URL:-http://backend:8000}
   MYAPP_AI_FRAPPE_SITE_HOST: ${MYAPP_AI_FRAPPE_SITE_HOST:-staging.invalid}
   MYAPP_AI_POLICY_CACHE_TTL_SECONDS: ${MYAPP_AI_POLICY_CACHE_TTL_SECONDS:-30}
