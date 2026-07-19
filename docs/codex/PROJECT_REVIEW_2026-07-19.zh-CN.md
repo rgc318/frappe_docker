@@ -45,9 +45,19 @@
 - Mobile：`npx tsc --noEmit`、`npm run lint` 通过。
 - staging Compose：使用示例环境文件执行 `docker compose ... config --quiet` 通过。
 
-### 2.4 仍需独立架构改造
+### 2.4 已确认暂缓的认证架构改造
 
-Web 与 Mobile Web 的 refresh/access token 仍使用 `localStorage`。该项需要后端登录与刷新契约、Secure/HttpOnly/SameSite Cookie、CSRF、跨端兼容和迁移回退共同设计，不能通过删除本地 Token 的局部改动安全完成，建议作为独立认证安全项目实施。
+2026-07-19 经业务确认，本轮不实施 HttpOnly Cookie 改造，Web 与 Mobile Web 暂时保留当前基于 `localStorage` Token 和 `Authorization: Bearer` 的调用方式，避免在本次业务模块优化中同时改变登录、刷新、跨端调用和会话恢复行为。
+
+该决定不影响本轮已经完成的订单、采购、库存、主数据、权限、幂等和部署安全整改，但 `localStorage` 中的长期凭据仍属于待治理的认证安全债务。未来实施时应作为独立项目处理，至少覆盖：
+
+- Refresh Token 改为 `Secure + HttpOnly + SameSite` Cookie，Access Token 优先仅保存在内存。
+- 登录、刷新、退出、页面刷新后会话恢复及旧 Token 兼容迁移契约。
+- Web 的 `credentials`、CORS、Cookie Domain、CSRF 与多环境反向代理配置。
+- Mobile 原生安全存储与 Mobile Web Cookie 行为差异，不能机械复用浏览器实现。
+- 分阶段灰度、旧会话回退和避免集中强制退出的发布方案。
+
+在上述方案完成设计和跨端验证前，不应局部删除现有 Token 存储或直接把所有业务请求切换为 Cookie Session。
 
 ## 3. 高优先级发现
 
@@ -118,7 +128,7 @@ Web 与 Mobile Web 的 refresh/access token 仍使用 `localStorage`。该项需
 
 ### 4.1 Web 与 Mobile Web 把长期凭据放入 localStorage
 
-状态：待独立认证架构改造。
+状态：经业务确认本轮暂缓，保留为独立认证安全债务。
 
 Web 保存 access token 和 refresh token；Mobile Web 保存 Bearer token 和 CSRF token。任何同源 XSS 都可读取并带走长期 refresh token，目前项目内也未发现明确 CSP 配置。
 
