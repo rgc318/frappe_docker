@@ -1,12 +1,61 @@
 # 当前交接状态
 
-更新时间：2026-07-18 09:40 CST
+更新时间：2026-07-19 10:45 CST
 
 本文件用于跨新会话交接当前项目状态。长期规则不要写在这里，应写入 `AGENTS.md` 或 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-19 AI 业务工作台、草稿闭环与模型切换提交完成
+
+- 本轮把 2026-07-18 的三组连续改动作为同一交付里程碑收口：AI 自动场景纠偏、查询结果当前页详情、四类草稿原地编辑/确认执行、商品草稿字段与校验修复，以及 LiteLLM 全模型同步与工作台自由切换模型。
+- 已推送 Backend `cb6b65b feat: complete AI draft execution and model controls` 到 `origin/develop`；包含 `execute_ai_draft_v1`、草稿 `executed` 终态与持久回执、版本/确认/权限/幂等/审计保护、商品默认采购价语义、完整模型注册同步、普通用户可选模型接口及 Chat/SSE/四类草稿模型校验。
+- 已推送 AI Orchestrator `fcf6b9c feat: expose selectable LiteLLM models` 到 `origin/develop`；包含 LiteLLM 完整模型发现、Embedding 分类、可选 `model_alias` 契约、显式模型成本元数据和禁用静默 fallback。
+- 已推送 Web `3dccc00 feat: complete AI business workspace controls` 到 `origin/main`；包含共享草稿编辑器、当前页单据/商品 Drawer、草稿原地执行与回执、商品字段校验和业务术语、模型选择器及重试模型保持。
+- 父仓库本次提交同步 Backend/AI 子模块指针，提交企业设计事实源 `docs/05-development/04-ai-business-workbench.zh-CN.md`，并更新本交接与集中工作总结。父仓库既有未跟踪 `.codex` 继续不提交；Mobile 五项用户改动未触碰。
+- 最终验证保持通过：Backend 177 项；AI Ruff、Pre-commit、82 项 pytest、test/runtime 镜像；Web TypeScript、Biome、30 套/184 项 Jest、production build；四仓库 `diff --check`。真实 Session HTTP/SSE 验证为 LiteLLM 9 个模型、工作台 8 个聊天模型、`erp-embedding` 被排除，固定 `opencode-glm-5.2` 后实际完成模型一致。
+- 当前运行态：`ai-orchestrator` healthy，Backend/Frontend HTTP 正常。Backend 8000 当前使用与 `.vscode/launch.json` 等价的 `--noreload --nothreading` 进程，但未挂接 VS Code 调试器；需要断点时先停止当前进程再按 F5。
+
+### 2026-07-18 LiteLLM 全模型同步与 AI 工作台自由切换模型
+
+- 根因已修复：Orchestrator 旧模型发现逻辑虽然读取 LiteLLM `/v1/models`，但只向 Frappe 暴露 `MYAPP_AI_MODEL` 与 `MYAPP_AI_EMBEDDING_MODEL`；Chat/SSE/四类草稿请求也没有 `model_alias` 契约，因此 Web 既看不到完整库存，也无法固定实际执行模型。
+- Orchestrator 现在返回当前 LiteLLM Key 可见的全部模型；配置的 Embedding 别名或名称包含 `embed / embedding` 的模型分类为 `embedding`，其余为 `fast_chat`。Frappe 同步全部模型，已消失模型标记为 `degraded / missing`，人工 `disabled / retired` 不被覆盖。
+- 新增登录用户接口 `list_ai_selectable_models_v1`，只返回注册表中 `active / validated` 且能力为 `fast_chat / reasoning / structured` 的模型。Chat、SSE 和四类结构化草稿新增可选 `model_alias`；Frappe 在调用 Orchestrator 前再次校验，Embedding、停用、退役、缺失和注册表外别名均拒绝。
+- Web `/ai` 上下文栏新增模型选择器，默认项为“自动选择（策略）”；用户固定模型后显示明确状态，并在普通 SSE、四类草稿和人工重试中保留同一 `modelAlias`。显式选择时 Orchestrator 禁用本次请求的静默模型 fallback，最终 Run 返回的 `model_alias` 仍作为实际执行事实。
+- 自动化验证全部通过：Backend AI Model Governance/Service/Repository/Gateway 177 项；AI Orchestrator Ruff 与 82 项 pytest；Web TypeScript、Biome、30 套/184 项 Jest 和 production build；父仓库、Backend、AI、Web `git diff --check`。Jest 仍有既有 open-handle 提示，但退出码为 0。
+- 运行态已重建 `ai-orchestrator` 并完成真实 Session HTTP/SSE 验收：Orchestrator 返回 9 个模型；Frappe `sync_ai_model_registry_v1` 返回 `synced_count=9`、`missing_count=0`；普通可选列表为 8 个聊天模型且不含 `erp-embedding`。SSE 固定 `opencode-glm-5.2` 后最终 `model_alias` 和 Provider model 均为该别名，回复“模型切换正常”，测试会话已归档；提交 `erp-embedding` 被 Frappe 以 HTTP 422 拒绝，未进入模型调用。
+- 运行注意：本轮为加载新 Gateway 曾重启 Dev Container 的 Backend 容器，VS Code F5 进程随之结束；当前已按 `.vscode/launch.json` 等价参数恢复 `frappe serve --port 8000 --noreload --nothreading`，HTTP 服务正常，但不是挂接调试器的 F5 会话。如需断点调试，应先停止当前 8000 端口进程再重新按 F5 启动。
+- 当前改动未提交：Backend `apps/myapp`、AI `services/myapp-ai`、Web `frontend/myapp-web` 和父仓库交接/设计文档均有本轮及前序 AI 工作台改动；父仓库既有未跟踪 `.codex` 和 Mobile 五项用户改动继续保留，不得回滚或提交 `.codex`。
+
+### 2026-07-18 AI 商品草稿校验、状态保留与业务术语修复
+
+- 修复商品草稿再次编辑时可能回填会话 citation 旧快照的问题：`/ai` 每次打开草稿编辑器都会按草稿 ID 调用 `get_ai_draft_v1` 读取最新持久版本，并立即刷新消息卡片；不再以生成时快照作为编辑事实源。
+- 商品草稿存在校验问题时，保存后编辑器保持打开并直接展示后端错误，不再关闭后只留下灰色“确认执行”按钮。表单提交前也会按当前输入执行条件校验：初始库存数量大于 0 时，入库仓库和默认采购价必填；校验失败不会调用更新接口，用户已经输入的其他字段保持不变。
+- 文案与 Mobile 商品模块对齐：`库存单位` 改为 `库存基准单位`；移除可独立选择的“初始库存单位”，初始库存固定使用库存基准单位；`库存估值价` 改为业务术语 `默认采购价`；`编辑并重新校验 / 保存并重新校验` 改为 `完善草稿 / 编辑草稿 / 保存草稿`，自动校验作为系统行为说明而非按钮技术文案。
+- Backend 商品草稿新增 `standard_buying_rate` 规范字段，兼容读取旧 `valuation_rate`。正式执行时默认采购价写入 Standard Buying，并作为首次入库成本；标准售价不会用于库存计价。复杂业务编辑器交接同时预填标准采购价和估值价，保留专业页面进一步调整能力。
+- 已验证：Backend AI Service/Repository/Gateway 159 项通过；Web TypeScript、Biome、30 套/182 项 Jest 和 production build 通过；父仓库、Backend、Web `git diff --check` 通过。Jest 仍有既有 jsdom `getComputedStyle` 和 open-handle 非阻塞提示，退出码为 0。
+- 用户重启 Backend F5 后完成真实 Session HTTP 验证：`list_ai_drafts_v1` 返回 `AI_DRAFTS_FETCHED`；专用测试草稿 `AI-DRAFT-53b4c2b96e3344558b28698b75c9a931` 缺默认采购价时保存为版本 2 且 `ready_for_handoff=false`，商品名称、数量和仓库保持不变；补默认采购价后版本 3 变为 `ready_for_handoff=true`，`opening_uom=stock_uom`。随后测试草稿已标记 `discarded`；`confirmed=0` 调用正式执行接口返回 HTTP 422，未创建 Item、Item Price 或库存单据。
+- 本轮未修改 Mobile；其当前 `app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts` 五项既有用户改动继续保留。Backend 当前已加载新接口。
+
+### 2026-07-18 AI 业务操作台闭环完成
+
+- 新增企业级设计事实源 `docs/05-development/04-ai-business-workbench.zh-CN.md`。统一原则为：AI 只生成候选，用户必须明确确认；“需要确认”不等于“必须跳转”；查询、草稿编辑、重新校验、确认执行和正式回执应在 AI 工作台内闭环，业务模块深链只作为复杂操作的可选入口。
+- Backend 新增 `execute_ai_draft_v1`，覆盖商品建档、销售订单、采购订单和库存调整四类草稿。执行前强制 owner、`draft` 状态、版本、`ready_for_handoff` 和 `confirmed=1` 检查，并使用草稿级文件锁、请求幂等和成功/失败 AI 审计；正式执行复用 `create_product_v2`、`create_order_v2`、`create_purchase_order` 和 `reconcile_inventory_stock_v1`，不在 AI 层复制业务逻辑。
+- 草稿新增 `executed` 终态和持久回执字段：`execution_request_id`、`executed_by`、`executed_at`、`target_doctype`、`target_name`、`execution_result_json`。迁移 `extend_ai_draft_execution_fields` 已对真实 `localhost` 站点成功执行；只验证了旧草稿读取和未确认拒绝，未执行任何真实商品、订单或库存操作。
+- Web `/ai` 与 `/ai/drafts` 均支持四类草稿原地编辑、保存并重新校验、明确确认执行和正式业务回执；成功后显示正式对象、执行人和执行时间。订单/发票编号在当前页 `BusinessDocumentDrawer` 打开，商品结果在 `ProductDetailDrawer` 打开；“在业务模块打开/继续”均降为次级可选入口。
+- 价格边界已补齐：模型生成销售/采购草稿时仍忽略模型建议价并采用后端参考价；用户在草稿编辑器明确修改的非负价格由重新校验链路保留，负数价格回退到当前后端参考价并给出警告。
+- 最终验证：Backend AI Service/Repository/Gateway 158 项通过；Web TypeScript、Biome、30 套/179 项 Jest 和 production build 通过；父仓库、Backend、Web `git diff --check` 通过。Jest 仍提示项目既有未清理异步句柄，但退出码为 0 且全部测试通过。
+- 当前改动尚未提交：Backend 位于 `apps/myapp` 子模块，Web 位于独立仓库 `frontend/myapp-web`，父仓库包含新设计文档、交接文件和 Backend gitlink 脏状态；AI Orchestrator clean，父仓库既有未跟踪 `.codex` 保持不处理。当前 Backend 由 VS Code F5 以 `--noreload` 运行，页面联调前必须由用户停止并重新启动一次 F5 才能加载新接口；本轮未中断该调试会话。
+
+### 2026-07-18 AI 场景残留与空商品草稿修复
+
+- 根据用户截图和真实运行库会话 `AI-CONV-72998dcce4a14e7eaa5c842650379919` 定位：首次“添加一个新商品，煌星，10000一个，入库5000个”实际沿用了上一轮 `order_query`；手动切换 `product_setup_draft` 后固定场景又持续污染“查询一下煌星是否已经正常入库”及后续标点消息，最终额外创建标题为 `.` 的空商品草稿。第二张截图不是同一草稿版本丢字段，而是错误场景残留创建了不应存在的新草稿。
+- Web 显式场景现只对当前一次发送生效，请求开始即恢复 `auto`，并在固定场景旁显示“仅本次发送”；历史会话重新打开仍恢复 `auto`。Frappe 意图解析现让明确写意图优先，并把商品是否入库、到货、现货或库存状态等问法路由到 `product_search`；商品检索词会从“查询一下煌星是否已经正常入库”等表达中提取为“煌星”。
+- 当前未提交修改位于 Backend `apps/myapp`（AI Service、单测、API 文档）、Web `frontend/myapp-web`（AI 工作台、测试、设计文档）和父仓库本交接文件；AI Orchestrator clean，父仓库仍保留既有未跟踪 `.codex`。未修改或自动作废真实业务草稿，截图中的错误空草稿仍需用户按正常“放弃草稿”操作处理。
+- 已验证：Backend AI Service/Repository/Gateway 152 项通过；Web AI 工作台与领域 Service 2 套/14 项 Jest、TypeScript、Biome 通过；Backend、Web、父仓库 `git diff --check` 通过。
+- 当前 8000 端口的 Backend 由 VS Code F5 以 `frappe serve --noreload --nothreading` 启动；本轮未擅自中断用户调试会话。页面联调前需停止并重新启动一次 Backend F5 以加载新的意图解析代码，Web 开发服务通常可通过热更新加载前端修改。
 
 ### 2026-07-18 AI 工作台与商品草稿交付收口
 
@@ -80,6 +129,28 @@
 - Provider 恢复已确认：`erp-embedding` 字符串单条、数组单条和两条批量均 HTTP 200、1024 维；当前运行 Orchestrator 的真实检索返回 200。30 条质量门禁通过，最新报告保存在忽略目录 `ai-governance-reports/product-retrieval-v1-current.json`。新的 v2 alias/collection 尚未配置或发布；如果底层模型权重变化，必须按新向量空间完整发布流程处理。
 
 ## 本轮工作总结
+
+### 2026-07-19 AI 业务操作体验与模型治理集中总结
+
+#### 用户问题与设计判断
+
+- 自动理解原先会被历史固定场景污染：添加商品必须人工选模式，之后查询商品状态又可能继续生成空草稿。现在自动路由以当前问题为准，显式场景只对本次发送生效。
+- 草稿与正式业务操作原先完全割裂，用户必须跳转到业务模块才能继续。现在“需要用户确认”和“必须离开 AI 页面”已分离；高频四类草稿在工作台内完成编辑、校验、确认、执行和回执，专业页面只处理复杂例外。
+- 商品草稿原先缺少前端必填校验，重新打开可能回填旧 citation 快照并丢失人工修改，且“库存估值价 / 初始库存单位 / 编辑并重新校验”等文案不符合项目业务语言。现在编辑器读取最新持久版本，失败保持输入，使用“默认采购价 / 库存基准单位 / 完善草稿 / 保存草稿”。
+- 模型列表原先只同步默认 Chat 与 Embedding 配置，数量与 LiteLLM `/v1/models` 不一致，Chat/草稿也不能固定模型。现在完整同步 LiteLLM 可见库存，普通用户只看到合规聊天模型，并可在自动策略和固定模型之间切换。
+
+#### 最终交付
+
+- Backend：四类草稿统一原地执行服务、`executed` 状态、持久回执、幂等与审计、用户编辑价格保留、商品默认采购价与初始库存约束、模型注册同步、可选模型接口和模型选择校验。
+- AI Orchestrator：完整模型发现、模型能力分类、显式模型请求契约、策略成本元数据与无静默 fallback。
+- Web：共享草稿编辑器、草稿中心/来源会话一致交互、当前页业务详情 Drawer、确认执行与正式回执、商品字段校验和术语、自动场景一次性纠偏、模型选择与重试保持。
+- 文档：Backend/API、AI API/配置、Web 设计、父仓库企业工作台设计和交接记录已对齐同一业务边界。
+
+#### 验证与提交
+
+- 自动化：Backend 177 项；AI 82 项、Ruff、Pre-commit、test/runtime 镜像；Web 184 项、TypeScript、Biome、production build；四仓库 whitespace 检查通过。
+- 真实联调：Orchestrator 返回 9 个 LiteLLM 模型；Frappe 同步 9 个、缺失 0；普通用户选择器返回 8 个聊天模型；Embedding 选择以 HTTP 422 拒绝；SSE 固定 `opencode-glm-5.2` 后实际模型一致并成功完成。
+- 已推送：Backend `cb6b65b`、AI `fcf6b9c`、Web `3dccc00`。父仓库提交负责固定两个子模块版本和本轮跨仓库文档。
 
 ### 2026-07-17 AI 工作台公司、自动路由与真实单据查询收口
 
