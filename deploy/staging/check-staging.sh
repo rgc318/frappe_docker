@@ -60,8 +60,12 @@ compose ps
 
 echo
 echo "== AI service checks =="
-compose exec -T ai-orchestrator python -c \
-  'import json, urllib.request; data=json.load(urllib.request.urlopen("http://127.0.0.1:4010/health", timeout=5)); assert data.get("status") == "ok", data; print(json.dumps({key: data.get(key) for key in ("status", "litellm_configured", "runtime_governance_configured", "vector_search_configured", "langfuse_configured")}, sort_keys=True))'
+LANGFUSE_REQUIRED=0
+if [[ -n "$(get_env MYAPP_AI_LANGFUSE_HOST)" && -n "$(get_env MYAPP_AI_LANGFUSE_PUBLIC_KEY)" && -n "$(get_env MYAPP_AI_LANGFUSE_SECRET_KEY)" ]]; then
+  LANGFUSE_REQUIRED=1
+fi
+compose exec -T -e MYAPP_AI_REQUIRE_LANGFUSE="${LANGFUSE_REQUIRED}" ai-orchestrator python -c \
+  'import json, os, urllib.request; data=json.load(urllib.request.urlopen("http://127.0.0.1:4010/health", timeout=5)); delivery=data.get("langfuse_delivery") or {}; required=os.environ.get("MYAPP_AI_REQUIRE_LANGFUSE") == "1"; assert data.get("status") == "ok", data; assert not required or (data.get("langfuse_configured") is True and delivery.get("enabled") is True), data; summary={key: data.get(key) for key in ("status", "litellm_configured", "runtime_governance_configured", "vector_search_configured", "langfuse_configured")}; summary["langfuse_delivery_enabled"]=delivery.get("enabled"); print(json.dumps(summary, sort_keys=True))'
 
 compose exec -T backend bash -lc \
   './env/bin/python -c '\''import os, urllib.request; token=os.environ["MYAPP_AI_SERVICE_TOKEN"]; request=urllib.request.Request("http://ai-orchestrator:4010/internal/v1/vector/products/status", data=b"", headers={"Authorization": f"Bearer {token}"}, method="POST"); response=urllib.request.urlopen(request, timeout=10); assert response.status == 200; print("Backend to AI Orchestrator authentication: OK")'\'''

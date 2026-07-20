@@ -5,9 +5,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-executables-have-shebangs
-        files: ^(\.github/scripts/.*\.py|deploy/staging/.*\.sh|start-dev\.sh|start-prod\.sh|stop\.sh|install_x11_deps\.sh)$
+        files: ^(\.github/scripts/.*\.py|deploy/staging/.*\.sh|(start-dev|start-prod|stop|install_x11_deps|validate-secret-env-files|sync-ai-gateway-env|sync-langfuse-runtime-env|setup-ai-observability)\.sh)$
       - id: check-shebang-scripts-are-executable
-        files: ^(\.github/scripts/.*\.py|deploy/staging/.*\.sh|start-dev\.sh|start-prod\.sh|stop\.sh|install_x11_deps\.sh)$
+        files: ^(\.github/scripts/.*\.py|deploy/staging/.*\.sh|(start-dev|start-prod|stop|install_x11_deps|validate-secret-env-files|sync-ai-gateway-env|sync-langfuse-runtime-env|setup-ai-observability)\.sh)$
       - id: trailing-whitespace
       - id: end-of-file-fixer
 
@@ -50,11 +50,11 @@ repos:
         additional_dependencies: [mvdan.cc/sh/v3/cmd/shfmt@latest]
         entry: shfmt
         args: [-w]
-        files: ^(deploy/staging/.*\.sh|start-dev\.sh|start-prod\.sh|stop\.sh|install_x11_deps\.sh)$
+        files: ^(deploy/staging/.*\.sh|(start-dev|start-prod|stop|install_x11_deps|validate-secret-env-files|sync-ai-gateway-env|sync-langfuse-runtime-env|setup-ai-observability)\.sh)$
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1
     hooks:
       - id: shellcheck
         args: [-x]
-        files: ^(deploy/staging/.*\.sh|start-dev\.sh|start-prod\.sh|stop\.sh|install_x11_deps\.sh)$
+        files: ^(deploy/staging/.*\.sh|(start-dev|start-prod|stop|install_x11_deps|validate-secret-env-files|sync-ai-gateway-env|sync-langfuse-runtime-env|setup-ai-observability)\.sh)$

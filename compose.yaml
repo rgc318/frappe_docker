@@ -31,8 +31,10 @@ services:
     # add redis_socketio for backward compatibility
     command:
       - >
-        ./env/bin/pip install -e apps/myapp;
-        ls -1 apps > sites/apps.txt;
+        set -e;
+        ./env/bin/pip install -e apps/myapp &&
+        ./env/bin/pip check &&
+        ls -1 apps > sites/apps.txt &&
         bench set-config -g db_host $$DB_HOST;
         bench set-config -gp db_port $$DB_PORT;
         bench set-config -g redis_cache "redis://$$REDIS_CACHE";
@@ -65,8 +67,10 @@ services:
       - -c
     command:
       - >
+        set -e;
         mkdir -p /home/frappe/logs /home/frappe/frappe-bench/logs;
-        ./env/bin/pip install -e apps/myapp;
+        ./env/bin/pip install -e apps/myapp &&
+        ./env/bin/pip check &&
         exec bench serve
 
   ai-orchestrator:
@@ -197,7 +201,9 @@ services:
       - .env.ai.gateway.local
     command:
       - >
-        ./env/bin/pip install -e apps/myapp;
+        set -e;
+        ./env/bin/pip install -e apps/myapp &&
+        ./env/bin/pip check &&
         exec bench worker --queue short,default
 
   queue-long:
@@ -210,7 +216,9 @@ services:
       - .env.ai.gateway.local
     command:
       - >
-        ./env/bin/pip install -e apps/myapp;
+        set -e;
+        ./env/bin/pip install -e apps/myapp &&
+        ./env/bin/pip check &&
         exec bench worker --queue long,default,short
 
   queue-ai-vector:
@@ -223,7 +231,9 @@ services:
       - .env.ai.gateway.local
     command:
       - >
-        ./env/bin/pip install -e apps/myapp;
+        set -e;
+        ./env/bin/pip install -e apps/myapp &&
+        ./env/bin/pip check &&
         exec bench worker --queue ai-vector
     depends_on:
       configurator:
@@ -241,7 +251,9 @@ services:
       - .env.ai.gateway.local
     command:
       - >
-        ./env/bin/pip install -e apps/myapp;
+        set -e;
+        ./env/bin/pip install -e apps/myapp &&
+        ./env/bin/pip check &&
         exec bench schedule
 
 # ERPNext requires local assets access (Frappe does not)

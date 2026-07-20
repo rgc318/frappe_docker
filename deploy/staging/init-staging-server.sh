@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+umask 077
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_TEMPLATE="${ROOT_DIR}/deploy/staging/staging.env.example"
@@ -18,6 +19,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 else
   echo "Keeping existing env file: ${ENV_FILE}"
 fi
+chmod 600 "${ENV_FILE}"
 
 chmod 755 "${ROOT_DIR}/deploy/staging/"*.sh 2>/dev/null || true
 

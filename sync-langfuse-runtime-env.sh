@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+umask 077
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_FILE="${LANGFUSE_ENV_FILE:-${ROOT_DIR}/.env.langfuse.local}"
@@ -11,11 +12,20 @@ CLICKHOUSE_FILE="${LANGFUSE_CLICKHOUSE_ENV_FILE:-${ROOT_DIR}/.env.langfuse.click
 REDIS_FILE="${LANGFUSE_REDIS_ENV_FILE:-${ROOT_DIR}/.env.langfuse.redis.local}"
 MINIO_FILE="${LANGFUSE_MINIO_ENV_FILE:-${ROOT_DIR}/.env.langfuse.minio.local}"
 GATEWAY_FILE="${LANGFUSE_GATEWAY_ENV_FILE:-${ROOT_DIR}/.env.langfuse.gateway.local}"
+RECONCILE=0
 
-if [[ $# -gt 0 ]]; then
-  echo "Usage: $0" >&2
-  exit 2
-fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --reconcile)
+    RECONCILE=1
+    ;;
+  *)
+    echo "Usage: $0 [--reconcile]" >&2
+    exit 2
+    ;;
+  esac
+  shift
+done
 
 if [[ ! -f "${SOURCE_FILE}" ]]; then
   echo "Missing Langfuse environment file: ${SOURCE_FILE}" >&2
@@ -210,3 +220,31 @@ chmod 600 \
   "${MINIO_FILE}" \
   "${GATEWAY_FILE}"
 echo "Synchronized least-privilege Langfuse service and Orchestrator environments."
+
+if [[ "${RECONCILE}" == "1" ]]; then
+  if [[ ! -f "${ROOT_DIR}/.env" || ! -f "${ROOT_DIR}/.env.ai.local" ]]; then
+    echo "Skipped AI Orchestrator reconciliation because the base AI environment is not configured."
+    exit 0
+  fi
+
+  "${ROOT_DIR}/validate-secret-env-files.sh" \
+    "${ROOT_DIR}/.env" \
+    "${ROOT_DIR}/.env.ai.local" \
+    "${SOURCE_FILE}" \
+    "${GATEWAY_FILE}"
+
+  compose_args=(
+    --env-file "${ROOT_DIR}/.env"
+    --env-file "${ROOT_DIR}/.env.ai.local"
+    --env-file "${SOURCE_FILE}"
+    -f "${ROOT_DIR}/compose.yaml"
+    -f "${ROOT_DIR}/overrides/compose.langfuse.yaml"
+  )
+  container_id="$(COMPOSE_IGNORE_ORPHANS=1 docker compose "${compose_args[@]}" ps -q ai-orchestrator 2>/dev/null || true)"
+  if [[ -n "${container_id}" ]]; then
+    COMPOSE_IGNORE_ORPHANS=1 docker compose "${compose_args[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 120 ai-orchestrator
+    echo "Reconciled the running AI Orchestrator with the synchronized Langfuse environment."
+  else
+    echo "AI Orchestrator is not running; the synchronized Langfuse environment will apply on next startup."
+  fi
+fi

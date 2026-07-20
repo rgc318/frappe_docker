@@ -87,7 +87,7 @@ mv "${temporary_file}" "${OUTPUT_FILE}"
 trap - EXIT
 chmod 600 "${OUTPUT_FILE}"
 
-"${ROOT_DIR}/sync-langfuse-runtime-env.sh" >/dev/null
+"${ROOT_DIR}/sync-langfuse-runtime-env.sh" --reconcile >/dev/null
 
 echo "Generated ${OUTPUT_FILE} with mode 600; secret values were not printed."
 echo "The local admin login and project API keys are stored in that ignored file."

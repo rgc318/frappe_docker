@@ -26,6 +26,19 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+SOURCE_SECRET_ENV_FILES=(
+  "${ROOT_DIR}/.env"
+  "${ROOT_DIR}/.env.ai.local"
+)
+if [[ "${WITH_OBSERVABILITY}" == yes ]]; then
+  if [[ ! -f "${ROOT_DIR}/.env.langfuse.local" ]]; then
+    echo "Missing .env.langfuse.local; run ./setup-ai-observability.sh first." >&2
+    exit 1
+  fi
+  SOURCE_SECRET_ENV_FILES+=("${ROOT_DIR}/.env.langfuse.local")
+fi
+"${ROOT_DIR}/validate-secret-env-files.sh" "${SOURCE_SECRET_ENV_FILES[@]}"
+
 "${ROOT_DIR}/sync-ai-gateway-env.sh"
 
 COMPOSE_ARGS=(
@@ -39,15 +52,30 @@ COMPOSE_ARGS=(
 )
 
 if [[ "${WITH_OBSERVABILITY}" == yes ]]; then
-  if [[ ! -f "${ROOT_DIR}/.env.langfuse.local" ]]; then
-    echo "Missing .env.langfuse.local; run ./setup-ai-observability.sh first." >&2
-    exit 1
-  fi
-  "${ROOT_DIR}/sync-langfuse-runtime-env.sh"
+  "${ROOT_DIR}/sync-langfuse-runtime-env.sh" --reconcile
   COMPOSE_ARGS+=(
     --env-file "${ROOT_DIR}/.env.langfuse.local"
     -f "${ROOT_DIR}/overrides/compose.langfuse.yaml"
   )
 fi
 
-docker compose "${COMPOSE_ARGS[@]}" up -d --build
+SECRET_ENV_FILES=(
+  "${ROOT_DIR}/.env"
+  "${ROOT_DIR}/.env.ai.local"
+  "${ROOT_DIR}/.env.ai.gateway.local"
+)
+if [[ "${WITH_OBSERVABILITY}" == yes ]]; then
+  SECRET_ENV_FILES+=(
+    "${ROOT_DIR}/.env.langfuse.local"
+    "${ROOT_DIR}/.env.langfuse.runtime.local"
+    "${ROOT_DIR}/.env.langfuse.gateway.local"
+    "${ROOT_DIR}/.env.langfuse.web.local"
+    "${ROOT_DIR}/.env.langfuse.postgres.local"
+    "${ROOT_DIR}/.env.langfuse.clickhouse.local"
+    "${ROOT_DIR}/.env.langfuse.redis.local"
+    "${ROOT_DIR}/.env.langfuse.minio.local"
+  )
+fi
+"${ROOT_DIR}/validate-secret-env-files.sh" "${SECRET_ENV_FILES[@]}"
+
+docker compose "${COMPOSE_ARGS[@]}" up -d --build --wait --wait-timeout 300

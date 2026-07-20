@@ -15,6 +15,8 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+"${ROOT_DIR}/validate-secret-env-files.sh" "${ENV_FILE}"
+
 python3 - "${ENV_FILE}" <<'PY'
 from pathlib import Path
 import sys
