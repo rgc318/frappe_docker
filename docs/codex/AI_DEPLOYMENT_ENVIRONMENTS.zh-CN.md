@@ -34,6 +34,8 @@
   - Redis；
   - MinIO；
   - Orchestrator Project Key/投递参数。
+- `./sync-langfuse-runtime-env.sh --reconcile` 在 Orchestrator 已运行时会强制重建该容器，并等待观测增强健康检查确认 `langfuse_configured=true`、`langfuse_delivery.enabled=true`；未运行时只生成配置，下一次启动自动应用。
+- `start-dev.sh` / `start-prod.sh` 会在 Compose 启动前调用 `validate-secret-env-files.sh`，拒绝任何带 group/other 权限的实际 Secret env 文件，并等待服务健康后才返回。
 - 存储容器只获得自身凭据；Worker 不获得初始化管理员密码；Orchestrator 不获得存储密钥。
 - 明确不需要观测时才使用 `./start-dev.sh --without-observability`。
 
@@ -43,9 +45,9 @@
 
 - 使用 `deploy/staging/compose.staging.yaml` 和独立 ERP/AI 镜像标签。
 - 不启动本地 bundled Langfuse。通过 `MYAPP_AI_LANGFUSE_HOST/PUBLIC_KEY/SECRET_KEY` 接入独立受控 Langfuse；三项必须全部配置或全部为空。
-- `validate-staging-env.sh` 对镜像、占位符、Provider、短 Token、向量依赖和部分 Langfuse 配置失败关闭。
+- `validate-staging-env.sh` 对 Secret 文件权限、镜像、占位符、Provider、短 Token、向量依赖和部分 Langfuse 配置失败关闭；`staging.env` 必须为 `0600` 或更严格。
 - Backend/Worker 继续只接收 Gateway-safe 配置；Provider/Langfuse Project Key 只进入 Orchestrator。
-- staging 必须验证：迁移、Backend→Orchestrator 认证、OTLP Dispatcher 指标、向量 alias/points/维度、模型固定评测、备份恢复、回滚和故障摘除。
+- staging 必须验证：迁移、Backend→Orchestrator 认证、OTLP Dispatcher 指标、向量 alias/points/维度、模型固定评测、备份恢复、回滚和故障摘除。配置了 Langfuse 三项连接参数时，`check-staging.sh` 同样要求 `langfuse_configured=true` 与 `langfuse_delivery.enabled=true`。
 - `deploy/staging/staging.env` 只能作为受限服务器过渡文件；正式环境应由 Secret Manager 或编排平台在部署时注入。
 
 ## 4. Production
@@ -64,7 +66,9 @@
 
 ```bash
 ./sync-ai-gateway-env.sh
-./sync-langfuse-runtime-env.sh
+./sync-langfuse-runtime-env.sh --reconcile
+./validate-secret-env-files.sh \
+  .env .env.ai.local .env.ai.gateway.local .env.langfuse.local
 
 docker compose \
   --env-file .env \
