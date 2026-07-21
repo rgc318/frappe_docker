@@ -173,6 +173,8 @@ Wait for a couple of minutes for ERPNext site to be created or check `create-sit
 
 ### [AI 模型治理与策略管理设计](apps/myapp/AI_MODEL_GOVERNANCE_TECH_DESIGN.zh-CN.md)
 
+### [AI 业务操作台闭环设计](docs/05-development/04-ai-business-workbench.zh-CN.md)
+
 ### [AI 高并发与性能设计](apps/myapp/AI_HIGH_CONCURRENCY_TECH_DESIGN.zh-CN.md)
 
 ### [Getting Started Guide](docs/getting-started.md)
