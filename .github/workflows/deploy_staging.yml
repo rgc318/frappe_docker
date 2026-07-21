@@ -108,6 +108,7 @@ jobs:
           port: ${{ secrets.STAGING_SSH_PORT }}
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          command_timeout: 30m
           envs: GHCR_USERNAME,GHCR_TOKEN,IMAGE_TAG,SITE_NAME,DEPLOY_REF_NAME
           script: |
             set -euo pipefail
@@ -161,6 +162,7 @@ jobs:
           port: ${{ secrets.STAGING_SSH_PORT }}
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          command_timeout: 15m
           envs: RUN_STAGING_HTTP_REGRESSION,STAGING_HTTP_USERNAME,STAGING_HTTP_PASSWORD,STAGING_HTTP_API_KEY,STAGING_HTTP_API_SECRET,STAGING_HTTP_BEARER_TOKEN
           script: |
             set -euo pipefail
