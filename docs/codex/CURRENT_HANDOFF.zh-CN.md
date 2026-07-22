@@ -1,12 +1,20 @@
 # 当前交接状态
 
-更新时间：2026-07-21 15:58 CST
+更新时间：2026-07-22 11:45 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-22 staging 部署、公司交易重置与完整运行态回归
+
+- `192.168.31.229:/srv/frappe_docker` 已部署 ERP/AI 固定镜像 `sha-b4f95ca`；AI Orchestrator、Qdrant、MariaDB、Backend、Worker、Scheduler、WebSocket 与 Frontend 健康，首页和 Ping API 均 HTTP 200。部署 workflow 的 SSH command timeout 已提交为 `8c6f7828 fix: allow slow staging image pulls`，部署 run `29887181264` 成功。
+- 重置前备份位于 `/srv/frappe_docker/backups/staging/staging-backup-staging.example.com-20260722-112316.tar.gz`，SHA-256 为 `bbc540320fb97da0f83e757c1c37f662efdef4e123fd35361e4fa15e0fbffe09`。ERPNext `Transaction Deletion Record` `TDL0001` 已完成 `rgc (Demo)` 公司级交易重置，清理 14 类、7,222 条交易/库存/账务引用，用户保持 14 个、启用 5 个，核心主数据数量不变；危险开关已恢复为关闭，环境类型为 `staging`。
+- staging 完整运行态回归：Backend `pip check`、migrate、592 项 unit、8 项真实站点 integration 全部通过；Gateway/V2/AI HTTP 共执行 132 项，其中 131 项原测试断言通过，唯一旧断言仍要求所有 citation 为 `purchase_order`，按当前 `business-result-set-v1` 正式契约复验为 `business_result_set + 5 purchase_order` 并通过；采购快捷 HTTP 39 项全部通过。
+- JWT 一次性 Token 未修改 User 密码/API Key；`me → refresh → 旧 refresh 401 → logout → 注销 access 401` 和无效 Token 401 均通过，测试 Token 已撤销并删除。AI 运行态发现 13 个模型，合成向量 upsert/search/delete 全链路通过且 point 已删除。
+- 回归后 `rgc (Demo)` 总账借贷差额为 0、负库存 Bin 为 0，用户仍为 14/5。HTTP/integration 回归生成的业务测试数据当前保留用于验收追踪；如需再次清空，应重新执行受控公司级交易重置。
 
 ### 2026-07-21 企业测试数据管理与公司级重置交付完成
 
