@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-22 16:55 CST
+更新时间：2026-07-22 17:20 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -14,7 +14,8 @@
 - GitHub Actions 已把旧 Ant Design Pro GitHub Pages/Surge 模板替换为：完整 CI、GHCR staging 镜像构建发布、SSH 部署到 `vivy@192.168.31.229` 的 staging Web workflow。部署默认使用 `staging_default` 网络、`http://frontend:8080` 上游和宿主机 `30080` 端口，具备输入/Secret 校验、非 root 容器、capabilities 清理、三项 HTTP 验收和按旧镜像 ID 自动回滚。
 - 已删除旧 `public/CNAME` 和三个 Surge PR preview workflow，避免继续发布到 `preview.pro.ant.design`；README 与 `.env.example` 已指向当前部署口径。运行时推荐 `MYAPP_WEB_API_BASE_URL=` 保持空值，由 Web Nginx 同域代理 Frappe，避免 CORS 和混合内容问题。
 - 验证完成：`npm run tsc`、Biome、31 套/196 项 Jest、production build、workflow YAML 解析和 `git diff --check` 全部通过；本地从零 Docker build 成功。容器以 UID 101、`no-new-privileges`、`cap-drop ALL` 启动并 healthy，`nginx -T` 通过。首次 staging 部署复验发现无尾斜杠路由会把浏览器重定向到容器内部 `:8080`，已由 `3a94950 fix: serve clean SPA routes directly` 修复，同时把部署门禁收紧为 `/user/login` 必须直接返回 200。
-- Web 部署提交均已推送 `origin/main`：`6784631`、`ce40379`、`2481f53`、`3a94950`。最终 CI run `29905159371`、coverage run `29905159351`、镜像构建 run `29905178510` 和部署 run `29905585851` 均成功。目标 `192.168.31.229:30080` 正在运行 `ghcr.io/rgc318/myapp-web:staging-20260722-3a94950`，容器 UID 101、状态 running/healthy、网络为 `staging_default`；`/healthz`、`/user/login`、动态 SPA 路由和 `/api/method/ping` 均为 200，AI 未授权流式请求由 Frappe 返回 403，哈希 JS 返回 immutable 缓存头。Web 工作树 clean。父仓库既有 `services/myapp-ai` gitlink脏状态和未跟踪 `.codex` 未触碰；本交接文件为本轮唯一父仓库修改。
+- Web 部署提交均已推送 `origin/main`：`6784631`、`ce40379`、`2481f53`、`3a94950`。用户验收截图进一步发现数据库重置后模型注册表为空，以及 6 个 AI 治理功能与用户/角色等系统功能平级。staging 已通过治理同步恢复 13 个模型，12 个聊天模型为 active/selectable，`erp-embedding` 按设计不进入聊天下拉框；Web `db6140b fix: group AI administration routes` 把模型、策略、用量、向量、审计和数据治理归组到“系统管理 > AI 管理”，并增加路由层级单测。
+- 最终 CI run `29907558040`、coverage run `29907558342`、镜像构建 run `29907761294` 和部署 run `29908433648` 均成功。目标 `192.168.31.229:30080` 正在运行 `ghcr.io/rgc318/myapp-web:staging-20260722-db6140b`，容器 UID 101、状态 running/healthy、网络为 `staging_default`；`/healthz`、`/user/login`、动态 SPA 路由、`/administration/ai` 和 `/api/method/ping` 均为 200，AI 未授权流式请求由 Frappe 返回 403，哈希 JS 返回 immutable 缓存头。Web 工作树 clean。父仓库既有 `services/myapp-ai` gitlink 脏状态和未跟踪 `.codex` 未触碰；本交接文件为本轮唯一父仓库修改。
 
 ### 2026-07-22 staging 部署、公司交易重置与完整运行态回归
 
