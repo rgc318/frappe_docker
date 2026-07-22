@@ -108,7 +108,7 @@ jobs:
           port: ${{ secrets.STAGING_SSH_PORT }}
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-          command_timeout: 30m
+          command_timeout: 60m
           envs: GHCR_USERNAME,GHCR_TOKEN,IMAGE_TAG,SITE_NAME,DEPLOY_REF_NAME
           script: |
             set -euo pipefail
