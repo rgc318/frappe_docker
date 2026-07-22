@@ -1,12 +1,20 @@
 # 当前交接状态
 
-更新时间：2026-07-22 11:45 CST
+更新时间：2026-07-22 14:40 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-22 Web 前端部署文件补齐与容器验收
+
+- 独立 Web 仓库 `frontend/myapp-web` 当前有未提交部署改动：新增 Node.js 22 + Nginx Unprivileged 多阶段 `Dockerfile`、`.dockerignore`、生产 Nginx 模板和 `DEPLOYMENT.zh-CN.md`；Nginx 支持 SPA history fallback、`/api/method/`、`/files/`、`/private/files/` 同域代理、AI POST + JWT SSE 关闭缓冲及 300 秒超时、健康检查、入口不缓存和哈希资源长期缓存。
+- GitHub Actions 已把旧 Ant Design Pro GitHub Pages/Surge 模板替换为：完整 CI、GHCR staging 镜像构建发布、SSH 部署到 `vivy@192.168.31.229` 的 staging Web workflow。部署默认使用 `staging_default` 网络、`http://frontend:8080` 上游和宿主机 `30080` 端口，具备输入/Secret 校验、非 root 容器、capabilities 清理、三项 HTTP 验收和按旧镜像 ID 自动回滚。
+- 已删除旧 `public/CNAME` 和三个 Surge PR preview workflow，避免继续发布到 `preview.pro.ant.design`；README 与 `.env.example` 已指向当前部署口径。运行时推荐 `MYAPP_WEB_API_BASE_URL=` 保持空值，由 Web Nginx 同域代理 Frappe，避免 CORS 和混合内容问题。
+- 验证完成：`npm run tsc`、Biome、31 套/196 项 Jest、production build、workflow YAML 解析和 `git diff --check` 全部通过；本地从零 Docker build 成功。容器以 UID 101、`no-new-privileges`、`cap-drop ALL` 启动并 healthy，`nginx -T` 通过；`/healthz` 200、动态 SPA 路由 200、`index.html` no-store、哈希 JS immutable。测试环境的 Frappe Host 路由使本地代理 ping 返回 Frappe 404，但已确认请求进入上游而非 SPA；目标 staging 的既有 `/api/method/ping` 为 200，发布 workflow 会以此作为硬门禁。
+- Web 部署改动已提交并推送 `origin/main`：`6784631 feat: add staging web deployment`、`ce40379 fix: track reproducible web dependencies`、`2481f53 fix: initialize Umi before CI checks`。远端 CI run `29902034634` 与 coverage run `29902034669` 均成功；Web 工作树 clean。尚未手动触发 `Build staging image` 和 `Deploy staging Web`，因此目标服务器前端尚未发布。父仓库既有 `services/myapp-ai` gitlink 脏状态和未跟踪 `.codex` 未触碰；本交接文件为本轮唯一父仓库修改。
 
 ### 2026-07-22 staging 部署、公司交易重置与完整运行态回归
 
