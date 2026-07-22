@@ -105,6 +105,19 @@ USER frappe
 
 COPY --from=builder --chown=frappe:frappe /home/frappe/frappe-bench /home/frappe/frappe-bench
 
+USER root
+
+RUN mkdir -p /home/frappe/frappe-bench/logs \
+    && chown frappe:frappe /home/frappe/frappe-bench/logs \
+    && if [ ! -e /home/frappe/logs ]; then \
+      ln -s /home/frappe/frappe-bench/logs /home/frappe/logs; \
+    fi
+
+USER frappe
+
+RUN test -d /home/frappe/logs \
+    && test -w /home/frappe/logs
+
 WORKDIR /home/frappe/frappe-bench
 
 VOLUME [ \

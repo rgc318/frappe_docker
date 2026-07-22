@@ -119,6 +119,8 @@ PY
 
 staging 镜像部署不再挂载 `/home/frappe/frappe-bench/env` 持久卷；虚拟环境属于镜像内容，只持久化 `sites` 数据。这样每次切换镜像时都会使用镜像内经过验证的 Python 依赖，避免旧 `bench-env-vol` 覆盖新镜像中的依赖。
 
+runtime 镜像同时保留 `/home/frappe/frappe-bench/logs` 日志卷，并提供 `/home/frappe/logs` 到该目录的兼容软链接。Frappe 独立 CLI、unittest 或从 bench 根目录启动的维护命令可能通过父目录解析日志路径；不要删除该链接，否则会在业务代码导入阶段出现 `FileNotFoundError: /home/frappe/logs/*.log`，导致测试数据 CLI 和容器内测试无法启动。
+
 ### staging 运行文件
 
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.staging.yaml`
