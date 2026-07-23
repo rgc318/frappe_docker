@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-23 15:14 CST
+更新时间：2026-07-23 17:30 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -17,6 +17,9 @@
 - 已推送 AI `f246542 feat: expand AI product setup pricing`、Backend `703a8e4 feat: complete AI product pricing and UOM priority`、Web `e03e586 feat: improve AI product pricing and UOM selection`、Mobile `15a1a87 feat: prioritize common UOM options`。Mobile 推送同时包含该分支原先已存在的前置提交 `1596c73 fix: display business UOM labels consistently`。
 - Mobile 全量 `npx tsc --noEmit` 仍被工作区范围内的大量既有/并行类型问题阻断，错误覆盖报表、样式、LinkOption、采购编辑和当前未提交价格映射等多处；本轮新增共享 UOM 排序 helper、Mobile UOM 搜索和主要选择器未出现独立 ESLint 错误。原有并行改动继续保留在 `app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`；其中后两个混合文件只提交了本轮 UOM 排序区块，其余价格/销售改动仍未提交。
 - 父仓库本次提交固定 Backend `703a8e4` 与 AI `f246542` 子模块指针，并提交本交接记录；父仓库原有未跟踪 `.codex` 继续未触碰。
+- staging 已部署完成：ERP/AI 镜像构建 run `29994851612`、Web 镜像构建 run `29994851719`、ERP/AI 部署 run `29995281853`、Web 部署 run `29995281707` 均成功。ERP/AI 使用 `staging-20260723-37c3ac7`，Web 使用 `staging-20260723-e03e586`；`staging.example.com` 已完成 `bench migrate`。
+- 部署健康检查确认 AI Orchestrator、Qdrant、MariaDB、Backend、各队列 Worker、Scheduler、WebSocket 和 Frontend 均运行正常，Backend → AI 内部认证通过，AI 状态为 `ok`；服务器内 ERP 首页和 Ping 为 HTTP 200。本地直连 `192.168.31.229:28080` 的 ERP 首页/Ping，以及 `192.168.31.229:30080` 的 Web 健康页、登录页、Ping 和商品页均为 HTTP 200。Mobile Web Preview 自动部署 run `29987625995` 也已成功。
+- Web 首次手动部署 run `29994471175` 在镜像构建前误用不存在的 `staging-latest`，因 `manifest unknown` 失败且未替换旧容器；随后先构建唯一标签再部署成功。后续继续遵循“先完成镜像构建，再使用相同不可变标签部署”的顺序。
 
 ### 2026-07-23 LiteLLM 模型同步、模型管理命名与真实可用性检查
 
