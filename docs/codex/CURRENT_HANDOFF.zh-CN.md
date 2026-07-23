@@ -1,12 +1,22 @@
 # 当前交接状态
 
-更新时间：2026-07-22 17:20 CST
+更新时间：2026-07-23 15:14 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-23 单位置顶与 AI 商品建档价格补全（已提交并推送）
+
+- 共享单位排序规则统一为 `Box / 箱` 第一、`Nos / 件` 第二，其余单位保持原顺序；Backend 商品 `all_uoms`、Web 通用 `UomSelect`/商品单位上下文、Mobile 通用 UOM 搜索及主要商品/采购单位选择入口均已接入。
+- AI 商品建档草稿已从原有 Standard Selling + 旧估值/成本候选扩展为四档价格：`standard_selling_rate`（标准售价/默认单价）、`wholesale_rate`（Wholesale 批发价）、`retail_rate`（Retail 零售价）、`standard_buying_rate`（成本价/默认采购价）。Orchestrator Schema 与 Prompt 已升级为 `product-setup-draft-v2`，可从用户原文区分四类价格；`valuation_rate` 仅保留明确“估值价”和旧响应兼容。Backend 草稿编辑、重校验、预览、交接和原地正式执行均保留这些字段；正式执行复用 `create_product_v2` 写对应价格表，成本价继续作为首次入库成本，售价不会用于库存计价。
+- Web 文案已明确为“标准售价（默认单价）”“批发价”“零售价”“成本价（默认采购价）”，商品主数据页接收 AI 交接时也会回填批发价和零售价。Mobile 既有四档价格字段是本轮契约对齐参考，未重写其价格逻辑。
+- 验证通过：AI Orchestrator Ruff、Pre-commit、89 项 pytest、test 镜像内 89 项测试和 runtime 镜像构建；Backend `test_ai_service + test_uom_display + test_wholesale_service` 共 73 项；Web `npm run tsc`、`npm run biome:lint`、32 套/199 项 Jest；各相关仓库 `git diff --check`；Mobile 本轮涉及文件的定向 ESLint。
+- 已推送 AI `f246542 feat: expand AI product setup pricing`、Backend `703a8e4 feat: complete AI product pricing and UOM priority`、Web `e03e586 feat: improve AI product pricing and UOM selection`、Mobile `15a1a87 feat: prioritize common UOM options`。Mobile 推送同时包含该分支原先已存在的前置提交 `1596c73 fix: display business UOM labels consistently`。
+- Mobile 全量 `npx tsc --noEmit` 仍被工作区范围内的大量既有/并行类型问题阻断，错误覆盖报表、样式、LinkOption、采购编辑和当前未提交价格映射等多处；本轮新增共享 UOM 排序 helper、Mobile UOM 搜索和主要选择器未出现独立 ESLint 错误。原有并行改动继续保留在 `app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`；其中后两个混合文件只提交了本轮 UOM 排序区块，其余价格/销售改动仍未提交。
+- 父仓库本次提交固定 Backend `703a8e4` 与 AI `f246542` 子模块指针，并提交本交接记录；父仓库原有未跟踪 `.codex` 继续未触碰。
 
 ### 2026-07-23 LiteLLM 模型同步、模型管理命名与真实可用性检查
 
@@ -163,6 +173,57 @@
 - Provider 恢复已确认：`erp-embedding` 字符串单条、数组单条和两条批量均 HTTP 200、1024 维；当前运行 Orchestrator 的真实检索返回 200。30 条质量门禁通过，最新报告保存在忽略目录 `ai-governance-reports/product-retrieval-v1-current.json`。新的 v2 alias/collection 尚未配置或发布；如果底层模型权重变化，必须按新向量空间完整发布流程处理。
 
 ## 本轮工作总结
+
+### 2026-07-23 AI 模型管理、LiteLLM 同步与可用性检查交付总结
+
+#### 用户问题与根因判断
+
+- 数据重置后的模型注册表为空，需要确认模型同步是否真正以 LiteLLM 为事实源。既有链路确实经过 Web → Frappe → AI Orchestrator → LiteLLM `/v1/models`，但界面没有明确说明同步范围是“当前 `MYAPP_AI_LITELLM_API_KEY` 可见模型”，容易把“LiteLLM 新增模型”和“当前 Key 已获授权”混为一谈。
+- 原同步结果把 LiteLLM 可见性写成类似健康状态，不能证明模型能够完成 Chat 或 Embedding 请求；既有策略验证是模型策略、评测报告和发布门禁校验，也不是运行时可用性探测。
+- AI 管理菜单已完成归组，但“模型治理”名称偏控制面术语，与用户日常维护模型库存、成本和健康状态的操作心智不一致，需要统一为“模型管理”。
+
+#### 最终设计与实现
+
+- AI Orchestrator 的模型发现请求增加 `Cache-Control: no-cache` 与 `Pragma: no-cache`，同步响应明确返回 `source=litellm` 和真实 `visible_count`。配置中的默认 Chat/Embedding 如果不在当前 Key 可见列表中仍会保留为缺失模型，但不会被误计入可见数量。
+- 同步状态拆分为明确语义：`listed` 表示当前 LiteLLM Key 可见，`missing` 表示当前 Key 不可见；已有真实探测产生的 `available / unavailable` 不会在下一次普通同步时被降回 `listed`。人工维护的 `disabled / retired` 状态继续不被自动同步覆盖。
+- AI Orchestrator 新增 `POST /internal/v1/governance/models/availability`：Chat 模型调用最小 `/v1/chat/completions`，Embedding 模型调用最小 `/v1/embeddings`，最多 4 路并发，单模型探测上限 20 秒。返回模型别名、能力、可用性、耗时、Provider 模型名和稳定错误码，不返回模型正文或 Provider 原始错误内容。
+- Backend 新增 `check_ai_model_availability_v1` Gateway。仅模型管理角色可执行；检查所有非 `disabled / retired` 模型并更新 `last_health_at`、`last_health_status`、`last_error_code` 和 Provider 模型显示名，写入 `check_model_availability` 审计。单次超时或失败不会自动改变人工模型状态，避免瞬时 Provider 波动直接停用生产模型。
+- Web 菜单、页面标题、编辑弹窗和成功提示统一使用“模型管理 / Model Management”。模型表格新增“一键检查可用性”，执行前明确提示会产生少量真实 Provider 请求费用；完成后显示检查总数、可用数和不可用数。健康列展示“LiteLLM 可见 / 可用 / 不可用 / LiteLLM 不可见”、检查时间和稳定错误码。
+
+#### 自动化验证
+
+- AI Orchestrator：Ruff、Pre-commit、89 项 pytest、test 镜像内 89 项测试、runtime 镜像构建全部通过。
+- Backend：模型管理 Service、API 聚合和 Gateway wrapper 共 141 项 unit 通过；可用性检查覆盖 available/unavailable 更新、错误码、审计、权限包装和不自动修改模型状态。
+- Web：TypeScript、Biome、32 套/198 项 Jest 和 production build 通过；领域 Service 覆盖 LiteLLM 同步数量和可用性响应的 snake_case → camelCase 映射。
+- 父仓库、Backend、AI、Web 的 `diff --check` 全部通过；`.codex` 继续作为本地未跟踪状态保留且未提交。
+
+#### 提交、构建与部署
+
+- 已推送 AI `f48c14b feat: add LiteLLM model availability checks`、Backend `ab3a708 feat: add AI model availability management`、Web `51670b7 feat: add AI model availability controls`。
+- 父仓库 `dc3c4602 feat: deliver AI model management checks` 固定 Backend/AI 子模块版本；`3f491d0d docs: record AI model management deployment` 补充最终部署证据。
+- 成功 workflow：ERP/AI 镜像构建 `29925570558`、Web 镜像构建 `29925386108`、ERP/AI 部署 `29979836312`、Web 部署 `29980057785`。
+- 发布镜像：`ghcr.io/rgc318/myapp-erpnext:staging-20260722-dc3c460`、`ghcr.io/rgc318/myapp-ai:staging-20260722-dc3c460`、`ghcr.io/rgc318/myapp-web:staging-20260722-51670b7`。目标 `192.168.31.229` 的 ERP、AI、Worker、Scheduler、WebSocket、Qdrant、MariaDB 和 Web 容器均正常运行，Web 容器为 healthy；模型管理页面、登录页、Ping 和健康检查均为 HTTP 200。
+
+#### 实机验收结果
+
+- 使用 Administrator 上下文执行模型同步：`source=litellm`、`visible_count=13`、`synced_count=13`、`missing_count=0`，确认部署环境当前 Service Key 能看到全部 13 个模型。
+- 一键真实探测检查 13 个模型，其中 9 个成功。`erp-embedding` 真实 Embedding 请求成功；8 个 Chat 模型真实 Chat 请求成功。
+- `nvap-gpt-5.5`、`nvap-gpt-5.6-luna`、`nvap-gpt-5.6-sol`、`nvap-gpt-5.6-terra` 均在约 20 秒达到探测上限，稳定记录为 `PROVIDER_TIMEOUT`。这表示它们在当前可用性 SLA 下不可用或响应过慢，不代表 LiteLLM Key 不可见，也不会自动停用模型。
+- 探测结果已经持久化到模型注册表并写入审计；后续普通同步不会覆盖这次真实健康结果。
+
+#### 部署过程复盘与当前风险
+
+- 首次 ERP/AI 和 Web workflow 输入使用短提交号，`actions/checkout` 与 `bench init` 按分支/标签执行浅克隆，无法把短 SHA 当作 `--branch`，因此构建失败。改用已经推送且头部固定的 `develop` / `main` 分支后构建成功。后续若要求不可变发布，应传完整可解析 ref，或改造 workflow 在构建前把 commit SHA 显式转换为可 checkout 的完整 ref，不能继续使用短 SHA。
+- 当前 20 秒探测阈值会把响应极慢的模型标记为 `PROVIDER_TIMEOUT`。如果 `nvap-*` 模型业务上允许更高首响应延迟，应先明确模型 SLA，再决定是否提高探测阈值；不能仅为了让检查变绿而无限延长超时。
+- 一键检查会对每个未停用模型产生一次最小真实请求。当前通过确认弹窗控制人工触发，尚未配置定时巡检、费用上限、连续失败告警或自动恢复通知。
+- Langfuse 当前未启用，不影响 Chat、同步或可用性检查主链路，但缺少持续运行观测和跨时间健康趋势；如需生产级监控，应单独完成 Langfuse/指标告警方案，而不是让可用性按钮承担全部可观测性职责。
+
+#### 后续建议
+
+1. 在 LiteLLM 控制面检查 4 个 `nvap-*` 模型的上游路由、配额、冷启动和 Provider 延迟，并用相同 Key 单独复测，区分“稳定超时”和“偶发慢响应”。
+2. 为模型可用性增加最近成功时间、连续失败次数和按模型配置的 SLA；达到连续失败阈值时告警，但仍保持人工决定停用或切换策略。
+3. 优化 staging 构建 workflow 的 ref 校验：接受分支、标签或完整 commit，并在进入耗时 Docker 构建前失败关闭短 SHA/不存在 ref。
+4. 如需自动巡检，先增加每日请求预算、并发和通知负责人，再通过 Scheduler 定时执行；默认不要自动停用或修改已发布模型策略。
 
 ### 2026-07-19 AI 业务操作体验与模型治理集中总结
 
