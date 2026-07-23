@@ -8,12 +8,14 @@
 
 ## 当前最终状态
 
-### 2026-07-22 LiteLLM 模型同步、模型管理命名与真实可用性检查
+### 2026-07-23 LiteLLM 模型同步、模型管理命名与真实可用性检查
 
 - AI Orchestrator、Backend 与 Web 已完成并推送本轮改动。模型同步继续以当前 `MYAPP_AI_LITELLM_API_KEY` 调用 LiteLLM `/v1/models`，增加 no-cache 请求头，并明确返回 `source=litellm` 与 `visible_count`；同步表示当前 Key 可见性，不再误标为真实健康。
 - 新增 `POST /internal/v1/governance/models/availability` 与 Gateway `check_ai_model_availability_v1`。Chat 模型调用最小 `/v1/chat/completions`，Embedding 模型调用最小 `/v1/embeddings`，最多 4 路并发；Backend 更新 `available / unavailable`、耗时对应的返回结果、Provider 模型名和稳定错误码并记录审计，不保存模型输出/Provider 错误原文，也不会因单次失败自动修改人工模型状态。已有真实检查结果不会被后续普通同步降回 `listed`。
 - Web 菜单和页面用户文案已由“模型治理”改为“模型管理”；同步成功提示当前 Key 可见数量，新增带少量费用确认的一键可用性检查按钮，健康列显示“LiteLLM 可见 / 可用 / 不可用 / LiteLLM 不可见”和错误码。
-- 验证通过：AI Ruff、Pre-commit、89 项 pytest、test/runtime Docker 镜像；Backend 模型管理与 Gateway 141 项 unit；Web TypeScript、Biome、32 套/198 项 Jest 和 production build；三仓库 `diff --check`。已推送 AI `f48c14b`、Backend `ab3a708`、Web `51670b7`；父仓库正在更新 Backend/AI gitlink，尚未完成 staging 镜像构建与部署。
+- 验证通过：AI Ruff、Pre-commit、89 项 pytest、test/runtime Docker 镜像；Backend 模型管理与 Gateway 141 项 unit；Web TypeScript、Biome、32 套/198 项 Jest 和 production build；三仓库 `diff --check`。已推送 AI `f48c14b`、Backend `ab3a708`、Web `51670b7` 和父仓库 `dc3c4602`。
+- staging 镜像构建 run `29925570558`、Web 镜像构建 run `29925386108`、ERP/AI 部署 run `29979836312`、Web 部署 run `29980057785` 均成功。服务器父仓库为 `dc3c4602`；ERP/AI 使用 `staging-20260722-dc3c460`，Web 使用 `staging-20260722-51670b7`，目标容器均 running/healthy，模型管理页面、登录页、Ping 和健康检查均为 HTTP 200。
+- 实机以 Administrator 上下文执行同步与真实可用性检查：当前 LiteLLM Key 可见 13 个、缺失 0；13 个模型中 9 个可用，`nvap-gpt-5.5`、`nvap-gpt-5.6-luna`、`nvap-gpt-5.6-sol`、`nvap-gpt-5.6-terra` 在 20 秒探测阈值内返回 `PROVIDER_TIMEOUT`。`erp-embedding` 和其余 8 个 Chat 模型真实调用成功，结果已写入模型注册表与审计。
 
 ### 2026-07-22 Web 前端部署文件补齐与容器验收
 
