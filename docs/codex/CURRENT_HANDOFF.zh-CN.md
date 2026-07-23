@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-23 23:24 CST
+更新时间：2026-07-24 00:12 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,16 +8,18 @@
 
 ## 当前最终状态
 
-### 2026-07-23 AI 草稿版本冲突恢复（已提交，未推送/未部署）
+### 2026-07-24 AI 工作台 P1 前两项（已提交，未推送/未部署）
 
 - Backend 新增稳定的草稿乐观锁冲突契约：保存、历史恢复或执行遇到过期 `expected_version` 时返回 HTTP `409` 与 `code=AI_DRAFT_VERSION_CONFLICT`，不再要求 Web 依赖中文错误文案。相关设计已同步修正 `product-setup-draft-v2` 和“用户确认后由 Frappe 正式领域服务执行”的主体表述。
 - Web 草稿工作台新增保存、校验、执行和回执步骤状态；保存或最终确认发生版本冲突时读取最新草稿，展示“原打开版本 / 我的输入 / 最新持久版本”三方字段差异，可全部采用最新版本或在最新版本上选择性重放本地字段。订单商品明细作为整体冲突字段处理，不按数组下标静默合并。
 - 无本地修改的执行前刷新若发现更高版本，会刷新工作台并要求用户重新确认，不直接执行；确认弹窗打开后再次发生冲突也会进入同一恢复流程。冲突合并始终以触发冲突的草稿快照为基线，避免刚保存的新版本被误判为未保存输入。
-- Backend 验证：`test_ai_repository + test_ai_service` 共 50 项通过，Backend `git diff --check` 通过；当前 backend bench 环境未安装 Ruff，因此未伪报 Ruff 已执行。
-- Web 验证：`npm run tsc`、`npm run biome:lint`、33 套/212 项 Jest、`npm run build`、`npm audit --omit=dev`（0 漏洞）和 `git diff --check` 全部通过。定向冲突测试为 4 套/31 项，覆盖订单明细整体选择和确认后再冲突。
-- 已提交 Backend `60144b1 feat: add AI draft version conflict contract`、Web `0f43e28 feat: recover AI draft version conflicts`；Web 另有前置未推送文档提交 `874dc15 docs: add AI Web optimization roadmap`。父仓库将在本节提交中固定 Backend gitlink。以上提交均未推送、未构建镜像、未部署。
+- Backend 进一步贯通 AI 流式错误码：Orchestrator 的限流、预算、并发、模型熔断、Prompt 版本、内部认证和服务不可用代码会保留到 SSE `error.code` 与持久 Run `error_code`；权限和校验错误也转换为稳定代码。未知内部异常统一为 `AI_RUN_FAILED` 和通用用户提示，不把数据库、供应商或堆栈细节暴露给普通用户。
+- Web 失败消息按稳定错误码分为四类：临时/限流问题提供“稍后重试”；请求校验或模型拒绝恢复原问题供修改；权限拒绝不提供无意义重试；预算与系统/治理配置故障引导查看诊断和联系管理员。所有恢复均为人工动作，不自动重复收费调用；页面刷新后继续使用持久 Run 的相同分类。
+- Backend 验证：`test_ai_repository + test_ai_service` 共 55 项通过，Backend `git diff --check` 通过；当前 backend bench 环境未安装 Ruff，因此未伪报 Ruff 已执行。
+- Web 验证：`npm run tsc`、`npm run biome:lint`、34 套/222 项 Jest、`npm run build`、`npm audit --omit=dev`（0 漏洞）和 `git diff --check` 全部通过。失败分类定向测试 5 套/41 项通过，另有 SSE/Gateway 错误包络 Service 测试。
+- 已提交 Backend `60144b1 feat: add AI draft version conflict contract`、`0bf60ef feat: preserve AI run failure codes`；Web `0f43e28 feat: recover AI draft version conflicts`、`30a5831 feat: classify AI failure recovery`，另有前置未推送文档提交 `874dc15 docs: add AI Web optimization roadmap`。父仓库将在本节提交中把 Backend gitlink 更新到 `0bf60ef`。以上提交均未推送、未构建镜像、未部署。
 - 仓库边界：父仓库仅保留 `.codex` 未跟踪状态；Mobile 原有 5 个未提交文件继续保留且本轮未触碰；AI Orchestrator 无本轮改动。
-- 下一步：先在 staging 使用两个页面并发编辑同一草稿，人工验收字段选择、横向差异表、最新版本二次确认和正式回执；随后按路线图进入“按稳定错误码分类恢复”，再处理草稿卡片关键业务摘要。
+- 下一步：先在 staging 使用两个页面并发编辑同一草稿，并人工制造 429、权限拒绝和上游不可用，验收字段选择、错误动作、刷新恢复、诊断和正式回执；代码路线下一项是草稿卡片关键业务摘要，随后再做每条消息独立 Run。
 
 ### 2026-07-23 AI 工作台交互 P0 收口（已推送并部署）
 
