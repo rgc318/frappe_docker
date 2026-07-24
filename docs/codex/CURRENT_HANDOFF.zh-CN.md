@@ -1,12 +1,23 @@
 # 当前交接状态
 
-更新时间：2026-07-24 11:23 CST
+更新时间：2026-07-24 16:17 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-24 AI 数据新鲜度与完整结果入口（已提交，未推送/未部署）
+
+- Backend 新增只读 `refresh_ai_business_result_v1`：使用已有 `business-result-set-v1` 的公司、日期、状态、排序、金额和分组范围重新查询，不创建会话、消息或 Run，不调用 AI Orchestrator/模型，也不产生模型费用。每次刷新重新检查当前用户、公司、DocType 和记录级权限。
+- 单据结果元数据新增 `queried_at`、`snapshot_source`、`permission_filtered`、`scope.exclude_cancelled`，分组新增 `module_href`、`available_count` 和 `truncated`。销售/采购订单在没有金额二次过滤时使用权限安全的 `visible_count`；发票或不能安全计算精确总量的场景返回 `available_count=null / truncated=null`，Web 明确显示“未知”，不泄露或猜测未授权数量。商品 citation 同步记录公司和回答时查询时间。
+- Web 每条已完成回答可独立“刷新当前数据”，只替换该消息的结构化单据 citation，保留商品、报表、草稿等其他来源；刷新失败留在原结果面板，不重新发送 Prompt。结果面板展示回答时/当前刷新时间、公司、当前账号权限、返回数、可见总量、截断状态和业务模块完整列表入口。
+- 商品和单据 Drawer 已并列展示“回答时数据/结构化快照”与“当前数据”，并提供不调用模型的单独刷新和完整业务页面入口。草稿卡片与工作台校验步骤使用持久草稿 `modified` 展示最近一次保存并重新校验时间。
+- Backend 验证通过：`test_ai_service + test_gateway_wrappers` 共 171 项；仍有既有 `Failed to log error in db: AI Orchestrator 流式调用失败` 测试日志，退出码为 0。Backend `git diff --check` 通过。Backend 提交：`83150bd feat: refresh AI business result snapshots`。
+- Web 验证通过：`npm run tsc`、`npm run biome:lint`、36 套/235 项 Jest、`npm run build`、`npm audit --omit=dev`（0 漏洞）和 `git diff --check`。Jest 仍保留既有 open-handle 提示，退出码为 0。Web 提交：`9c2876b feat: surface AI business data freshness`。
+- 两个提交均未推送、未构建镜像、未部署。AI Orchestrator 工作树干净；Mobile 原有 5 个未提交文件继续保留且未触碰；父仓库 `.codex` 继续保持未跟踪。
+- 下一步：先在 staging 用不同权限账号验证精确总量、未知截断、刷新后权限变化、商品/单据快照差异和历史消息恢复；代码路线下一项是长会话分页或窗口化，随后处理会话搜索/重命名/待处理数量、场景与模型高级设置和水印可读性。
 
 ### 2026-07-24 每条 AI 回答独立 Run（已提交，未推送/未部署）
 
