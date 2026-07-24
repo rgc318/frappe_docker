@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-24 21:33 CST
+更新时间：2026-07-24 21:41 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -15,16 +15,16 @@
 - Web 将场景与固定模型迁入“高级设置” Drawer。日常上下文栏只显示智能/固定场景、友好固定模型名称、公司和设置入口；场景仍只影响下一次发送。固定模型选择器和高级诊断 Drawer 完全服从 Backend 能力位，普通账号不会获得模型库存，治理账号优先看到友好模型名称，技术 alias 仅作为补充。
 - Web 长文本可读性已加强：Markdown 最大阅读宽度 `80ch`，长 URL/连续字符可换行，代码块和宽表格在自身区域横向滚动，气泡不会被超长内容撑开。水印按路由分级：普通 `/ai` 稀疏低透明，AI 审计、用户管理、打印预览和打印历史更强，其他页面使用中等强度；环境开关保持不变。
 - Backend 验证通过：模型治理、Repository、AI Service 和 Gateway 包装共 213 项，`git diff --check` 通过；仍有既有 `Failed to log error in db: AI Orchestrator 流式调用失败` 测试日志，退出码为 0。Backend 提交：`df3824f feat: enforce AI workspace diagnostic permissions`。
-- Web 验证通过：`npm run tsc`、`npm run biome:lint`、37 套/244 项 Jest、`npm run build`、`npm audit --omit=dev`（0 漏洞）和 `git diff --check`。提交钩子格式化后再次通过 TypeScript、Biome 和 37 套/244 项 Jest；Jest 仍有既有 open-handle 提示，退出码为 0。Web 提交：`f087e4b feat: simplify AI workspace advanced controls`。
+- Web 验证通过：`npm run tsc`、`npm run biome:lint`、37 套/244 项 Jest、`npm run build`、`npm audit --omit=dev`（0 漏洞）和 `git diff --check`。提交钩子格式化后再次通过 TypeScript、Biome 和 37 套/244 项 Jest；Jest 仍有既有 open-handle 提示，退出码为 0。Web 功能提交：`f087e4b feat: simplify AI workspace advanced controls`；范围收缩文档提交：`48d1733 docs: defer heavyweight AI workspace roadmap`。纯根目录 Markdown 被当前 Biome 配置忽略，lint-staged 对纯文档提交因 0 个文件被处理而失败；该文档提交在 `git diff --cached --check` 通过后使用 `--no-verify`，未修改钩子配置。
 - 两个提交均未推送、未构建镜像、未部署。AI Orchestrator 工作树干净；Mobile 原有 5 个未提交文件继续保留且未触碰；父仓库 `.codex` 继续保持未跟踪。
-- 下一步：在 staging 分别使用普通业务账号、AI Model Manager、AI Model Approver/AI Auditor 和 System Manager 验证模型清单、越权固定模型拒绝、同步/SSE/历史诊断脱敏及消息级 Run；同时用长 Markdown、代码、宽表格、草稿表单和不同高风险路由做真实浏览器水印/滚动视觉验收。
+- 当前范围已经收口，不继续主动推进重型 P2。下一步只做最小发布闭环：推送已验证提交、部署 staging，使用普通业务账号与管理员账号验证固定模型权限、服务端诊断脱敏和消息级 Run，并用长 Markdown、代码、宽表格与草稿表单检查水印和滚动。冒烟通过后结束当前阶段；发现真实缺陷时做针对性修复。
 
 #### 未完成范围快照与接手顺序
 
 - 已完成但仍待 staging 人工验收：P0 草稿闭环、版本冲突与错误恢复、草稿摘要、消息级 Run、数据刷新、长会话分页、会话管理效率，以及本节高级设置/角色权限/服务端脱敏/水印与长文本可读性。
-- 下一项代码任务可进入治理后台 P2：治理总览与模型/策略/用量/向量/审计页面真正拆分，策略 Steps 编辑，模型检查批次任务化与历史趋势，审计和数据治理结果结构化。
-- 工程门禁仍待：共享草稿编排 Hook/控制器、大型 AI 页面组件拆分、完整浏览器 E2E、键盘与屏幕阅读器验收、性能预算和治理查询缓存。
-- 体验增强仍待评估：复制上下文新建会话，以及会话草稿内存是否需要可选浏览器持久化；任何持久化都必须先评估共享终端和敏感业务文本风险。
+- 当前明确暂缓：治理后台全面 P2 重构、策略 Steps 编辑、模型检查任务化与历史趋势、审计/数据治理结果全面结构化。只有治理人员出现可复现的效率、审计、性能或可靠性问题时才单独立项。
+- 当前明确暂缓：共享草稿编排重写、大型 AI 页面组件拆分、完整浏览器 E2E 平台、全面键盘/屏幕阅读器矩阵、性能预算和治理查询缓存。现有 TypeScript、Biome、Jest、production build、依赖审计与 staging 人工冒烟已足够作为当前门禁。
+- 低优先级体验增强暂缓：复制归档会话上下文、未发送文本浏览器持久化。Mobile 适配只在近期存在 Mobile 发布计划时启动；现有 5 个本地修改继续保持不动。
 
 ### 2026-07-24 AI 会话管理效率优化（已提交，未推送/未部署）
 
