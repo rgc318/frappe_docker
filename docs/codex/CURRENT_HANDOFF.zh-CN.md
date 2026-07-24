@@ -1,12 +1,31 @@
 # 当前交接状态
 
-更新时间：2026-07-24 16:24 CST
+更新时间：2026-07-24 17:00 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-24 AI 长会话游标分页与增量加载（已提交，未推送/未部署）
+
+- Backend `get_ai_conversation_v1` 新增 `before_sequence + limit` 稳定向前游标分页；默认返回最近 40 条消息、单页最大 100 条，响应补充 `total`、`returned_count`、`has_more` 和 `next_before_sequence`。查询使用会话内唯一 `sequence_no` 倒序截取后恢复正序，避免会话末尾新增消息导致 offset 重复或跳页；每页仍完整返回 Run、citation、错误和持久反馈。
+- Web 打开历史会话时只加载最近 40 条，并在消息区顶部按需“加载更早消息”。历史页按消息 ID 去重后前置，反馈按 Run 合并；旧消息的运行详情、业务 citation、草稿入口和失败诊断继续绑定原消息。加载前后补偿滚动高度，保持用户原阅读位置，不覆盖 Sender 尚未发送文本、场景/模型选择、当前流式 Run、失败恢复上下文或已打开的消息级 Run；生成中禁用历史加载。
+- Web 同步清理本次触达页面中的 Ant Design `Tag.bordered` / `Drawer.width` 弃用用法，改用当前 `variant` / `size` API。
+- Backend 验证通过：`test_ai_repository + test_ai_service + test_gateway_wrappers` 共 184 项；仍有既有 `Failed to log error in db: AI Orchestrator 流式调用失败` 测试日志，退出码为 0。Backend `git diff --check` 通过。Backend 提交：`e37b477 feat: paginate AI conversation messages`。
+- Web 验证通过：`npm run tsc`、`npm run biome:lint`、36 套/236 项 Jest、`npm run build`、`npm audit --omit=dev`（0 漏洞）和 `git diff --check`。新增定向测试覆盖游标请求、旧 Run/citation/反馈/失败消息恢复、未发送文本保持和前置历史后的滚动位置；最终页面定向测试 14 项通过。Web 提交：`7f13a64 feat: incrementally load AI conversation history`。
+- 两个提交均未推送、未构建镜像、未部署。AI Orchestrator 工作树干净；Mobile 原有 5 个未提交文件继续保留且未触碰；父仓库 `.codex` 继续保持未跟踪。
+- 下一步：先在 staging 构造或使用 100 条以上真实消息的会话，验收连续多页加载、旧 Run/citation/草稿/失败消息可达、滚动锚点、加载失败重试和生成中禁用；代码路线进入会话管理效率，优先实现关键词搜索、重命名、最近更新时间、待复核草稿 Badge 和按会话保存未发送文本。
+
+#### 未完成范围快照与接手顺序
+
+- 已完成但仍待 staging 人工验收：P0 草稿闭环、版本冲突恢复、错误码分类恢复、草稿关键业务摘要、每条回答独立 Run、数据新鲜度与完整结果入口、长会话游标分页与增量加载。验收必须覆盖不同公司/角色、并发编辑、历史失败 Run、权限变化、未知截断、刷新失败、重复提交保护和 100 条以上会话。
+- 下一项代码任务：会话管理效率。推荐顺序为会话关键词搜索与最近更新时间、会话重命名、待复核草稿 Badge、按会话保存未发送文本；实现时仍需保持归档只读、公司锁定、消息级 Run 和来源会话深链。
+- 后续工作台简化：默认智能模式、场景/固定模型高级设置、友好模型名称、按角色开放调试能力，以及普通工作区水印和长文本可读性优化。
+- 治理后台缺口：总览与模型/策略/用量/向量/审计页面真正拆分，策略 Steps 编辑，模型检查批次任务化与历史趋势，审计和数据治理结果结构化。
+- 工程门禁缺口：共享草稿编排 Hook/控制器、大型组件拆分、完整浏览器 E2E、键盘与屏幕阅读器验收、性能预算、治理查询缓存和剩余文档版本一致性检查。
+- 当前仓库快照：父仓库提交本节后预计 `develop` ahead 7，仅 `.codex` 未跟踪；Backend `develop` ahead 4 且干净；Web `main` ahead 7 且干净；AI Orchestrator 干净；Mobile 仍有原有 5 个未提交文件，后续任务不得顺带提交或回退。
 
 ### 2026-07-24 AI 数据新鲜度与完整结果入口（已提交，未推送/未部署）
 
