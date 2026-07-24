@@ -1,12 +1,30 @@
 # 当前交接状态
 
-更新时间：2026-07-24 18:38 CST
+更新时间：2026-07-24 21:33 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-24 AI 高级设置、诊断权限与可读性优化（已提交，未推送/未部署）
+
+- Backend 新增 AI 工作台能力位：只有 `System Manager`、`AI Model Manager` 可固定模型；`System Manager`、`AI Model Manager`、`AI Model Approver`、`AI Auditor` 可查看高级运行诊断。`list_ai_selectable_models_v1` 对所有登录用户返回能力位，但只向可固定模型的账号返回受控模型清单；未授权账号绕过 Web 提交 `model_alias` 会由 Frappe 拒绝。
+- Backend 对同步 Chat、SSE、四类结构化草稿和历史会话统一实施服务端脱敏。普通业务账号仍可获得 Run ID、状态、总耗时、稳定错误和业务警告，但不会收到模型 alias、Provider 模型、策略、trace、Token、首 Token 或流式统计；内部持久 Run 继续保存完整诊断供授权治理角色审计。
+- Web 将场景与固定模型迁入“高级设置” Drawer。日常上下文栏只显示智能/固定场景、友好固定模型名称、公司和设置入口；场景仍只影响下一次发送。固定模型选择器和高级诊断 Drawer 完全服从 Backend 能力位，普通账号不会获得模型库存，治理账号优先看到友好模型名称，技术 alias 仅作为补充。
+- Web 长文本可读性已加强：Markdown 最大阅读宽度 `80ch`，长 URL/连续字符可换行，代码块和宽表格在自身区域横向滚动，气泡不会被超长内容撑开。水印按路由分级：普通 `/ai` 稀疏低透明，AI 审计、用户管理、打印预览和打印历史更强，其他页面使用中等强度；环境开关保持不变。
+- Backend 验证通过：模型治理、Repository、AI Service 和 Gateway 包装共 213 项，`git diff --check` 通过；仍有既有 `Failed to log error in db: AI Orchestrator 流式调用失败` 测试日志，退出码为 0。Backend 提交：`df3824f feat: enforce AI workspace diagnostic permissions`。
+- Web 验证通过：`npm run tsc`、`npm run biome:lint`、37 套/244 项 Jest、`npm run build`、`npm audit --omit=dev`（0 漏洞）和 `git diff --check`。提交钩子格式化后再次通过 TypeScript、Biome 和 37 套/244 项 Jest；Jest 仍有既有 open-handle 提示，退出码为 0。Web 提交：`f087e4b feat: simplify AI workspace advanced controls`。
+- 两个提交均未推送、未构建镜像、未部署。AI Orchestrator 工作树干净；Mobile 原有 5 个未提交文件继续保留且未触碰；父仓库 `.codex` 继续保持未跟踪。
+- 下一步：在 staging 分别使用普通业务账号、AI Model Manager、AI Model Approver/AI Auditor 和 System Manager 验证模型清单、越权固定模型拒绝、同步/SSE/历史诊断脱敏及消息级 Run；同时用长 Markdown、代码、宽表格、草稿表单和不同高风险路由做真实浏览器水印/滚动视觉验收。
+
+#### 未完成范围快照与接手顺序
+
+- 已完成但仍待 staging 人工验收：P0 草稿闭环、版本冲突与错误恢复、草稿摘要、消息级 Run、数据刷新、长会话分页、会话管理效率，以及本节高级设置/角色权限/服务端脱敏/水印与长文本可读性。
+- 下一项代码任务可进入治理后台 P2：治理总览与模型/策略/用量/向量/审计页面真正拆分，策略 Steps 编辑，模型检查批次任务化与历史趋势，审计和数据治理结果结构化。
+- 工程门禁仍待：共享草稿编排 Hook/控制器、大型 AI 页面组件拆分、完整浏览器 E2E、键盘与屏幕阅读器验收、性能预算和治理查询缓存。
+- 体验增强仍待评估：复制上下文新建会话，以及会话草稿内存是否需要可选浏览器持久化；任何持久化都必须先评估共享终端和敏感业务文本风险。
 
 ### 2026-07-24 AI 会话管理效率优化（已提交，未推送/未部署）
 
