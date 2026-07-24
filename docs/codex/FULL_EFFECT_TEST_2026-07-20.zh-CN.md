@@ -16,19 +16,19 @@ Mobile：按用户要求延期，不纳入本轮适配与发布测试
 
 ## 2. 测试总量
 
-| 区域 | 结果 |
-| --- | --- |
-| Backend unit | `578/578` 通过 |
-| Backend 真实站点 integration | `8/8` 通过 |
-| Backend 真实 HTTP 不重复用例 | `169/169` 通过 |
-| HTTP 模块原始加载数 | `331`；其中 `test_gateway_v2_http` 会同时加载继承的 Gateway 基础用例，本报告按不重复业务用例统计为 `169` |
-| AI pytest | `86/86` 通过 |
-| AI 固定离线效果评测 | `22/22`，full gate `PASS` |
-| Web Jest | `30` 套、`190/190` 通过 |
-| Web TypeScript / Biome / production build | 通过 |
-| AI Docker test/runtime | 构建、默认测试、`pip check` 通过 |
-| AI 合成 Chat + Vector 集成 | 通过，测试资源已清理 |
-| development / staging AI 部署编排 | 配置、健康、模型发现、向量可达通过 |
+| 区域                                      | 结果                                                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Backend unit                              | `578/578` 通过                                                                                           |
+| Backend 真实站点 integration              | `8/8` 通过                                                                                               |
+| Backend 真实 HTTP 不重复用例              | `169/169` 通过                                                                                           |
+| HTTP 模块原始加载数                       | `331`；其中 `test_gateway_v2_http` 会同时加载继承的 Gateway 基础用例，本报告按不重复业务用例统计为 `169` |
+| AI pytest                                 | `86/86` 通过                                                                                             |
+| AI 固定离线效果评测                       | `22/22`，full gate `PASS`                                                                                |
+| Web Jest                                  | `30` 套、`190/190` 通过                                                                                  |
+| Web TypeScript / Biome / production build | 通过                                                                                                     |
+| AI Docker test/runtime                    | 构建、默认测试、`pip check` 通过                                                                         |
+| AI 合成 Chat + Vector 集成                | 通过，测试资源已清理                                                                                     |
+| development / staging AI 部署编排         | 配置、健康、模型发现、向量可达通过                                                                       |
 
 真实 HTTP 不重复用例构成：
 
@@ -199,13 +199,13 @@ Standalone 合成集成：
 
 每个接口采样 `5` 次：
 
-| 接口 | 平均 | P95 | 最大 |
-| --- | ---: | ---: | ---: |
-| `search_sales_orders_v2` | `193.63 ms` | `195.89 ms` | `200.45 ms` |
-| `search_purchase_orders_v2` | `134.15 ms` | `134.92 ms` | `136.92 ms` |
-| `get_sales_order_detail` | `21.67 ms` | `21.54 ms` | `23.71 ms` |
-| `get_purchase_order_detail_v2` | `20.98 ms` | `21.23 ms` | `22.69 ms` |
-| `search_product_v2` | `13.75 ms` | `13.72 ms` | `14.98 ms` |
+| 接口                           |        平均 |         P95 |        最大 |
+| ------------------------------ | ----------: | ----------: | ----------: |
+| `search_sales_orders_v2`       | `193.63 ms` | `195.89 ms` | `200.45 ms` |
+| `search_purchase_orders_v2`    | `134.15 ms` | `134.92 ms` | `136.92 ms` |
+| `get_sales_order_detail`       |  `21.67 ms` |  `21.54 ms` |  `23.71 ms` |
+| `get_purchase_order_detail_v2` |  `20.98 ms` |  `21.23 ms` |  `22.69 ms` |
+| `search_product_v2`            |  `13.75 ms` |  `13.72 ms` |  `14.98 ms` |
 
 当前本地基线未发现明显慢接口；销售/采购工作台查询数据量已超过千级，仍保持在约 `200 ms` 以内。
 

@@ -1,12 +1,21 @@
 # 当前交接状态
 
-更新时间：2026-07-24 21:41 CST
+更新时间：2026-07-24 22:20 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-24 AI 工作台批次已推送并部署到 staging
+
+- 已推送 Backend `apps/myapp` `develop` 到 `df3824f`、独立 Web `main` 功能批次到 `48d1733`、父仓库 `develop` 到 `34237552`；AI Orchestrator 继续使用已验证的 `f246542`。Mobile 原有 5 个未提交文件和父仓库未跟踪 `.codex` 均未触碰。
+- ERP/AI 首次镜像构建 run `30099102521` 因 workflow 将完整 Backend commit SHA 误作为 `git clone --branch` 参数而失败，不是源码或依赖失败。改用当时精确指向 `df3824f` 的 `myapp_ref=develop` 后，镜像构建 run `30099398198` 成功；Frappe/ERPNext 均为 `16.18.3`，`pip check` 无损坏依赖。
+- 已发布 `ghcr.io/rgc318/myapp-erpnext:staging-20260724-3423755`（digest `sha256:2d95ba6a0c8f69c056d6cbce01065971ef8f6dfa97a648a5e4da1859cba92e08`）和 `ghcr.io/rgc318/myapp-ai:staging-20260724-3423755`（digest `sha256:75ff72cad1b994cfe791933518454300dff886c5f9a9302af17671dd91ef697e`）。Web 构建 run `30099102601` 通过 TypeScript、Biome、37 套/244 项 Jest，并发布 `ghcr.io/rgc318/myapp-web:staging-20260724-48d1733`（digest `sha256:5f62452003accfb2b916747102e786a6e3c3fb9d942ea3bd7d70eb3601867403`）。
+- ERP/AI 部署 run `30099726843` 成功，`staging.example.com` 完成 `bench migrate`；Backend、Frontend、Worker、Scheduler、WebSocket、MariaDB、Qdrant 与 AI Orchestrator 均在线，AI 健康状态为 `ok`，Backend 到 Orchestrator 鉴权通过，首页与 Ping 均为 200。Web 部署 run `30099898237` 成功，容器切换到 `staging-20260724-48d1733`，workflow 内 `/healthz`、`/user/login` 与 `/api/method/ping` 验收通过；公网 `https://erpnext.rgcdev.top/api/method/ping` 返回 `pong`，首页为 200。
+- 推送触发的 Web 普通 CI run `30099017142` 成功；coverage run `30099017198` 在 Bun/jsdom 环境因缺少 `HTMLElement.scrollIntoView` 失败，普通 Jest 与镜像构建未失败。已在全局测试初始化补齐 mock，本地 `npm run tsc`、`npm run biome:lint` 与 37 套/244 项 coverage 通过，并推送测试提交 `e29bc01 test: stabilize jsdom scroll behavior`；该提交不改变运行时代码，无需重建已部署 Web 镜像。
+- 父仓库首次推送 Lint run `30099041610` 仅因 Prettier 会机械重排本轮 3 份 Markdown 而失败；本交接提交已使用同版本 Prettier 纳入格式化结果。完整 staging HTTP 业务回归本次未启用，仍需使用普通业务账号与治理账号人工验收固定模型权限、服务端诊断脱敏、消息级 Run、长 Markdown/代码/宽表格滚动与分级水印。
 
 ### 2026-07-24 AI 高级设置、诊断权限与可读性优化（已提交，未推送/未部署）
 
@@ -1459,6 +1468,7 @@
 - Web 商品选择器增强已在前一提交完成：`e74ac07 feat: enhance order product picker`。
 - `.codex` 是既有未跟踪本地目录，不应提交。
 - Web Jest 详情页测试仍输出 jsdom `window.getComputedStyle` not implemented 和既有 open handle 提示，但测试退出码为 0；AntD 旧 API 告警已清理。
+
 ## 当前目标
 
 - 已完成企业级测试数据管理第三阶段：在完整生成、按场景补充和 reset 基础上，新增 `small / medium / large` 数据量档位，每个场景分别生成 1 / 5 / 20 份实例。
