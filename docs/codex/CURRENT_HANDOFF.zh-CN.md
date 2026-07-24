@@ -1,12 +1,21 @@
 # 当前交接状态
 
-更新时间：2026-07-24 00:12 CST
+更新时间：2026-07-24 10:55 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-24 AI 草稿关键业务摘要（已提交，未推送/未部署）
+
+- Web 新增共享 `AiDraftCompactSummary`，会话中的 `ai_draft` citation 与 `/ai/drafts` 草稿中心列表共用同一摘要规则；用户无需先打开复核工作台即可核对商品、价格、单位、往来单位、日期、订单数量与金额、仓库或库存变化。
+- `ai_draft` citation 的 `data` 已确认是 Backend 返回的完整持久草稿，包含 `payload`、validation、version、status 和 execution；`list_ai_drafts_v1` 返回同一结构，因此本项不需要扩展 Backend 契约。Web 领域 Service 新增统一 `mapAiDraft` / `resolveAiDraftCitation`，消息卡片不再自行解析草稿版本、状态、校验和执行回执元数据。
+- 商品建档摘要展示名称/编码、库存单位、标准售价、批发价、零售价、成本价以及初始库存和仓库。销售/采购摘要展示客户或供应商、单据与交付日期、商品行数、按 UOM 分组的数量、草稿金额和涉及仓库；不同 UOM 不直接相加，任一行缺少数量或价格时不展示误导性的部分金额合计。库存调整摘要展示商品、仓库、当前库存、目标库存、差异数量、估值参考和原因。
+- 四类草稿组件测试、消息卡片接入测试和 citation 领域映射测试已补齐。Web 全量验证通过：`npm run tsc`、`npm run biome:lint`、35 套/227 项 Jest、`npm run build`、`npm audit --omit=dev`（0 漏洞）和 `git diff --check`。Jest 仍保留既有 open-handle 提示，但退出码为 0。
+- Web 提交：`c84d89e feat: summarize AI draft business facts`。该提交未推送、未构建镜像、未部署；Backend、AI Orchestrator 和 Mobile 均无本项改动。Mobile 原有 5 个未提交文件继续保留且未触碰，父仓库 `.codex` 继续保持未跟踪。
+- 下一步：路线图第二阶段第 4 项“每条消息独立 Run”。在进入代码前，仍建议把版本冲突、错误分类和本次紧凑摘要一起在 staging 用真实账号人工验收，重点检查长商品名、四档价格换行、多 UOM 订单、多个仓库和窄屏横向滚动。
 
 ### 2026-07-24 AI 工作台 P1 前两项（已提交，未推送/未部署）
 
