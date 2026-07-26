@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-26 16:32 CST
+更新时间：2026-07-26 16:48 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -14,12 +14,12 @@
 - 新增 `reset_ai_conversation_context_v1` POST 接口，继续执行 owner 隔离并拒绝修改归档会话。`get_ai_conversation_v1` 增量返回状态、版本、更新时间、过期时间和上下文起始序号；Web 工作台显示上下文状态并提供带确认的“清除上下文”入口。
 - 工作状态新增独立 TTL，默认 168 小时，可通过 `MYAPP_AI_CONVERSATION_STATE_TTL_HOURS` 在 1～720 小时范围配置。过期或损坏状态在下一次 Chat/SSE 前恢复为空状态并切断旧模型消息窗口；内部 `load_conversation_context` 审计记录状态版本和 `expired / invalid_state / user_reset` 原因，不向用户重复展示工具事件。
 - 本地 `bench --site localhost migrate` 已成功执行 `extend_ai_conversation_context_lifecycle`，并确认 `context_start_sequence int(11) NOT NULL DEFAULT 1` 已存在。Backend 当前相关扩大回归 274 项通过；Web `npm run tsc`、Biome、37 套/245 项 Jest 和各仓库 `diff --check` 通过。
-- 已本地提交：Backend `de677b3 feat: add AI conversation context lifecycle`，Web `3fabcfe feat: add AI conversation context reset`；Web 后续布局修复提交为 `e4a78b9 fix: add spacing to user detail tabs`。均未推送、未部署。Backend 当前分支比远端 ahead 2；Web 比远端 ahead 2。AI Orchestrator 本轮无新增源码改动，仍保留未推送提交 `b374fc7`，父仓库暂不固定其 gitlink。
+- 已本地提交：Backend `de677b3 feat: add AI conversation context lifecycle`，Web `3fabcfe feat: add AI conversation context reset`；Web 布局修复初版为 `e4a78b9`，根据实际 ProComponents 版本源码确认 `tabs.cardProps` 不生效后，已由 `589378d fix: apply user detail tab spacing` 修正为直接给每个 Tab pane 绑定内容 class。均未推送、未部署。Backend 当前分支比远端 ahead 2；Web 比远端 ahead 3。AI Orchestrator 本轮无新增源码改动，仍保留未推送提交 `b374fc7`，父仓库暂不固定其 gitlink。
 
 ### 2026-07-26 用户详情布局间距修复（已本地提交，未推送/未部署）
 
 - 审查用户详情、商品详情、销售/采购单据详情、Party 抽屉详情、AI 草稿和 AI 管理页面后，确认用户详情的 `ProCard + tabs.items` 是唯一复现截图中内容贴边的共用模式；用户列表/角色列表的全宽表格 `padding: 0` 属于有意设计。
-- 用户详情 Tabs 通过 `tabs.cardProps.bodyStyle` 增加响应式内边距：桌面最大 24px，小屏最小 16px，覆盖账号概览、角色、数据权限、变更记录、权限快照、安全与会话全部内容，未改变业务契约。
+- 用户详情 Tabs 通过每个 `items[]` 的 `className` 直接设置实际 Tab pane 的响应式内边距：桌面最大 24px，小屏最小 16px，覆盖账号概览、角色、数据权限、变更记录、权限快照、安全与会话全部内容，未改变业务契约。
 - Web 验证已通过：`npm run tsc`、`npm run biome:lint`、Jest 37 套/245 项、`git diff --check`。
 
 ### 2026-07-26 AI 多轮会话工作状态增强（已提交，未推送/未部署）
