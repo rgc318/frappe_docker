@@ -1,12 +1,72 @@
 # 当前交接状态
 
-更新时间：2026-07-24 21:41 CST
+更新时间：2026-07-26 15:19 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-26 AI 多轮会话工作状态增强（已提交，未推送/未部署）
+
+- Backend 新增 `MyApp AI Conversation.state_version`、`working_state_json`、`state_updated_at` 字段及迁移 patch。Repository 对工作状态执行 owner 隔离、字段白名单、大小限制、`FOR UPDATE` 锁和版本比较；状态只保存 `conversation-state-v1` 的场景、商品实体、订单/报表筛选和结果集引用。
+- `_prepare_chat_run` 现在在意图解析前读取会话状态，并把裁剪后的状态传给 Orchestrator `erp-intent-v3`。当前消息优先，模型负责补全有效意图；Frappe 仍在每轮工具执行边界重新校验公司、DocType 和权限。
+- Chat/SSE 在业务工具和最终回答成功后才写回状态；版本冲突记录 `state_update_skipped` 审计，不影响当前回答。状态更新异常也不会把已成功的只读业务回答改成失败。
+- 新增单元与评测覆盖：商品代词继承、订单筛选继承与当前状态覆盖、报表口径切换、结果集摘要、状态 owner/版本隔离、并发冲突和 Orchestrator 状态上下文。当前验证：Backend AI/向量/Gateway 相关 261 项（1 项默认关闭的付费 HTTP 测试跳过）通过；AI Orchestrator 90 项 pytest、Ruff、Pre-commit、Docker test target、runtime build 和 offline 29/29 gate 通过。
+- 本地 `bench --site localhost migrate` 已成功执行 `extend_ai_conversation_state`。真实多轮 HTTP 已通过：商品会话两轮 citation 均命中 `SKU010`，订单会话第二轮保持 `sales_order / limit=5` 并更新为 `unfinished / last_month`；数据库状态分别持久化为 `active_scenario=product_search` 和 `active_scenario=order_query`，`state_version=2`。
+- 首次真实回归暴露旧 20 秒意图解析超时会在模型约 20 秒返回前触发，导致第二轮静默回退为 `general`；现已改为 45 秒并复测通过。Backend 已按 `bench serve --port 8000 --noreload --nothreading` 重启。
+- 宿主默认 Docker Buildx activity 目录为只读，首次 Compose 构建失败；改用 `BUILDX_CONFIG=/tmp/myapp-ai-buildx` 后 test/runtime 与 Compose 镜像均成功构建。Orchestrator 已恢复为正常 Compose 容器，`/health` 返回 `intent_parse=erp-intent-v3`。
+- 已提交：AI Orchestrator `b374fc7 feat: add state-aware intent parsing`；Backend `7e323b4 feat: add stateful AI conversation context`。两个子模块均未推送，父仓库暂不更新对应 gitlink；staging/production 未部署。
+
+### 2026-07-26 AI 结构化意图 Schema v2（未提交/未部署）
+
+- `IntentParseCandidate` 升级为 `erp-intent-v2`，在既有意图、商品实体、日期预设、状态、排序和数量之外，增加订单/发票多实体、报表口径、明确 `date_from/date_to` 和 `min_amount`；Schema 使用 `extra=forbid`，Orchestrator 仍只做结构化解析，不访问 ERP。
+- Frappe 执行边界对白名单实体、报表类型、ISO 日期顺序、金额上限和置信度重新校验；高置信度结构化字段可驱动多单据查询、现金流/采购等报表和金额门槛，非法或低置信度值回退本地 DSL，不信任模型原始字段。
+- 离线评测集新增多实体自定义日期和现金流报表用例；Orchestrator 90 项 pytest、Ruff、Docker test target 和 offline 26/26 gate 已通过，Backend AI/向量/Gateway 相关 8 个测试模块共 253 项通过。已只重建并重启本地 `ai-orchestrator`，健康检查返回 `intent_parse=erp-intent-v2`；真实 Service Token 在线解析多采购单据+自定义日期+金额下限、现金流报表和 Camera 商品均正确。在线结果显示本地治理服务不可用时使用 `policy_service_unavailable` fallback policy，但结构化解析成功；Backend HTTP 验证见下方，staging/production 未部署。
+- 本地 Backend 已按 `bench serve --port 8000 --noreload --nothreading` 启动并完成真实 `scenario=auto` HTTP 验证：商品、订单、报表同步请求均 `AI_CHAT_COMPLETED`，订单 DSL 为 `last_30_days / unfinished / amount_desc / limit=3`，现金流报表为 `2026-07-01` 至 `2026-07-20`；Run 持久化记录 `structured_intent`、受控工具和无错误码。AI HTTP 回归中的同步聊天、商品、SSE 订单、SSE 报表 4 项全部通过；首次失败的旧断言已改为验证无业务上下文时不编造事实。
+- 本轮验证时间段未创建 Item、Item Price、Sales Order、Purchase Order、Stock Entry 或 Stock Reconciliation；只产生并归档 AI 会话/Run，以及订单测试的一条正向反馈。当前 Backend 不是 VS Code 调试器挂接进程，只是本地 bench 服务；如需断点调试，应停止该服务后重新按 F5。
+
+### 2026-07-26 AI 结构化意图解析与自然语言规则优化 v1（历史基线，未提交/未部署）
+
+- 参考 OpenAI Structured Outputs / Function Calling、Anthropic strict tool use 和 Microsoft Semantic Kernel function calling 的共同模式，当前实现调整为“模型使用严格 JSON Schema 理解意图，Frappe 使用白名单、权限和业务服务执行；本地规则只作为快速路径与失败回退”。
+- AI Orchestrator 新增 `POST /internal/v1/intent/parse`、`erp-intent-v1` Prompt、`IntentParseCandidate/Response` 和严格 `json_schema` 输出，解析 `general / product_search / order_query / report_summary`、置信度、日期预设、状态、排序和数量，不访问 ERP 数据库、不执行写操作；后续已由上方 v2 记录取代。
+- Frappe 对 `auto` 模式的商品、订单、报表查询调用结构化意图端点；本地判断为 `general` 但包含业务实体时也会调用。置信度低于 `0.6`、端点超时、不可用或输出非法时回退本地规则，并在 Run `tool_calls` 记录 `local_rules / structured_intent / structured_intent_fallback`；用户显式选择场景时仍不增加额外意图模型调用。
+- 高置信度意图中的 `product_query` 已进入共享商品解析器；订单查询消费受控日期预设、状态、排序和 1～20 数量；报表查询消费日期预设。本地解析出的非默认具体条件优先保留，模型默认 `all/latest/10` 不会覆盖更具体的本地结果。订单/发票实体和报表类型继续由 Frappe 白名单解析。
+- 同步修复真实中文规则缺口：“看看/告诉我库存和售价”可识别为商品查询；“最近一个月”解析为最近 30 天；“还没/尚未/没有完成”优先解析为 `unfinished`；“前3张/前三张”解析为 `limit=3`。
+- 验证通过：Backend AI/向量/Gateway 203 项；AI Ruff、90 项 pytest、Docker test target 90 项和 offline full gate 24/24；三个相关工作树 `diff --check` 通过。已仅重建并重启本地 `ai-orchestrator`，健康检查返回 `intent_parse=erp-intent-v1`；使用真实本地 Service Token 的在线调用已正确解析“商品 Camera”与“最近一个月还没完成的销售订单，前三张”。Backend 未重启，未中断现有 F5 调试会话；staging/生产未部署。
+
+### 2026-07-26 AI 自然语言真实验收（未修改代码）
+
+- 使用本地 `localhost`、`Administrator` 和真实 ERP 数据执行了自然语言场景：商品查询、销售订单查询、销售报表，以及销售/采购/库存/商品建档四类草稿结构化调用。商品查询在带受控上下文时正确返回 `Camera / SKU010`、库存 `0`、售价 `1280.0`；销售与采购草稿分别正确抽取客户/商品/数量/单位、商品/数量/单位，库存草稿正确抽取 `decrease / 3 / 箱`。
+- 真实测试暴露两个自然语言解析偏差：`“我记得有个叫…的商品，帮我看看库存和售价”`、`“商品Camera，告诉我真实匹配…”` 当前自动场景仍判为 `general`，因为场景关键词未覆盖“看看”或无显式查询动词；`“最近一个月还没完成的销售订单”` 被 DSL 解析为 `date_range=all`、`status_filter=completed`，AI 回答已识别并提示“实际条件与请求不一致”。这两项应作为下一轮解析器修复用例。
+- 直接向 Orchestrator 发送带真实业务上下文的自然语言回答测试：商品查询、订单查询、报表回答均成功；没有上下文时模型正确拒绝编造业务事实。商品建档草稿本次返回 `AI 草稿服务暂时不可用`，尚未区分是 Provider 瞬时故障、Schema 拒绝还是治理限流，后续需查内部 HTTP 错误详情/服务日志。
+- 离线固定评测命令 `uv run python -m myapp_ai.evals.runner --mode offline --output /tmp/myapp-ai-eval-natural-test.json` 通过：22/22，critical、安全、Schema、禁止模式、结构化字段准确率均 100%，`gate_scope=full`、`release_gate_eligible=true`。本轮没有运行 live 计费评测，也没有执行正式单据写入。
+
+### 2026-07-26 AI 共享商品实体解析已实现（Backend 未提交）
+
+- 已在 `apps/myapp/myapp/services/ai_service.py` 增加共享 `_resolve_item_candidates` 边界，统一商品查询、销售草稿、采购草稿和库存草稿的精确编码/条码/名称、Unicode NFKC 归一化、关键词候选、必要时语义召回、权限复核和 `resolved / ambiguous / not_found` 结果。
+- “商品迪莫”“迪莫商品”“商品：Camera”等请求外壳会先归一化为实体查询；明确精确匹配不再依赖向量服务。无结果、多候选或描述性表达才尝试语义检索，语义不可用时保留可观测的 lexical fallback；商品查询上下文新增 `match_method`、`status`、`confidence`。
+- 新增共享解析器单元测试，覆盖全角/空白归一化、商品前后缀词序、精确匹配跳过语义服务、重复名称歧义和语义可用但无结果。Backend 容器内 `test_ai_service + test_ai_deterministic_eval + test_ai_vector_service` 共 73 项通过；仍有既有 `Failed to log error in db: AI Orchestrator 流式调用失败` 测试日志，退出码为 0；`git diff --check` 通过。
+- 当前仅修改 Backend 子模块的 `ai_service.py` 和测试，尚未提交、推送或部署；AI Orchestrator 仓库未修改。完整商品向量重建、测试点清理、质量集门禁和 staging 持久开关仍未完成，不能把本次解析器改动当作语义检索发布批准。
+
+### 2026-07-26 AI 自然语言检索架构审查与本地语义对比（文档已补充，代码未修改）
+
+- 已新增设计事实源 [`docs/codex/AI_NL_RETRIEVAL_ARCHITECTURE.zh-CN.md`](AI_NL_RETRIEVAL_ARCHITECTURE.zh-CN.md)。结论是：精确商品编码/条码/名称查询不依赖向量索引；向量检索只作为同义词、词序、昵称、规格和描述性表达的召回增强；模型负责结构化意图/实体理解，Frappe 负责白名单工具、权限、实时事实和最终校验。
+- 已核对当前真实代码路径：商品只读查询由 Frappe `_infer_ai_scenario`、`_extract_product_search_terms`、`search_product_v2` 和可选 `search_products_semantic` 预先构建业务上下文，之后 AI Orchestrator 只根据受控结果组织回答；当前 `tool_calls` 是后端工具执行审计，不是模型直接访问 ERP 数据库的自主函数调用。订单/报表 DSL 仍主要由本地关键词/正则解析；四类草稿是 Orchestrator 结构化候选加 Frappe 实体和业务校验。
+- 本轮没有提交业务代码，也没有修改 staging 配置。此前一次未完成的归一化代码补丁已撤回，`apps/myapp` 子模块工作树保持干净；父仓库已有的 `apps/myapp` gitlink、设计文档、交接文档和 `.codex` 用户状态均未回滚。
+- 本地临时对比：容器原本已配置 `MYAPP_AI_VECTOR_SEARCH_ENABLED=1`。将单次进程临时切换为 `0/1` 对比 `商品Camera`：关闭语义时为 `lexical_fallback` 且无结果，开启语义时返回 `SKU010 / Camera`；`帮我找适合拍照的相机` 两种模式都能命中 Camera，但开启语义后因本地索引不完整出现额外低质量候选。
+- 本地向量状态约为 `total_items=904`、`indexed=179`、Qdrant `points_count=179`，说明开启开关不等于索引质量达标；应先完整重建、清理历史测试点并完成质量门禁，再考虑 staging 持久启用。staging 之前的临时 Embedding 冒烟已能用“商品迪莫”返回“迪莫”，但 staging 持久配置仍未修改。
+- 下一步按新文档执行：先实现共享商品实体解析（精确 → 归一化 → 关键词 → 语义），让商品查询、销售/采购/库存草稿共用；随后本地全量索引和评测，再处理订单/报表结构化意图解析。不要继续为单个词序无限增加正则，也不要让向量服务成为精确查询前置依赖。
+
+### 2026-07-24 AI 工作台批次已推送并部署到 staging
+
+- 已推送 Backend `apps/myapp` `develop` 到 `df3824f`、独立 Web `main` 功能批次到 `48d1733`、父仓库 `develop` 到 `34237552`；AI Orchestrator 继续使用已验证的 `f246542`。Mobile 原有 5 个未提交文件和父仓库未跟踪 `.codex` 均未触碰。
+- ERP/AI 首次镜像构建 run `30099102521` 因 workflow 将完整 Backend commit SHA 误作为 `git clone --branch` 参数而失败，不是源码或依赖失败。改用当时精确指向 `df3824f` 的 `myapp_ref=develop` 后，镜像构建 run `30099398198` 成功；Frappe/ERPNext 均为 `16.18.3`，`pip check` 无损坏依赖。
+- 已发布 `ghcr.io/rgc318/myapp-erpnext:staging-20260724-3423755`（digest `sha256:2d95ba6a0c8f69c056d6cbce01065971ef8f6dfa97a648a5e4da1859cba92e08`）和 `ghcr.io/rgc318/myapp-ai:staging-20260724-3423755`（digest `sha256:75ff72cad1b994cfe791933518454300dff886c5f9a9302af17671dd91ef697e`）。Web 构建 run `30099102601` 通过 TypeScript、Biome、37 套/244 项 Jest，并发布 `ghcr.io/rgc318/myapp-web:staging-20260724-48d1733`（digest `sha256:5f62452003accfb2b916747102e786a6e3c3fb9d942ea3bd7d70eb3601867403`）。
+- ERP/AI 部署 run `30099726843` 成功，`staging.example.com` 完成 `bench migrate`；Backend、Frontend、Worker、Scheduler、WebSocket、MariaDB、Qdrant 与 AI Orchestrator 均在线，AI 健康状态为 `ok`，Backend 到 Orchestrator 鉴权通过，首页与 Ping 均为 200。Web 部署 run `30099898237` 成功，容器切换到 `staging-20260724-48d1733`，workflow 内 `/healthz`、`/user/login` 与 `/api/method/ping` 验收通过；公网 `https://erpnext.rgcdev.top/api/method/ping` 返回 `pong`，首页为 200。
+- 推送触发的 Web 普通 CI run `30099017142` 成功；coverage run `30099017198` 在 Bun/jsdom 环境因缺少 `HTMLElement.scrollIntoView` 失败，普通 Jest 与镜像构建未失败。已在全局测试初始化补齐 mock，本地 `npm run tsc`、`npm run biome:lint` 与 37 套/244 项 coverage 通过，并推送测试提交 `e29bc01 test: stabilize jsdom scroll behavior`；后续 CI run `30100310953` 与 coverage run `30100310946` 均成功。该提交不改变运行时代码，无需重建已部署 Web 镜像。
+- 父仓库首次推送 Lint run `30099041610` 仅因 Prettier 会机械重排本轮 3 份 Markdown 而失败；格式化与发布交接提交 `15f6e3cb docs: record staging AI workspace release` 已推送，后续 Lint run `30100755236` 成功。完整 staging HTTP 业务回归本次未启用，仍需使用普通业务账号与治理账号人工验收固定模型权限、服务端诊断脱敏、消息级 Run、长 Markdown/代码/宽表格滚动与分级水印。
 
 ### 2026-07-24 AI 高级设置、诊断权限与可读性优化（已提交，未推送/未部署）
 
@@ -1459,6 +1519,7 @@
 - Web 商品选择器增强已在前一提交完成：`e74ac07 feat: enhance order product picker`。
 - `.codex` 是既有未跟踪本地目录，不应提交。
 - Web Jest 详情页测试仍输出 jsdom `window.getComputedStyle` not implemented 和既有 open handle 提示，但测试退出码为 0；AntD 旧 API 告警已清理。
+
 ## 当前目标
 
 - 已完成企业级测试数据管理第三阶段：在完整生成、按场景补充和 reset 基础上，新增 `small / medium / large` 数据量档位，每个场景分别生成 1 / 5 / 20 份实例。
