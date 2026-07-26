@@ -63,8 +63,8 @@ AI 仅组织真实结果，不创造事实
 2. 语义检索是召回增强层，不是事实源；事实必须来自 ERP 正式服务。
 3. 模型可以提出工具和参数，但后端必须使用白名单、Schema、权限和业务服务重新校验。
 4. 多轮会话使用短期消息历史加受控 `conversation-state-v1` 工作状态；状态只帮助解析“它/刚才那个/只看未完成”等省略表达，不是 ERP 事实缓存。
-4. 无法唯一匹配时返回候选并要求用户确认，不能因为“只有一个模糊候选”就自动写入单据。
-5. 语义服务关闭、索引为空或 Provider 不可用时，系统应明确记录 `lexical_fallback`，而不是假装完成了语义理解。
+5. 无法唯一匹配时返回候选并要求用户确认，不能因为“只有一个模糊候选”就自动写入单据。
+6. 语义服务关闭、索引为空或 Provider 不可用时，系统应明确记录 `lexical_fallback`，而不是假装完成了语义理解。
 
 ## 三、分阶段改进
 
@@ -127,7 +127,7 @@ resolve_item_candidates(query, company, context, warehouse, limit)
   "intent": "order_query",
   "entities": ["sales_order", "sales_invoice"],
   "company": null,
-  "date_range": {"from": null, "to": null, "preset": "latest"},
+  "date_range": { "from": null, "to": null, "preset": "latest" },
   "status": "unfinished",
   "sort": "amount_desc",
   "limit": 5,
