@@ -8,6 +8,14 @@
 
 ## 当前最终状态
 
+### 2026-07-26 AI 上下文生命周期增强（未提交/未推送/未部署）
+
+- Backend 在既有 `conversation-state-v1` 上增加 `context_start_sequence` 消息边界和迁移 patch。用户清除上下文后保留全部历史消息、Run、citation 和草稿，但后续模型消息只读取新边界之后的内容，旧商品实体、订单筛选、报表口径和结果集引用不再参与意图或回答。
+- 新增 `reset_ai_conversation_context_v1` POST 接口，继续执行 owner 隔离并拒绝修改归档会话。`get_ai_conversation_v1` 增量返回状态、版本、更新时间、过期时间和上下文起始序号；Web 工作台显示上下文状态并提供带确认的“清除上下文”入口。
+- 工作状态新增独立 TTL，默认 168 小时，可通过 `MYAPP_AI_CONVERSATION_STATE_TTL_HOURS` 在 1～720 小时范围配置。过期或损坏状态在下一次 Chat/SSE 前恢复为空状态并切断旧模型消息窗口；内部 `load_conversation_context` 审计记录状态版本和 `expired / invalid_state / user_reset` 原因，不向用户重复展示工具事件。
+- 本地 `bench --site localhost migrate` 已成功执行 `extend_ai_conversation_context_lifecycle`，并确认 `context_start_sequence int(11) NOT NULL DEFAULT 1` 已存在。Backend 当前相关扩大回归 274 项通过；Web `npm run tsc`、Biome、37 套/245 项 Jest 和各仓库 `diff --check` 通过。
+- 当前改动未提交、未推送、未部署。Backend 仍基于本地未推送提交 `7e323b4` 继续修改；Web 基于干净的 `origin/main` 工作树修改；AI Orchestrator 本轮无新增源码改动，仍保留未推送提交 `b374fc7`。
+
 ### 2026-07-26 AI 多轮会话工作状态增强（已提交，未推送/未部署）
 
 - Backend 新增 `MyApp AI Conversation.state_version`、`working_state_json`、`state_updated_at` 字段及迁移 patch。Repository 对工作状态执行 owner 隔离、字段白名单、大小限制、`FOR UPDATE` 锁和版本比较；状态只保存 `conversation-state-v1` 的场景、商品实体、订单/报表筛选和结果集引用。
