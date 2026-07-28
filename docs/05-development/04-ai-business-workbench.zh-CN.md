@@ -149,6 +149,8 @@ draft ──编辑/恢复──> draft（新版本）
 - 普通用户通过 `list_ai_selectable_models_v1` 只能看到 `active / validated` 且属于 `fast_chat / reasoning / structured` 的模型；Embedding 和不可用模型不进入选择器。
 - Chat、SSE 和四类草稿统一接受可选 `model_alias`。省略时使用已发布策略；显式选择时由 Frappe 再次校验，并禁用本次请求的静默模型 fallback。
 - 最终 Run 返回的 `model_alias` 是实际执行事实，Web 不能只依据发送前的本地选择宣称模型已经切换。
+- 只读 Agent 在创建 Run 前执行 Runtime Policy 就绪预检。没有唯一有效的已发布策略，或主模型、fallback、显式固定模型任一未达到 `active / validated + supports_tools=true` 时，本次请求使用兼容查询模式。同步响应和 SSE 都返回 warning，Web 按普通运行警告展示，不应把 `AI_AGENT_MODEL_TOOLS_UNVERIFIED` 等内部治理错误直接呈现给业务用户。
+- 兼容查询只发生在新 Run 路由阶段，继续复用同一会话和单个模型调用；Agent 已开始后的失败不自动改走兼容路径，避免重复 Run、重复工具副作用或第二次模型费用。
 
 ## 6. Web 组件
 

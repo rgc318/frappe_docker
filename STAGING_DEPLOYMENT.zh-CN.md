@@ -137,6 +137,8 @@ runtime 镜像同时保留 `/home/frappe/frappe-bench/logs` 日志卷，并提�
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/DATA_MIGRATION.zh-CN.md`
 
+`deploy/staging/check-staging.sh` 在 `MYAPP_AI_AGENT_RUNTIME_ENABLED=1` 时会读取内部发布策略快照。没有已发布策略会输出 `Agent runtime policy: compatibility fallback (no published policy)`，但不会把整个 staging 判为故障；此时新只读请求由 Frappe 自动使用兼容查询。存在发布策略时会同时打印策略数和工具能力已就绪模型数。该检查不自动创建或发布策略，正式启用 Agent 仍必须完成 live/full 评测、审批和发布门禁。
+
 ---
 
 ## 3. 服务器准备
