@@ -1,12 +1,19 @@
 # 当前交接状态
 
-更新时间：2026-07-28 13:38 CST
+更新时间：2026-07-28 13:45 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-28 Backend 独立 CI 版本漂移修复（已提交并验证，不涉及业务运行时）
+
+- 根因：`apps/myapp/.github/workflows/ci.yml` 原先执行 `bench init` 时未指定 `frappe_ref`，随着 Frappe 上游默认分支转入 v17，独立 CI 实际安装了 `frappe 17.0.0.dev0`；这与 myapp 按 Frappe 16.18.x 维护的 `requests<2.34.0` 约束冲突。开发容器和 staging 不受影响：前者已有完整 bench 环境，后者由父仓库 workflow 显式传入 Frappe/ERPNext `v16.18.3`。
+- CI 已固定 `FRAPPE_REF=v16.18.3`、`ERPNEXT_REF=v16.18.3`，安装并启用 ERPNext，校验 Frappe 实际包版本，创建 runner 所需的 `${HOME}/logs`，并将无界的 `bench run-tests --app myapp` 改为有 10 分钟上限的 `myapp/tests/unit` 全量单元测试发现。HTTP/集成测试仍在 devcontainer、Docker 或 staging 专用环境执行。
+- Backend CI 修复提交依次为 `e56e6db`、`6895281`、`28ae9f5`、`f53889c`；最终 run [30332012052](https://github.com/rgc318/myapp/actions/runs/30332012052) 在固定 v16.18.3 环境中通过 `674 tests`。父仓库已在 `1072d0d0` 更新 Backend 子模块指针并推送；父仓库 Lint 通过。
+- 本次只改 CI workflow、Backend README、父仓库子模块指针和交接记录，未改业务代码、AI Agent 运行逻辑、API 合约或 staging 运行镜像；无需重新部署。`.codex` 仍是用户本地未跟踪目录，禁止提交。
 
 ### 2026-07-28 Agent 持久审批与 Web 同 Run 恢复闭环（已提交、推送并部署 staging）
 
