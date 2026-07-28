@@ -25,6 +25,7 @@
 - Web 已完成 `waiting_approval` 接入：SSE 暂停不会被当作流式不完整，来源会话展示审批工具、风险等级和裁剪参数摘要，Sender 在待审批期间锁定；批准或带原因拒绝后通过 Frappe 恢复同一 Run，并重新读取持久会话。审批列表对乱序响应做保护，旧请求不能覆盖新暂停状态。
 - 只读 Agent 与原有销售/采购/库存/商品草稿场景保持隔离，自动场景中的明确写意图继续进入既有草稿加人工复核链路，不会被只读工具集截获。
 - Frappe 在创建新只读 Agent Run 前会镜像 Orchestrator 的发布策略选择规则，检查场景、环境、生效期、灰度、公司/角色优先级、唯一胜出策略，以及主模型、fallback 和显式固定模型的工具能力。只有预检通过才签发 Agent 能力令牌。
+- 新 Agent Run 同时携带 Frappe 预检命中的策略编码和版本。Orchestrator 先复用匹配的短缓存；若策略版本或主模型、fallback、显式固定模型的状态/工具能力元数据不一致，则在执行模型前强制刷新一次。刷新后仍不一致时失败关闭，避免策略刚发布、回滚或模型探测刚更新后的 30 秒缓存窗口使用旧治理快照。
 - Agent Runtime 开关已开启但策略尚未发布、不匹配、存在同优先级歧义或模型工具能力未验证时，新请求不会进入一个必然失败的 Agent Run，而是使用既有“本地意图解析 → Frappe 只读预查询 → 模型总结”兼容路径，并返回用户可见 warning。已经进入 Agent 循环后的真实治理、模型或工具错误仍失败关闭，不自动重放或产生第二次模型费用。
 - `bench --site localhost migrate` 已成功执行 `create_ai_agent_runtime_tables`、`create_ai_agent_approval_table` 与 `add_ai_model_supports_tools`。
 
