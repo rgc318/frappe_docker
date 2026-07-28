@@ -1,12 +1,64 @@
 # 当前交接状态
 
-更新时间：2026-07-26 23:41 CST
+更新时间：2026-07-28 13:05 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-28 Agent 持久审批与 Web 同 Run 恢复闭环（已提交并推送，staging 发布中）
+
+- `waiting_approval` 核心闭环已完成。Orchestrator 在敏感工具前保存包含原工具决策的安全检查点，Frappe 原子创建 `MyApp AI Agent Approval`、绑定 `run_id + call_id + tool + arguments_hash`、切换 Run 状态并吊销能力令牌；批准或拒绝后重新签发令牌并恢复同一 Run，批准仍受工具幂等保护，拒绝形成结构化 `AI_AGENT_TOOL_REJECTED / denied` 结果。
+- 审批状态支持 `pending / approved / rejected / expired`、乐观版本、拒绝原因、审批人与执行结果哈希。审批参数只保存裁剪摘要和 SHA-256；任何 `call_id`、工具名或参数哈希替换都会失败关闭。取消待审批 Run 会使未决审批失效；审批已提交但恢复调用中断时可显式恢复同一审批。
+- Web `src/services/myapp/ai.ts` 已把 Frappe SSE `waiting_approval` 识别为正常暂停终态，不再误报 `AI_STREAM_INCOMPLETE`；新增 owner-scoped 审批列表与审批 mutation 映射。`/ai` 展示工具名、风险等级和裁剪参数摘要，锁定 Sender，并提供“批准并继续”和必须填写原因的拒绝动作；决定后重新读取待办和来源会话。
+- Web 额外修复审批提示刚出现时立即操作的短竞态：审批恢复后的会话重读可绕过普通会话切换 loading 锁；待审批列表使用请求顺序保护，旧响应不能覆盖刚由 SSE 收到或刚处理的审批，列表短暂失败也不会静默清空已知状态。
+- 文档已同步：`docs/codex/AI_AGENT_RUNTIME_ARCHITECTURE.zh-CN.md`、Orchestrator `README.zh-CN.md` / `docs/API_CONTRACT.zh-CN.md`、Backend `API_GATEWAY.zh-CN.md`、Web `AI_WEB_FRONTEND_DESIGN.zh-CN.md` / `WEB_DEVELOPMENT.zh-CN.md`。本地 `bench --site localhost migrate` 已成功创建 Agent Runtime、审批表和 `supports_tools` 字段，并确认审批表字段真实存在。
+- 最终验证通过：Backend AI/治理/向量/Gateway 相关 297 项 unit；Orchestrator 107 项 pytest、9 个 subtests、Ruff、Pre-commit、offline 32/32；Docker test 镜像与容器内 107 项测试、runtime 镜像；Web TypeScript、Biome、37 套/249 项 Jest、production build、`npm audit --omit=dev` 0 漏洞；父仓库、Backend、Orchestrator、Web `diff --check`。Backend 仍打印既有测试内预期的 Orchestrator 日志失败提示；Web 全量 Jest 仍有既有 open-handle，使用 `--forceExit` 取得完整通过统计，测试退出码为 0。
+- 当前正式 Agent 工具仍只有三个 `L1_READ_ONLY` 工具，均不触发审批；销售/采购/库存/商品写意图继续走既有草稿加人工复核。因此本轮新增审批基础设施和 UI 不改变原有普通对话与草稿体验，也没有让 AI 绕过正式业务确认。
+- 当前剩余生产条件：staging 使用真实模型和不同角色完成敏感工具暂停、批准、拒绝、过期、取消、并发审批、进程中断与网络故障注入；首个敏感工具接入时补齐业务权限、审批角色、正式业务幂等和审计策略。Mobile 尚未接入审批 UI，仅在近期有 Mobile 发布计划时实施。
+- 子仓库改动已提交并推送：Backend `187d413 feat: add persistent AI agent runtime`（`develop`）、Orchestrator `726950b feat: add production agent runtime`（`develop`）、Web `0789693 feat: add AI agent approval workflow`（`main`）。父仓库正在固定 Backend/Orchestrator 子模块指针并发布 staging；production 未变更。`.codex` 为用户本地未跟踪状态，继续排除在提交之外。
+
+### 2026-07-27 Agent 持久检查点与同 Run 恢复（未提交/未推送/未部署）
+
+- Orchestrator 同步与 SSE Agent Runtime 已接入 `agent-state-v1` 持久检查点：输入 Guardrail、模型工具决策、待执行工具调用、每个正式工具结果和输出 Guardrail 均写入 Frappe；Backend 固定限制检查点 200KB、事件 30KB，并拒绝能力令牌、Authorization、Cookie、密码等敏感字段。
+- 模型决策检查点保存规范化的待执行 `tool_calls`。进程在模型决策后崩溃时，恢复会执行原决策中尚未完成的工具；在工具完成后从下一模型步骤继续；已通过输出 Guardrail 的最终回答可直接同步返回或 SSE 回放。流式中断不会保存半段文本，而是从最近工具安全边界重新生成完整回答。
+- 新增 Orchestrator `POST /internal/v1/agent/run/resume` 与 `/resume/stream`；运行事件和检查点读写除 Service Token 外均要求当前 Run 能力令牌。Frappe 已接入 `resume_ai_run_v1` 与 `stream_ai_run_resume_v1`，在用户所有权和原 Prompt/模型边界校验后重新激活失败/过期 Run 并重新签发能力令牌。
+- 已验证：Orchestrator 定向 Agent 13 项通过，Ruff；Backend AI/Gateway/Repository 235 项 unit 通过。上一阶段全量门禁仍为 Orchestrator 106 项、Backend 282 项、Docker test/runtime、offline 32/32；本轮用户恢复改动尚未重新构建 Docker 镜像，尚未部署或运行 staging 故障注入。
+- 当前下一步：实现 `waiting_approval` 持久审批表、批准/拒绝状态迁移与同 Run 恢复；随后补恢复/审批 Web 反馈、Docker test/runtime 构建和 staging full-gate。保留所有既有未提交改动，不提交、不推送。
+
+### 2026-07-27 Agent Runtime P0 运行控制与 Guardrail 增强（未提交/未推送/未部署）
+
+- 只读 Agent 路径已与原有四类写意图草稿链路隔离：自动场景先做安全动作分类，商品建档、销售订单、采购订单和库存调整继续进入草稿加人工复核，不会被只读工具集截获。
+- Orchestrator 新增统一 `MYAPP_AI_AGENT_RUN_TIMEOUT_SECONDS`（默认 90 秒）、`MYAPP_AI_AGENT_MAX_TOTAL_TOKENS`（默认 60000）和取消轮询配置。等待模型、工具或最终 SSE 时，定期调用内部最小 Run Control 接口；Frappe 将 Run 取消后，Orchestrator 会取消对应的异步上游任务并以稳定码 `AI_RUN_CANCELLED` 结束。
+- 新增输入、工具结果和输出 Guardrail：阻断内部提示/凭据提取请求；工具参数按版本化白名单 Schema 校验；工具结果在进入模型前移除敏感字段和指令式内容；输出阻断凭据形态和系统提示泄露。Guardrail、模型决策、工具调用均写入 Langfuse Span，并通过稳定错误码返回。
+- Frappe 新增仅返回 `status/cancelled` 的内部 `get_ai_agent_run_control_v1`；能力令牌签发在数据库锁定后确认 Run 仍为 `running`，避免对已结束 Run 误签发。
+- `run_id + call_id` 并发幂等已强化：工具 Step 在 Run 行锁内再次读取相同调用，后到请求直接复用首个已完成结果；若存在未完成 claim，则返回稳定 `AI_AGENT_TOOL_IN_PROGRESS`，不执行第二次业务查询。
+- 已验证：Orchestrator Ruff、Pre-commit、全量 102 项 pytest 与 9 个 subtests、offline 32/32 gate 全部通过；Docker test 镜像构建及容器内 102 项测试通过，runtime 镜像构建通过；Backend AI、治理、向量、数据任务和 Gateway 共 275 项通过。宿主默认 Buildx activity 目录只读，按既有方案使用 `BUILDX_CONFIG=/tmp/myapp-ai-buildx` 后成功。Backend 测试仍会打印既有的 `Failed to log error in db: AI Orchestrator 流式调用失败` 预期日志，但退出码为 0。尚未推送或部署，仍需 staging full-gate。
+- 当前未完成：审批暂停与同 Run 恢复、崩溃后从持久模型决策/Guardrail 快照续跑、真实 staging 取消传播和 Guardrail 故障注入。
+
+### 2026-07-27 生产级单 Agent Runtime 实施（未提交/未推送/未部署）
+
+- 新增设计事实源 `docs/codex/AI_AGENT_RUNTIME_ARCHITECTURE.zh-CN.md`，明确 Orchestrator 持有有限 Agent loop，Frappe 是用户/公司/权限/ERP 事实唯一边界；当前不引入多 Agent，正式写操作继续使用草稿加人工确认。
+- Backend 已新增 Agent Run 扩展字段、`MyApp AI Agent Step`、短期能力令牌、SHA-256 存储、`run_id + call_id` 工具幂等、用户身份切换和三个只读工具：`search_products`、`query_business_documents`、`get_business_report`。内部工具端点同时验证服务 Token 与能力令牌；新增 `cancel_ai_run_v1`，取消后吊销令牌，完成/失败 SQL 只更新 `running`，迟到响应不能覆盖 `cancelled`。
+- Orchestrator 已新增 `/internal/v1/agent/run` 与 `/internal/v1/agent/run/stream`，模型使用正式 Function Calling，工具结果作为 `role=tool` 回传；默认最多 3 个模型步骤、2 次工具调用。工具后的最终 grounded answer 已改为真实 LiteLLM SSE，不再以单个伪 delta 返回；完成事件包含上游 `first_token_ms`。
+- 上下文已增加 `MYAPP_AI_MAX_CONTEXT_TOKENS=24000`，保留系统提示、工具定义和输出预算后，从最近完整会话/assistant-tool 单元向前裁剪。模型治理新增真实 `capability_probe` Function Calling 探测与 `supports_tools`；staging/production Agent 对未验证模型失败关闭。
+- Langfuse 增加 `agent-run` 父 Span 和 `agent-tool:<tool>` 子 Span，默认关闭原文采集时只发送摘要；能力令牌不进入模型或 Langfuse。固定评测从 29 增至 32，新增“带莫字商品”及变体，覆盖工具选择、参数准确性、调用预算、空结果有限重试和越权工具拒绝。
+- 本地迁移成功：`bench --site localhost migrate` 执行 `create_ai_agent_runtime_tables` 与 `add_ai_model_supports_tools`；数据库确认 Agent Step 表和 `supports_tools` 列均存在。
+- 验证通过：Backend 相关 241 项 unit；Orchestrator `pytest` 95 passed + 9 subtests、Ruff、Pre-commit；Docker test 镜像构建与容器内 95 项测试；runtime 镜像构建；父/Backend/Orchestrator `diff --check`。仅有既有 Starlette/httpx 弃用警告和测试内预期的 Frappe 日志失败提示，退出码均为 0。
+- 当前工作区未提交，且必须保留进入本轮前已有的文档改动：父仓库 `AI_NL_RETRIEVAL_ARCHITECTURE`、`CURRENT_HANDOFF`，Orchestrator `docs/API_CONTRACT`，Web `AI_WEB_FRONTEND_DESIGN`。`.codex` 仍为用户未跟踪状态。本轮未提交、未推送、未构建部署镜像到 Registry、未部署 staging/production。
+- 对外口径：生产级只读单 Agent Runtime 核心已实现；完整生产验收仍需 staging 真实模型/权限/故障注入 full gate。接入第一个敏感或写工具前，还必须完成 `waiting_approval` 的持久暂停与同 Run 恢复；当前写工具未接入 Agent，因此不会绕过人工确认。
+
+### 2026-07-27 AI Agent 架构与流式输出复核（文档已更新，代码未修改）
+
+- staging 真实复现“查询一下有没有带莫字的商品”返回 0 条。Run 审计中的两个搜索词哈希已反查为“有没有带莫字的”“有没有带莫字”；直接调用 `search_product_v2(search_key=莫)` 能返回“迪莫”，库存 1000 件、参考价 5。根因是商品工具参数提取和编排，而不是 ERP 商品接口或数据。
+- 当前商品查询仍是“本地场景/结构化意图 → Frappe 关键词和实体解析 → 预执行商品搜索 → LLM 总结”，不具备模型选择工具、接收 tool result 后根据空结果再次调用的完整 Agent loop。目标架构调整为模型通过白名单 Schema 生成 `search_products(query, match_mode, search_fields, limit)`，Frappe 校验权限、公司、字段和数量后执行；本地规则只保留精确快速路径、降级和安全规范化。
+- 已核对 OpenAI Function Calling/Agents SDK、Anthropic Tool Use、Google ADK 和 Microsoft Agent Framework 官方设计，共同边界为“模型理解和选择工具，应用执行受控工具，结果回传模型，必要时有限继续调用”；模型仍不得直接访问 MariaDB、Frappe ORM 或生成原始数据库过滤器。
+- 当前 Chat 链路确实是端到端 SSE：LiteLLM `stream=true`，Orchestrator/Frappe 转发 `message_delta`，两层响应均设置 `X-Accel-Buffering: no`，Web Nginx `proxy_buffering off`，浏览器使用 `fetch + ReadableStream`。当前客户端只展示可见 `delta.content`，不展示或折叠模型隐藏推理正文。
+- 截图对应两次 `opencode-deepseek-v4-flash` Run：`AI-RUN-40e03546c0044b9ea2312648a6f3e61a` 总耗时 12110ms、首 Token 11562ms、reasoning tokens 869；`AI-RUN-0a81084cab2740e3bd27c9dbb492c041` 总耗时 26463ms、首 Token 25937ms、reasoning tokens 1988。两次首 Token 到完成都只有约 0.53～0.55 秒，所以肉眼表现为长时间加载后短回答近似一次出现，并非接口退化为非流式。
+- 当前决策：流式功能已确认正常，暂不调整 SSE 链路、前端打字机动画或运行中的模型配置；后续若优化首 Token 体验，优先通过简单查询使用低延迟/低推理模型的模型路由解决，不人为拆分或延迟完整回答制造假流式。
+- 已更新 `docs/codex/AI_NL_RETRIEVAL_ARCHITECTURE.zh-CN.md`、Web `AI_WEB_FRONTEND_DESIGN.zh-CN.md` 和 AI Orchestrator `docs/API_CONTRACT.zh-CN.md`；当前仅为未提交文档修改，未构建镜像、未部署，也未改变业务接口或运行态。
 
 ### 2026-07-26 AI 会话列表重叠修复（已提交、推送并部署 staging）
 
