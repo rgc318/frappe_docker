@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-28 13:05 CST
+更新时间：2026-07-28 12:40 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -8,7 +8,7 @@
 
 ## 当前最终状态
 
-### 2026-07-28 Agent 持久审批与 Web 同 Run 恢复闭环（已提交并推送，staging 发布中）
+### 2026-07-28 Agent 持久审批与 Web 同 Run 恢复闭环（已提交、推送并部署 staging）
 
 - `waiting_approval` 核心闭环已完成。Orchestrator 在敏感工具前保存包含原工具决策的安全检查点，Frappe 原子创建 `MyApp AI Agent Approval`、绑定 `run_id + call_id + tool + arguments_hash`、切换 Run 状态并吊销能力令牌；批准或拒绝后重新签发令牌并恢复同一 Run，批准仍受工具幂等保护，拒绝形成结构化 `AI_AGENT_TOOL_REJECTED / denied` 结果。
 - 审批状态支持 `pending / approved / rejected / expired`、乐观版本、拒绝原因、审批人与执行结果哈希。审批参数只保存裁剪摘要和 SHA-256；任何 `call_id`、工具名或参数哈希替换都会失败关闭。取消待审批 Run 会使未决审批失效；审批已提交但恢复调用中断时可显式恢复同一审批。
@@ -17,8 +17,11 @@
 - 文档已同步：`docs/codex/AI_AGENT_RUNTIME_ARCHITECTURE.zh-CN.md`、Orchestrator `README.zh-CN.md` / `docs/API_CONTRACT.zh-CN.md`、Backend `API_GATEWAY.zh-CN.md`、Web `AI_WEB_FRONTEND_DESIGN.zh-CN.md` / `WEB_DEVELOPMENT.zh-CN.md`。本地 `bench --site localhost migrate` 已成功创建 Agent Runtime、审批表和 `supports_tools` 字段，并确认审批表字段真实存在。
 - 最终验证通过：Backend AI/治理/向量/Gateway 相关 297 项 unit；Orchestrator 107 项 pytest、9 个 subtests、Ruff、Pre-commit、offline 32/32；Docker test 镜像与容器内 107 项测试、runtime 镜像；Web TypeScript、Biome、37 套/249 项 Jest、production build、`npm audit --omit=dev` 0 漏洞；父仓库、Backend、Orchestrator、Web `diff --check`。Backend 仍打印既有测试内预期的 Orchestrator 日志失败提示；Web 全量 Jest 仍有既有 open-handle，使用 `--forceExit` 取得完整通过统计，测试退出码为 0。
 - 当前正式 Agent 工具仍只有三个 `L1_READ_ONLY` 工具，均不触发审批；销售/采购/库存/商品写意图继续走既有草稿加人工复核。因此本轮新增审批基础设施和 UI 不改变原有普通对话与草稿体验，也没有让 AI 绕过正式业务确认。
-- 当前剩余生产条件：staging 使用真实模型和不同角色完成敏感工具暂停、批准、拒绝、过期、取消、并发审批、进程中断与网络故障注入；首个敏感工具接入时补齐业务权限、审批角色、正式业务幂等和审计策略。Mobile 尚未接入审批 UI，仅在近期有 Mobile 发布计划时实施。
-- 子仓库改动已提交并推送：Backend `187d413 feat: add persistent AI agent runtime`（`develop`）、Orchestrator `726950b feat: add production agent runtime`（`develop`）、Web `0789693 feat: add AI agent approval workflow`（`main`）。父仓库正在固定 Backend/Orchestrator 子模块指针并发布 staging；production 未变更。`.codex` 为用户本地未跟踪状态，继续排除在提交之外。
+- staging 发布记录：父仓库 `6b21ce26`，ERP/AI 构建 run [30328623248](https://github.com/rgc318/frappe_docker/actions/runs/30328623248)，ERP 镜像 `ghcr.io/rgc318/myapp-erpnext:staging-20260728-6b21ce26@sha256:b6741a8fc7e7f88215b3c35155c50d6d7d21419a65755fb276961fa84387e2b5`，AI 镜像 `ghcr.io/rgc318/myapp-ai:staging-20260728-6b21ce26@sha256:6192a02efd674fb0d8155c7c5c82d2650c3a55673f6e9c7db007bb23f6879a13`；Web 构建 run [30328422011](https://github.com/rgc318/myapp-web/actions/runs/30328422011)，镜像 `ghcr.io/rgc318/myapp-web:staging-20260728-6b21ce26@sha256:f297df135bf9b7ba163f9ee972b767d6de230f3b49ae2b0e5be9e98e6ebe4a7d`。
+- 部署验收：ERP/AI 部署 run [30328945811](https://github.com/rgc318/frappe_docker/actions/runs/30328945811)，Web 部署 run [30329069477](https://github.com/rgc318/myapp-web/actions/runs/30329069477)，均成功；工作流 health check 确认 AI `status=ok`、Backend→AI 鉴权、ERP 首页/Ping 通过，直连 `192.168.31.229:28080` 的 ERP 首页/Ping 和 `:30080` 的 Web `/healthz`、登录页、Gateway Ping 均 HTTP 200。production 未变更。
+- 子仓库改动已提交并推送：Backend `187d413 feat: add persistent AI agent runtime`（`develop`）、Orchestrator `726950b feat: add production agent runtime`（`develop`）、Web `0789693 feat: add AI agent approval workflow`（`main`）；父仓库 `6b21ce26 feat: add modern AI agent runtime` 已推送并固定子模块指针。`.codex` 为用户本地未跟踪状态，继续排除在提交之外。
+- 远端 CI：Orchestrator CI/CodeQL、Web CI/coverage、父仓库 Lint 均通过；Backend CI [30328345110](https://github.com/rgc318/myapp/actions/runs/30328345110) 失败于既有 CI 使用 Frappe `develop`/v17 依赖组合的 `pip check`（PyJWT/requests 版本不匹配），不是本次 AI 代码测试失败；本地 Backend 297 项验证和 staging 构建均通过。首次 ERP/AI 构建 run `30328423351` 仅因误把提交 SHA 传给要求分支名的 `myapp_ref` 失败，已由上述正确 run 重建。
+- 当前剩余生产条件：正式接入敏感工具前，仍需在 staging 使用真实模型和不同角色完成暂停、批准、拒绝、过期、取消、并发审批、进程中断与网络故障注入，并补齐业务权限、审批角色、正式业务幂等和审计策略。当前三个正式工具均为 `L1_READ_ONLY`，不会触发审批；Mobile 尚未接入审批 UI，仅在近期有 Mobile 发布计划时实施。
 
 ### 2026-07-27 Agent 持久检查点与同 Run 恢复（未提交/未推送/未部署）
 
