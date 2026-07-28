@@ -18,7 +18,7 @@
 - 部署后验收：ERP 首页/Ping、Web `/healthz`、登录页、Gateway Ping 均 HTTP 200；staging `check-staging.sh` 通过，AI `status=ok`、LiteLLM/治理/向量配置正常，Backend→AI 鉴权通过；容器无重启，AI/Web healthy。真实普通 Chat SSE 产生 14 个 delta 并完成 Run；持久取消实测将 Run 状态写为 `cancelled`；Web 产物包含 `cancel_ai_run_v1`。
 - Agent 治理风险：模型可用性探测已执行，13/13 可用、8 个模型确认支持工具调用；但 staging 当前没有任何已发布 AI Runtime Policy，因此 Agent 请求按设计返回 `AI_AGENT_MODEL_TOOLS_UNVERIFIED`，不会执行工具。不能绕过正式评测和策略审批直接发布模型策略；需后续选择模型、完成 live/full gate 和治理审批后，才能在 staging 完整验收商品/订单/报表 Agent 工具链。当前普通 Chat 与部署健康不受影响。
 - 最终代码验证：Orchestrator 108 项 pytest + 9 subtests、offline eval `32/32`、Ruff/Pre-commit/Docker test/runtime；Backend 250 项；Web 37 套/251 项、tsc、Biome、production build；Backend CI [30336085292](https://github.com/rgc318/myapp/actions/runs/30336085292)、Orchestrator CI/CodeQL [30336085145](https://github.com/rgc318/myapp-ai/actions/runs/30336085145)、Web CI/coverage [30336090324](https://github.com/rgc318/myapp-web/actions/runs/30336090324) 均通过。父仓库、Backend、Orchestrator、Web `git diff --check` 均通过。
-- 当前仅有父仓库本交接文件待提交；`.codex` 是用户已有未跟踪状态，继续排除。production 未变更。
+- 当前所有相关代码、子模块指针和交接记录均已提交并推送；`.codex` 是用户已有未跟踪状态，继续排除。production 未变更。
 
 ### 2026-07-28 Backend 独立 CI 版本漂移修复（已提交并验证，不涉及业务运行时）
 
