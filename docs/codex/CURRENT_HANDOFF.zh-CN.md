@@ -1,12 +1,23 @@
 # 当前交接状态
 
-更新时间：2026-07-28 21:23 CST
+更新时间：2026-07-28 23:33 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-28 AI 只读查询改为模型优先语义路由（已提交、推送并部署 staging）
+
+- 根因已修复：Web 的“自动识别”原先先把只读问题固化为 `product_search / order_query / report_summary` 再提交 Backend，Backend 又只在请求场景为 `auto` 时尝试结构化意图模型，因此实际兼容路径仍由本地关键词和正则生成查询词。“查询一下有没有带莫字的商品”被错误提取为整段请求外壳，无法命中实际存在的商品“迪莫”。
+- 新边界为：Web 自动识别只采用四类写草稿结果进入专用草稿与人工复核链路；只读粗粒度结果仍以 `scenario=auto` 发送。Backend 在 Agent Runtime 未就绪的兼容路径中，对除四类写草稿之外的所有 Chat 请求调用 `erp-intent-v3`，由模型生成白名单场景和结构化参数；显式只读场景保持锁定，模型不能改写为另一类工具。关键词/DSL 只在模型配置缺失、超时、低置信度或输出非法时降级，并记录 `structured_intent_fallback`。
+- 回归覆盖原句和换说法：`product_query="莫"` 必须使底层 `search_product_v2(search_key="莫")` 返回“迪莫”；“仓里还剩迪莫吗”在本地规则仍为 `general`，但模型可路由到 `product_search`；显式 `product_search` 不会被模型误改成 `order_query`。Web 覆盖自动只读请求发送 `auto`、显式只读场景锁定一次和四类草稿仍走专用 API。
+- 提交与推送：Backend `e4f828e fix: prioritize AI intent parsing for chat queries`（`develop`）、Web `e3942aa fix: keep auto chat routing model-driven`（`main`）、父仓库 `7ceba511 fix: make AI query routing model-driven`（`develop`）。Backend CI [30369230738](https://github.com/rgc318/myapp/actions/runs/30369230738)、Web CI [30369329683](https://github.com/rgc318/myapp-web/actions/runs/30369329683) / coverage [30369329154](https://github.com/rgc318/myapp-web/actions/runs/30369329154)、父仓库 Lint [30369373999](https://github.com/rgc318/frappe_docker/actions/runs/30369373999) 均成功。
+- 本地验证通过：Backend AI 文件 78 项、全量 unit 689 项；Web TypeScript、Biome、37 套 252 项 Jest、production build；父仓库、Backend、Orchestrator、Web `diff --check`。Backend 容器没有安装 Ruff，宿主没有安装 Pre-commit，因此未本地重复执行这两个命令；远端 Backend CI 和父仓库 Lint 已通过。Web Jest 仍有既有 open-handle 提示，但退出码为 0。
+- staging 统一标签 `staging-20260728-7ceba511`。ERP/AI 构建 run [30371622544](https://github.com/rgc318/frappe_docker/actions/runs/30371622544)，Web 构建 run [30369809312](https://github.com/rgc318/myapp-web/actions/runs/30369809312)；ERP/AI 部署与 health check run [30371981447](https://github.com/rgc318/frappe_docker/actions/runs/30371981447)，Web 部署 run [30371979486](https://github.com/rgc318/myapp-web/actions/runs/30371979486)。镜像 digest：ERP `sha256:b578b72726bb75c53c2f9e9df0e2cc994db1c35a421c64193b9589e6d4046790`、AI `sha256:261a389dd78eb8a2619b55aa0f6c6b368111d0dc9503185a2c6e44e162e79332`、Web `sha256:e4a8bdeedc8d33ce81f50386e4d5674b8e4fb1dec5ed61b407c300b4baeeca5b`；Web OCI revision 为 `e3942aa3653b93bf16e10c8aa932b297193dcde6`，AI revision 仍为 `79a838022f923179a7658ca0753356e186b19a8e`。
+- 部署后真实验收：服务器 `vivy@192.168.31.229` 父仓库为 `7ceba511`，ERP/AI/Web 新镜像全部运行且重启数为 0；ERP 首页/Ping、Web `/healthz`/登录、Backend→AI 鉴权均通过，最近 Frontend/Orchestrator 日志无 5xx、ERROR 或 Traceback。同步 Run `AI-RUN-7100417c3056422ea1633fc9573969ec` 返回 citation“迪莫”；审计工具顺序为 `agent_runtime_readiness → parse_ai_intent → search_products → load_conversation_context → update_conversation_state`，`parse_mode=structured_intent`，实际 `search_term_hashes` 与“莫”的 SHA-256 完全一致，`result_count=1`。换说法 Run `AI-RUN-7d37de722e9840759663c365a2479d68` 同样以 `structured_intent` 查询“迪莫”并返回 1 项。真实 SSE Run `AI-RUN-ca833e3321dd455f9d658ac3ccef67ef` 完成并返回“迪莫”，收到 92 个上游 delta、138 个字符；Web 没有人工逐字拆分或延迟。首次未消费 Response 的测试 Run 已通过正式取消接口标记 `cancelled`。
+- 治理边界不变：`check-staging.sh` 仍输出 `Agent runtime policy: compatibility fallback (no published policy)`，上述 Run 的策略字段为空且 Agent Step 为 0。没有创建或发布 Runtime Policy，也没有绕过 live/full evaluation、审批和发布门禁；production 未变更，`.codex` 继续保持用户本地未跟踪状态。
 
 ### 2026-07-28 Agent Runtime 策略快照握手与缓存竞态修复（已提交、推送并部署 staging）
 
