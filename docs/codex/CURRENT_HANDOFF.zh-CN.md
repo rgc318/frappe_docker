@@ -1,12 +1,24 @@
 # 当前交接状态
 
-更新时间：2026-07-28 13:45 CST
+更新时间：2026-07-28 15:34 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-28 AI Agent 审查缺陷修复与 staging 发布（已提交、推送并部署）
+
+- Orchestrator 修复工具结果后的 SSE 输出 Guardrail 泄露窗口：每个上游 delta 先对累计输出执行检查，保留 256 字符安全尾部，完整输出通过后才发送尾部；首次 Token 指标改为首次真正向客户端发送内容时记录。新增跨 delta 凭据回归测试，确认 `MYAPP_AI_SERVICE_TOKEN` 形态被阻断前不会发出 `message_delta`，阻断事件会持久化失败审计。
+- Backend 在 Frappe 边界按 Orchestrator 的三个正式工具 Schema 重新验证参数类型、必填字段、枚举、长度、数量、数值范围和额外字段；`run_id + call_id` 的缓存与执行中重放同时绑定 `tool_name + arguments_json`，不同工具或参数复用同一 Call ID 会失败关闭。审批入口同时验证工具属于 Run `allowed_tools`，并新增对应回归测试。
+- Web “停止生成”现在调用 `cancel_ai_run_v1` 持久取消当前 Run，同时立即中止本地 SSE；持久状态确认失败时只提示刷新，不阻塞本地停止。领域 service 与页面测试分别覆盖取消 mutation 契约以及“持久取消 + AbortSignal”组合行为。
+- 提交与推送：Backend `be1ba6e fix: harden AI agent tool execution`（`develop`）、Orchestrator `c775399 fix: prevent guarded stream leakage`（`develop`）、Web `efc69aa fix: persist AI run cancellation`（`main`）；父仓库 `4c1cd84a fix: harden AI runtime release`（`develop`）已固定并推送两个子模块指针。
+- staging 发布：统一 tag `staging-20260728-4c1cd84a`。ERP/AI 构建 run [30336195765](https://github.com/rgc318/frappe_docker/actions/runs/30336195765)、部署与 health check run [30336730841](https://github.com/rgc318/frappe_docker/actions/runs/30336730841)；Web 构建 run [30336195383](https://github.com/rgc318/myapp-web/actions/runs/30336195383)、部署 run [30337241185](https://github.com/rgc318/myapp-web/actions/runs/30337241185)。服务器 `vivy@192.168.31.229` 已运行 ERP/AI/Web 新镜像，AI revision `c775399ee5bcd632d5c0702ca2ab09f32c022743`，镜像 digest 分别为 ERP `sha256:20284eee8c1808b217fa5533e224db69c2b1adef10a64e54883651686064c261`、AI `sha256:caba17952d5ab30c25b7165692956b0875974fa254792ef82be27b404539b492`、Web `sha256:e27d53c7dde0607428453f888d24f819fdd3d082758d79fd83b46f7d4a5e4d1c`。
+- 部署后验收：ERP 首页/Ping、Web `/healthz`、登录页、Gateway Ping 均 HTTP 200；staging `check-staging.sh` 通过，AI `status=ok`、LiteLLM/治理/向量配置正常，Backend→AI 鉴权通过；容器无重启，AI/Web healthy。真实普通 Chat SSE 产生 14 个 delta 并完成 Run；持久取消实测将 Run 状态写为 `cancelled`；Web 产物包含 `cancel_ai_run_v1`。
+- Agent 治理风险：模型可用性探测已执行，13/13 可用、8 个模型确认支持工具调用；但 staging 当前没有任何已发布 AI Runtime Policy，因此 Agent 请求按设计返回 `AI_AGENT_MODEL_TOOLS_UNVERIFIED`，不会执行工具。不能绕过正式评测和策略审批直接发布模型策略；需后续选择模型、完成 live/full gate 和治理审批后，才能在 staging 完整验收商品/订单/报表 Agent 工具链。当前普通 Chat 与部署健康不受影响。
+- 最终代码验证：Orchestrator 108 项 pytest + 9 subtests、offline eval `32/32`、Ruff/Pre-commit/Docker test/runtime；Backend 250 项；Web 37 套/251 项、tsc、Biome、production build；Backend CI [30336085292](https://github.com/rgc318/myapp/actions/runs/30336085292)、Orchestrator CI/CodeQL [30336085145](https://github.com/rgc318/myapp-ai/actions/runs/30336085145)、Web CI/coverage [30336090324](https://github.com/rgc318/myapp-web/actions/runs/30336090324) 均通过。父仓库、Backend、Orchestrator、Web `git diff --check` 均通过。
+- 当前仅有父仓库本交接文件待提交；`.codex` 是用户已有未跟踪状态，继续排除。production 未变更。
 
 ### 2026-07-28 Backend 独立 CI 版本漂移修复（已提交并验证，不涉及业务运行时）
 
