@@ -1,12 +1,23 @@
 # 当前交接状态
 
-更新时间：2026-07-28 17:48 CST
+更新时间：2026-07-28 21:23 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-28 Agent Runtime 策略快照握手与缓存竞态修复（已提交、推送并部署 staging）
+
+- 根因已修复：Backend 每次新 Run readiness 都读取最新发布策略，而 Orchestrator 默认缓存已验证策略快照 30 秒；策略刚发布、回滚或模型工具能力刚更新时，Backend 可能判定 Agent 已就绪，但 Orchestrator 仍持有旧快照。新 Agent Run 现在携带 readiness 命中的 `policy_code / policy_version`，Orchestrator 复用匹配缓存；版本或主模型、fallback、显式固定模型的 `status + supports_tools` 元数据不一致时强制刷新一次，刷新后仍不一致则以 `AI_AGENT_POLICY_SNAPSHOT_MISMATCH` 失败关闭。
+- 契约审查额外补齐绕过边界：新建 Agent Run 缺少有效策略编码或正版本号时，在访问策略服务或模型前以 `AI_AGENT_POLICY_HANDSHAKE_REQUIRED` 拒绝；审批/失败检查点恢复继续绑定原 Run、能力范围、固定模型和持久检查点，不被误当成新 Run。普通 Chat 继续使用短缓存，不增加每请求刷新开销；无发布策略的兼容查询不携带策略握手字段。
+- 提交与推送：Backend `358c22b fix: bind agent runs to runtime policy version`、Orchestrator `79a8380 fix: refresh stale agent policy snapshots`、父仓库 `25b1af94 fix: synchronize AI agent policy snapshots`，均已推送 `develop`。远端 Backend CI [30360001505](https://github.com/rgc318/myapp/actions/runs/30360001505)、Orchestrator CI [30360047708](https://github.com/rgc318/myapp-ai/actions/runs/30360047708) / CodeQL [30360047814](https://github.com/rgc318/myapp-ai/actions/runs/30360047814)、父仓库 Lint [30360412798](https://github.com/rgc318/frappe_docker/actions/runs/30360412798) 全部成功。
+- 验证通过：Backend 定向 100 项、全量 unit 685 项及 Pre-commit/Ruff；Orchestrator 全量 `113 passed + 9 subtests`、容器内 113 项、Ruff/Pre-commit、offline eval `32/32 PASS`、test/runtime 镜像；隔离 Compose 的 health/chat/vector 写入检索删除；父仓库和三个相关仓库 `diff --check`。父仓库本地 `uvx pre-commit --all-files` 仅因未改动的只读 `deploy/staging/backup-staging.sh` 和 Python 3.14 下 `pyupgrade` 上游兼容问题未能全量完成；本次改动文件钩子通过，远端 Lint 亦通过。
+- staging 统一标签 `staging-20260728-25b1af94`，成功构建 run [30360986351](https://github.com/rgc318/frappe_docker/actions/runs/30360986351)，正确站点 `staging.example.com` 部署与健康检查 run [30361328624](https://github.com/rgc318/frappe_docker/actions/runs/30361328624)。ERP digest `sha256:bb48a95803da507c7b98a8e37e66c00758a961bdb72dba9a470b867f85d1dd8b`；AI digest `sha256:6cfbccbded69b4cdcc2ad9331f6a6aaf7dc6cfd9266868d8616c2bbd8312e2a9`，AI OCI revision `79a838022f923179a7658ca0753356e186b19a8e`。服务器父仓库为 `25b1af94`，所有 staging 容器运行中且重启数为 0，AI/Qdrant/MariaDB healthy，ERP 首页和 Ping HTTP 200，Backend→AI 鉴权通过。
+- 部署后真实验收：仍无发布策略，`check-staging.sh` 正确输出 `Agent runtime policy: compatibility fallback (no published policy)`。同步 Camera 查询返回 `SKU010`、库存 `83 件`、价格 `1280.0 元`，Run `AI-RUN-b70d9a15408f4b66875866da46c7ddfc` completed；真实 SSE Run `AI-RUN-b898605375434fc99c034839f7719165` 产生 38 个上游 delta，共 59 字符，单块长度分布为 `1/2/3/4/6`，证明没有人为固定逐字符输出。两个 Run 均 completed、策略为空且 Agent Step 为 0；最近 Backend/Orchestrator 日志没有 Traceback、策略握手错误或 HTTP 5xx。
+- 已知独立部署缺陷：`Build myapp staging image` 文档声称 `myapp_ref` 支持完整 commit，但 workflow 把该值写入 `apps.staging.json.branch`，`bench init` 会执行 `git clone --branch <SHA>`；首次 run [30360504077](https://github.com/rgc318/frappe_docker/actions/runs/30360504077) 因此失败。确认远端 `develop` 精确指向 `358c22b243ee8d1f286f90f167a17ac05911342e` 后用分支重跑成功。本轮未扩大范围修改构建工具；后续应让 workflow 真正支持不可变 commit checkout，或把输入契约收窄为 branch/tag。
+- 当前边界不变：staging 仍没有已发布 Runtime Policy，真实自主工具 Agent 不能绕过 live/full evaluation、审批和发布门禁启用；普通 Chat 和兼容只读查询正常。production 未变更，父仓库仅保留用户已有未跟踪 `.codex`。
 
 ### 2026-07-28 Agent Runtime 策略未就绪兼容降级（已提交、推送并部署 staging）
 
