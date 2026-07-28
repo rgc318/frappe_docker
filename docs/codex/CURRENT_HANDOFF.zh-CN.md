@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-28 12:40 CST
+更新时间：2026-07-28 13:38 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -19,8 +19,8 @@
 - 当前正式 Agent 工具仍只有三个 `L1_READ_ONLY` 工具，均不触发审批；销售/采购/库存/商品写意图继续走既有草稿加人工复核。因此本轮新增审批基础设施和 UI 不改变原有普通对话与草稿体验，也没有让 AI 绕过正式业务确认。
 - staging 发布记录：父仓库 `6b21ce26`，ERP/AI 构建 run [30328623248](https://github.com/rgc318/frappe_docker/actions/runs/30328623248)，ERP 镜像 `ghcr.io/rgc318/myapp-erpnext:staging-20260728-6b21ce26@sha256:b6741a8fc7e7f88215b3c35155c50d6d7d21419a65755fb276961fa84387e2b5`，AI 镜像 `ghcr.io/rgc318/myapp-ai:staging-20260728-6b21ce26@sha256:6192a02efd674fb0d8155c7c5c82d2650c3a55673f6e9c7db007bb23f6879a13`；Web 构建 run [30328422011](https://github.com/rgc318/myapp-web/actions/runs/30328422011)，镜像 `ghcr.io/rgc318/myapp-web:staging-20260728-6b21ce26@sha256:f297df135bf9b7ba163f9ee972b767d6de230f3b49ae2b0e5be9e98e6ebe4a7d`。
 - 部署验收：ERP/AI 部署 run [30328945811](https://github.com/rgc318/frappe_docker/actions/runs/30328945811)，Web 部署 run [30329069477](https://github.com/rgc318/myapp-web/actions/runs/30329069477)，均成功；工作流 health check 确认 AI `status=ok`、Backend→AI 鉴权、ERP 首页/Ping 通过，直连 `192.168.31.229:28080` 的 ERP 首页/Ping 和 `:30080` 的 Web `/healthz`、登录页、Gateway Ping 均 HTTP 200。production 未变更。
-- 子仓库改动已提交并推送：Backend `187d413 feat: add persistent AI agent runtime`（`develop`）、Orchestrator `726950b feat: add production agent runtime`（`develop`）、Web `0789693 feat: add AI agent approval workflow`（`main`）；父仓库 `6b21ce26 feat: add modern AI agent runtime` 已推送并固定子模块指针。`.codex` 为用户本地未跟踪状态，继续排除在提交之外。
-- 远端 CI：Orchestrator CI/CodeQL、Web CI/coverage、父仓库 Lint 均通过；Backend CI [30328345110](https://github.com/rgc318/myapp/actions/runs/30328345110) 失败于既有 CI 使用 Frappe `develop`/v17 依赖组合的 `pip check`（PyJWT/requests 版本不匹配），不是本次 AI 代码测试失败；本地 Backend 297 项验证和 staging 构建均通过。首次 ERP/AI 构建 run `30328423351` 仅因误把提交 SHA 传给要求分支名的 `myapp_ref` 失败，已由上述正确 run 重建。
+- 子仓库改动已提交并推送：Backend 功能 `187d413 feat: add persistent AI agent runtime`、独立 CI 修复最新提交 `f53889c ci: prepare Frappe log directory`（`develop`），Orchestrator `726950b feat: add production agent runtime`（`develop`）、Web `0789693 feat: add AI agent approval workflow`（`main`）；父仓库 `6b21ce26 feat: add modern AI agent runtime` 已推送并固定发布时子模块指针。`.codex` 为用户本地未跟踪状态，继续排除在提交之外。
+- 远端 CI：Orchestrator CI/CodeQL、Web CI/coverage、父仓库 Lint 均通过；Backend 独立 CI 已从浮动 Frappe `develop` 修复为固定 Frappe/ERPNext `v16.18.3`，增加实际 Frappe 包版本断言、ERPNext 安装、Frappe 日志目录准备和 10 分钟有界单元测试步骤。最终 run [30332012052](https://github.com/rgc318/myapp/actions/runs/30332012052) 完成完整环境安装并通过 `myapp/tests/unit` 674 项测试；需要真实 HTTP 服务或业务数据的 HTTP/集成测试继续在 devcontainer、Docker 或 staging 执行。首次 ERP/AI 构建 run `30328423351` 仅因误把提交 SHA 传给要求分支名的 `myapp_ref` 失败，已由上述正确 run 重建。
 - 当前剩余生产条件：正式接入敏感工具前，仍需在 staging 使用真实模型和不同角色完成暂停、批准、拒绝、过期、取消、并发审批、进程中断与网络故障注入，并补齐业务权限、审批角色、正式业务幂等和审计策略。当前三个正式工具均为 `L1_READ_ONLY`，不会触发审批；Mobile 尚未接入审批 UI，仅在近期有 Mobile 发布计划时实施。
 
 ### 2026-07-27 Agent 持久检查点与同 Run 恢复（未提交/未推送/未部署）
