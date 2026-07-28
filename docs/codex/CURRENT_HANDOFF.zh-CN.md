@@ -1,12 +1,25 @@
 # 当前交接状态
 
-更新时间：2026-07-28 15:34 CST
+更新时间：2026-07-28 17:48 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-28 Agent Runtime 策略未就绪兼容降级（已提交、推送并部署 staging）
+
+- 根因已修复：Backend 原先只根据 `MYAPP_AI_AGENT_RUNTIME_ENABLED + company + 非草稿写意图` 创建 Agent Run，没有在签发 capability 前确认当前场景存在唯一有效的已发布 Runtime Policy。staging 无发布策略时，Orchestrator 会退到无模型元数据的系统默认策略并返回 `AI_AGENT_MODEL_TOOLS_UNVERIFIED`。
+- Backend 新增 Agent Runtime readiness resolver，镜像 Orchestrator 的场景/环境、生效期、灰度、公司/角色范围与优先级规则；最高优先级必须只有一个策略。主模型、全部 fallback 和显式固定模型均必须处于 `active / validated` 且 `supports_tools=true`。只有预检通过才进入 Agent 并签发 capability。
+- 策略未发布、不匹配、范围/灰度未命中、同优先级歧义、模型工具能力未验证或预检暂时不可用时，新请求继续使用原有“本地意图解析 → Frappe 只读查询 → 模型总结”兼容路径。同步与 SSE 都返回友好 warning；不会创建第二个 Run、不会二次调用模型，也不会绕过 live/full evaluation、审批和发布门禁。已经进入 Agent Runtime 后的真实错误继续失败关闭。
+- staging 健康检查新增发布策略状态。`MYAPP_AI_AGENT_RUNTIME_ENABLED` 在 Compose 中显式默认 `1`；无策略时输出 `Agent runtime policy: compatibility fallback (no published policy)`，不再把整个服务判为故障。架构、业务工作台和 staging 部署文档已同步。
+- 提交与推送：Backend `da7f116 fix: fallback when AI agent policy is unavailable`（`develop`）；父仓库 `c48463ca fix: add AI agent compatibility fallback`（`develop`）已更新 Backend 子模块指针。Orchestrator 和 Web 无运行时代码修改，继续使用 `c775399` 与 `efc69aa`。
+- 验证通过：Backend 全量 unit `685 tests`；AI/治理/Gateway 定向 `295 tests`；Backend Pre-commit/Ruff；Web AI 定向 `44 tests`；父仓库 Pre-commit、Compose config、ShellCheck/shfmt、`bash -n` 与各仓库 `diff --check`。远端 Backend CI run [30344684344](https://github.com/rgc318/myapp/actions/runs/30344684344) 和父仓库 Lint run [30344716305](https://github.com/rgc318/frappe_docker/actions/runs/30344716305) 成功。
+- staging 镜像标签 `staging-20260728-c48463ca`，构建 run [30344884986](https://github.com/rgc318/frappe_docker/actions/runs/30344884986) 成功。ERP digest `sha256:1ec6ad1662cbe40e34ac5f1fa3221fc8e743a3d9c605e1f68330742c9aa5a911`；AI digest `sha256:ddd6199b9202bede8d5fa08dbef91ff4265e19808e8480d2f202406a2054e591`，AI revision 仍为 `c775399ee5bcd632d5c0702ca2ab09f32c022743`。
+- 首次部署 run [30345200116](https://github.com/rgc318/frappe_docker/actions/runs/30345200116) 使用了错误的 `site_name=localhost`，镜像切换和健康检查成功但 migrate 被安全跳过；发现服务器真实站点为 `staging.example.com` 后，已用正确站点重新执行部署 run [30345587349](https://github.com/rgc318/frappe_docker/actions/runs/30345587349)，`bench migrate`、容器切换和 health check 全部成功。服务器 `vivy@192.168.31.229` 当前父仓库为 `c48463ca`，Backend/AI 容器 0 重启；ERP 首页/Ping、Web health/login 均 HTTP 200。
+- 部署后真实验收：发布策略快照仍为空，health check 正确报告 compatibility fallback。同步商品查询成功返回 `SKU010 / Camera`、库存 `83 件`、价格 `1280.0`，Run `AI-RUN-8b34ebbf5d3c4ed09f9f8347f595fb36` 完成；真实 SSE 查询产生 33 个上游 delta，warning 在模型生成前到达，最终 completed 同时保留 warning，Run `AI-RUN-ebc05e3db84f4234b89f0884541ee039` 完成。两个 Run 的 capability hash 均为空，Agent Step 总数为 0，证明兼容路径没有先进入 Agent、没有重复 Run 或模型调用；最近 Backend 日志未出现 `AI_AGENT_MODEL_TOOLS_UNVERIFIED`。
+- 当前边界：普通 Chat、商品/订单/报表兼容查询已经可用，生产治理门禁保持不变。staging 仍没有已发布 Runtime Policy，因此真正的模型自主工具 Agent 仍未启用；后续只有完成 live/full 评测、治理审批和策略发布后，才可验收 Agent 工具链。production 未变更，`.codex` 继续保持用户本地未跟踪状态。
 
 ### 2026-07-28 AI Agent 审查缺陷修复与 staging 发布（已提交、推送并部署）
 
