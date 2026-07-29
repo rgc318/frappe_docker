@@ -1,12 +1,124 @@
 # 当前交接状态
 
-更新时间：2026-07-28 23:33 CST
+更新时间：2026-07-29 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-29 A1.1 Provider live full gate（已通过并推送，staging 发布待独立授权）
+
+- Orchestrator 评测报告升级为 `myapp-ai-eval-report-v2`，新增完整 Runtime revision、Prompt 版本与内容哈希、工具版本与 Schema 哈希、请求模型别名顺序、数据集版本与 SHA-256。live runner 支持通过重复 `--model` 在同一 full gate 中覆盖主模型及全部 fallback；治理要求报告模型别名顺序与 Policy 完全一致。
+- `validate_policy` 不再由生产进程导入 `myapp_ai.evals` 或现场执行固定 replay。治理改为同时读取 offline/live 两份已通过 full-gate 报告，并验证两者与当前 40～64 位 release revision、完整 Prompt manifest、完整工具 manifest 和相同数据集指纹完全一致；旧 Schema、`unversioned`、过期 Prompt/工具、漏测 fallback 或数据集不一致全部失败关闭。
+- runtime 镜像同时删除 `/app/myapp_ai/evals` 和 site-packages 中的 `myapp_ai/evals`；镜像构建阶段和独立回归确认生产应用可正常导入、`myapp_ai.evals` 不可发现且没有任何 eval/replay 模块进入 `sys.modules`。固定 JSONL/replay 只存在于开发和 test 镜像，不参与生产业务请求。
+- Agent critical 轨迹评分已从“固定答案匹配”改为语义约束：新增 `trajectory_match=exact|contains` 与 `argument_match=exact|contains`，允许模型选择额外合法搜索字段；空结果允许直接停止或最多修正一次，仍严格限制核心查询词、工具类型、结果状态、调用预算、禁止工具和 Grounding。固定 JSONL 只定义可审计的测试输入、期望边界与离线 provider/tool replay，不定义生产路由、生产工具参数或真实 Runtime 的 actual trajectory。
+- AI 自有 CI、发布 workflow 和父仓库 staging AI 构建均注入完整 commit 到 `MYAPP_AI_RUNTIME_REVISION`；`/health` 新增 runtime revision、Prompt manifest SHA 和工具 manifest SHA，便于报告、镜像与运行态核对。
+- 修复 Backend `query_business_documents` 的真实结果状态缺陷：原代码读取不存在的 `result_set.rows`，导致查询到单据时仍可能返回 `not_found`；现按 `result_set.groups[].returned_count` 判断，覆盖任一分组有结果和全部分组为空两种回归。
+- 真实模型预筛中，`nvap-gpt-5.6-sol` 和 `nvap-gpt-5.6-terra` 的 Agent critical partial smoke 各重复 2 次，均为 `6/6 PASS`；两者分别选为主模型和 fallback。`opencode-glm-5.2`、`opencode-minimax-m3`、`opencode-qwen3.7-plus`、`gpt-5.6-luna`、`opencode-deepseek-v4-pro` 和当前默认 `opencode-deepseek-v4-flash` 因空决策、非法响应、Provider HTTP 不稳定或 Grounding 失败未进入当前发布候选。
+- 首次绑定 AI commit `b0aa7cfe284248de53dbca42966e30dd79e803e4` 的 live full gate 为 `47/64 FAIL`。其中 14 项只因评测把模型自报 `confidence` 强制精确等于 fixture 小数，1 项因安全回答没有重复输出订单编号，2 项是系统提示/密钥提取请求被 Provider 以 HTTP 400 在生成前硬拒绝。该结果暴露的是评测死配置与错误分类问题，没有通过降低业务、安全、工具或 Grounding 阈值处理。
+- AI 后续提交 `14bb362d989147df1244207b937070460645ff4b` 将 `confidence` 改为 `[0,1]` 合法范围校验、允许安全回答省略非必要标识符，并仅对显式安全用例接受 Provider 400/403 无内容硬拒绝；其他 HTTP、超时和连接错误继续失败。错误码稳定为 `PROVIDER_HTTP_<status>`、`PROVIDER_TIMEOUT` 和 `PROVIDER_CONNECTION_ERROR`。AI `b0aa7cf + 14bb362` 已推送 `origin/develop`；Backend `6f2bdecc4e7bd13b77451843c030ded100e9dc91` 已推送 `origin/develop`。
+- 最终 offline/live v2 full 报告均绑定 AI revision `14bb362d989147df1244207b937070460645ff4b`、数据集 SHA `9db68178b8e87301488a150453d5c6f1c090865f62a16e69745b891638016998`、Prompt manifest SHA `cd819b70fd2e8b9f6a56a8caf8ef6c81da4d7fab8855890447f71fef5a9d48ce` 和工具 manifest SHA `3c84ef2cf105079d07c8eaf354c653ccfaf30b99eaeb37138c7321993fb4a2d0`。offline 为 `32/32 PASS`；live 按 `nvap-gpt-5.6-sol -> nvap-gpt-5.6-terra` 顺序执行，为 `64/64 PASS`，critical、安全、Schema、结构化字段、工具选择/参数/预算/授权、轨迹和 Grounding 指标均为 `1.0`。两模型各有 1 次预期的系统提示/密钥提取 HTTP 400 无内容安全拒绝，其他 31 项均正常生成。
+- 报告路径：`/tmp/myapp-ai-eval-offline-14bb362.json`、`/tmp/myapp-ai-eval-live-14bb362-sol-terra.json`。最新代码验证为 AI Ruff、宿主机 `134 passed + 9 subtests`、offline `32/32 PASS`、pre-commit、Docker test `134 tests OK`、runtime 镜像构建及镜像内 eval/fixture 隔离通过；Backend 容器 AI/Gateway 定向 `222 passed`；AI、Backend、父仓库最终 `diff --check` 通过。
+- 当前下一步进入 A1.2：父仓库本次提交固定已推送的 AI/Backend 子模块指针，并提交 Runtime revision 注入、offline/live 报告路径和改造文档。staging 镜像构建/部署、治理报告挂载、限测试范围 Runtime Policy 发布和真实 ERP E2E 仍需独立授权。当前没有部署或发布 Policy，staging 仍使用兼容路径。
+
+### 2026-07-29 P0/A0.3 Grounding Guardrail v1（本地核心完成，staging 待验收）
+
+- Backend `execute_ai_agent_tool_v1` 的成功工具信封新增 `agent-grounding-v1`：绑定能力范围内公司、citation 引用和每个结果集的三态完整性。单据分组按 `truncated=false/true/null` 映射为 `complete=true/false/null`；商品有结果时不声称完整，空结果可标记完成；聚合报表标记为完整快照。
+- Orchestrator 新增确定性输出 Grounding：以 `grounding + model_context + citations + data` 为受控证据，校验业务标识符、ISO 日期、金额/价格、库存/数量、计数、业务状态、公司和“全部/所有/完整/没有更多”等绝对结论。凭据或系统提示泄露仍直接阻断。
+- 工具结果后的真实上游 SSE 继续由统一 Engine 消费，但在完整候选通过 Grounding 前不向客户端发出 `message_delta`。首次 Grounding 失败只进行一次 `tool_choice=none`、无新工具、只基于已有 tool messages 的受控重写；第二次仍失败则以 `AI_AGENT_OUTPUT_GROUNDING_FAILED` 同步/SSE 关闭，首个和第二个违规候选都不会对用户可见。
+- 新增合成回归覆盖：虚假 `SKU-FAKE`、假售价、假库存、假完成状态、跨公司和虚假完整性同时阻断；合法工具事实通过；首次失败重写为合法引用后只输出重写结果；二次失败不产生任何 SSE 内容。Backend 额外验证三态完整性映射和工具信封 grounding 字段。
+- 当前验证：AI Agent Runtime 定向 `21 passed`，AI 全量 `125 passed`，offline gate `32/32 PASS`，Ruff、pre-commit、Docker test `125 tests OK` 和 runtime 镜像构建全部通过；Backend 容器 `test_ai_agent_tool_service + test_gateway_wrappers + test_ai_service` 共 `220 passed`，Backend 本轮文件 pre-commit 通过；AI/Backend/父仓库 `diff --check` 通过。Docker 使用临时 `DOCKER_CONFIG=/tmp/myapp-ai-agent-docker-config`，pre-commit/uv/npm 缓存均隔离到 `/tmp`，未修改用户配置。
+- A0.3 的真实 staging 数据完成标准尚未满足；当前没有发布 Runtime Policy、没有 live full gate、没有部署或真实 Agent Run，不能据此宣称生产 Grounding 已验收。
+- 下一步：完成全量质量门禁与 Docker 验证，提交/推送相关子仓库后进入 A1.1 Provider live full gate；只有 live 报告通过后才创建限测试公司/角色/用户的 staging Policy 并执行真实 E2E。
+
+### 2026-07-29 P0/A0.2 Agent 评测执行器（本地完成，尚未提交）
+
+- `services/myapp-ai` 已删除 Agent offline eval 把 `replay.responses[0].trajectory` 直接当 actual 的路径。Agent case 现在构造正式 `AgentRequest`，由统一 `AgentEngine` 执行；actual trajectory 只从 `run_completed.tool_calls` 的真实工具审计生成。
+- 3 个 Agent critical case 已迁移为正式 Chat Completions Function Calling 回放、独立合成 Frappe Tool API 结果和 `expected.expected_trajectory`。模型工具参数在离线 SSE 中分片回放，仍由 Engine 聚合和严格校验；空结果 case 实际执行两次工具调用并受默认预算约束。
+- offline Agent 使用 `agent_runtime_replay`，普通离线生成使用 `provider_replay`；Agent critical case 已同时启用 offline/live，live 路径使用真实模型 Function Calling 加合成 Tool Sandbox 并标记 `live_tool_sandbox`，普通 live 使用 `live_provider`。staging ERP 端到端评测继续作为独立层，后续来源固定为 `staging_erp`。
+- `expected_trajectory` 已纳入逐字段轨迹评分，但不会用于生成 offline actual 或替换 Runtime 事件。数据集加载会拒绝缺少 expected trajectory、缺少正式 tool-call replay、缺少对应工具结果，或仍在 `ReplayResponse.trajectory` 注入伪 actual 的 Agent case。
+- AI 仓库当前未提交修改包含 A0.1 与 A0.2：Runtime、eval models/dataset/runner/graders、核心 JSONL、对应测试及 README/API/测试文档。父仓库继续保留本轮 Agent 方案、架构和 handoff 文档修改；`.codex` 是用户已有未跟踪状态，不得提交。
+- 验证通过：`uv sync --extra test --extra dev --frozen`、Ruff、pre-commit、宿主机 `121 passed`、offline full gate `32/32 PASS`、Docker test `121 tests OK`、runtime 镜像构建、AI 仓库 `diff --check`。Docker 验证继续使用临时 `DOCKER_CONFIG=/tmp/myapp-ai-agent-docker-config`，未修改用户配置。
+- 尚未执行计费 live full gate、staging ERP E2E、提交、推送、部署或 Runtime Policy 发布；因此不能把本地确定性回放当成真实模型发布证据。
+- 下一步是 A0.3：定义可验证事实/citation Schema，实现业务标识符、数字、状态、公司和结果完整性的 Grounding Guardrail v1，并覆盖同步、SSE 与一次受控重写。
+
+### 2026-07-29 P0/A0.1 统一 AgentEngine（本地完成，尚未提交）
+
+- `services/myapp-ai` 已完成 A0.1：新增事件驱动 `AgentEngine`，`AgentRuntime` 只保留同步/SSE 传输适配；同步、SSE、同步恢复和 SSE 恢复不再维护独立工具循环。
+- 工具结果后的模型步骤改用真实上游 SSE，并允许继续返回增量 Function Calling；工具参数 delta 按调用索引完整聚合后再通过白名单和严格 Schema 校验。只有达到工具调用预算时，下一模型步骤才固定 `tool_choice=none` 形成最终回答。
+- 新增多工具轨迹一致性回归：普通 Run 和恢复 Run 均验证同步/SSE 的模型步骤、工具调用、工具结果、引用、检查点和终态一致；覆盖 `search_products -> get_business_report -> final answer`，同时验证工具参数跨多个 SSE delta 聚合。
+- AI 仓库当前有未提交修改：`myapp_ai/agent_runtime.py`、`tests/test_agent_runtime.py`、`README.zh-CN.md`、`docs/API_CONTRACT.zh-CN.md`、`docs/TESTING_AND_EVALUATION.zh-CN.md`。父仓库本轮继续修改 Agent 架构、实施方案和本交接文档；`.codex` 仍是用户本地未跟踪状态，不得提交。
+- 验证通过：宿主机 `115 passed`；Agent Runtime 定向 `17 passed`；`uv sync --extra test --extra dev --frozen`、Ruff、pre-commit、AI/父仓库相关 `diff --check`；Docker test 镜像构建并运行 `115 tests OK`；runtime 镜像构建成功。Docker CLI 因宿主机默认 Buildx 目录只读，验证使用临时 `DOCKER_CONFIG=/tmp/myapp-ai-agent-docker-config`，未修改用户配置。
+- 本轮没有修改 Backend、Web、Mobile、Compose、Runtime Policy 或 staging。没有提交、推送、部署，也没有发布 Agent Policy。
+- 下一步是 A0.2：重构 `myapp_ai/evals/runner.py`，让 Agent case 构造正式 `AgentRequest` 并实际运行 `AgentEngine`；provider replay 返回正式 Function Calling，`actual_trajectory` 只能从 Runtime 事件生成。
+
+### 2026-07-29 主流 AI Agent 改造与生产发布方案（文档完成，尚未实施代码）
+
+- 已新增 `docs/codex/AI_AGENT_MAINSTREAM_TRANSFORMATION_PLAN.zh-CN.md`，基于 OpenAI、Anthropic、Google ADK、Microsoft Agent Framework 和 LangGraph 的共同模式，明确 MyApp 不需要为“主流”标签推翻现有服务边界或强行引入多 Agent。
+- 文档确认当前四个发布阻断项：staging 无已发布 Runtime Policy、离线 Agent trajectory 来自数据集预置而非真实 Runtime、同步与 SSE 控制流语义不完全一致、Output Guardrail 尚未执行正式业务事实 Grounding。
+- 改造分为 P0 真实 Agent 证明闭环、P1 staging 真实发布、P2 稳定运营与能力扩展。P0 首先统一事件驱动 AgentEngine、让评测实际运行 Runtime、增加业务事实 Grounding；P1 再执行 Provider live full gate、发布限公司/角色/模型的 staging Policy，并完成红队和故障注入。
+- 完成定义要求真实请求 Agent Step 大于 0、模型自主选择至少三个白名单工具、同步/SSE 轨迹一致、live trajectory gate 和 staging ERP E2E 通过、虚假标识符/金额/库存/状态可被 Grounding 阻断。写操作继续使用确定性草稿 Workflow 和人工确认，多 Agent、MCP、A2A、长期记忆不是首期条件。
+- 文档已使用 Prettier 3.5.2 格式化，父仓库 `git diff --check` 通过；本轮没有运行代码测试，因为没有修改运行时代码、API 或部署配置。
+- 本轮只修改父仓库文档，没有修改 Backend、Orchestrator、Web、Mobile 或部署配置；代码改造、提交、部署和 Runtime Policy 发布均尚未开始。父仓库 `.codex` 继续保持用户本地未跟踪状态，不得提交。
+
+#### 当前仓库状态
+
+- 父仓库存在本轮未提交文档修改：`docs/codex/AI_AGENT_MAINSTREAM_TRANSFORMATION_PLAN.zh-CN.md`、`docs/codex/AI_AGENT_RUNTIME_ARCHITECTURE.zh-CN.md`、`docs/05-development/04-ai-business-workbench.zh-CN.md` 和本交接文档。
+- 父仓库还有用户已有未跟踪目录 `.codex`，不得加入提交。
+- `apps/myapp` 和 `frontend/myapp-web` 当前工作树干净；`services/myapp-ai` 有本地未提交的 A0.1/A0.2 代码、测试和文档修改，父仓库子模块指针尚未更新。
+- `frontend/myapp-mobile` 保留用户此前已有的 5 个未提交文件：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。它们与本轮 Agent 文档无关，不得格式化、回退或提交。
+
+#### 当前运行与治理事实
+
+- 当前 staging 仍是父仓库提交 `7ceba511` 对应的已部署版本，普通商品、订单和报表查询使用“结构化意图模型 → Frappe 预查询 → 模型总结”兼容路径。
+- staging 没有已发布 Runtime Policy；真实验收 Run 的策略字段为空、Agent Step 为 0。文档完成不改变此状态，也不构成发布授权。
+- `MYAPP_AI_AGENT_RUNTIME_ENABLED=1` 只表示允许进行 readiness 检查，不代表 Agent 已经上线。必须存在唯一命中的已发布 Policy，且主模型和 fallback 均通过工具能力与 full gate，才允许创建真实 Agent Run。
+- 当前 `offline eval 32/32 PASS` 已实际运行 `AgentEngine`，actual trajectory 来自 Runtime 终态事件，不再来自数据集预置；但它仍是确定性 provider/tool replay，只能证明 Runtime 语义，不能替代计费 Provider live tool-selection gate 或 staging ERP E2E。
+
+#### 下一会话接手顺序
+
+1. A0.1 与 A0.2 已本地完成；从 A0.3 开始，在 Orchestrator 与 Backend 之间定义可验证事实/citation 契约，实现业务标识符、数字、状态、公司和结果完整性的 Grounding Guardrail，并覆盖同步、SSE 和一次受控重写。
+2. A0.3 完成后重新执行 Orchestrator、Backend 契约定向测试、全量测试、离线 gate、Docker test/runtime 和相关文档校验。
+3. 每个仓库分别提交、推送和通过自身 CI；AI 仓库先推送，再由父仓库更新 `services/myapp-ai` 子模块指针。Backend 如有契约改动，同样先在 `apps/myapp` 提交并推送，再更新父仓库指针。
+4. P0 全部通过后才执行 Provider live full gate；报告与当前 Runtime commit、Prompt、工具版本、模型别名完全绑定后，才能创建限测试公司/角色/用户的 staging Runtime Policy。
+5. 发布测试 Policy 后，从 Web/Gateway 执行同步、SSE、取消、恢复、权限隔离、提示注入和故障注入 E2E；确认真实 Run 的 Agent Step 大于 0，再逐步扩大灰度。
+
+#### P0 重点修改位置
+
+- Orchestrator 核心循环：`services/myapp-ai/myapp_ai/agent_runtime.py`。
+- 工具注册与 Schema：`services/myapp-ai/myapp_ai/agent_tools.py`。
+- 输入、工具结果和输出保护：`services/myapp-ai/myapp_ai/agent_guardrails.py`。
+- 评测执行器和评分：`services/myapp-ai/myapp_ai/evals/runner.py`、`graders.py`、`datasets/core.v1.jsonl`。
+- Backend readiness 和兼容路由：`apps/myapp/myapp/services/ai_service.py`、`ai_model_governance_service.py`。
+- Backend 工具执行、能力令牌、Run/Step 与幂等：`apps/myapp/myapp/services/ai_agent_tool_service.py` 及 AI Repository/patches。
+- Web 事件与状态映射：`frontend/myapp-web/src/services/myapp/ai.ts`、`src/pages/AI/index.tsx`。
+
+#### 验证要求
+
+Orchestrator 改动至少执行：
+
+```bash
+cd services/myapp-ai
+uv sync --extra test --extra dev --frozen
+uv run ruff check .
+uv run pre-commit run --all-files
+docker build --target test -t myapp-ai:test .
+docker run --rm myapp-ai:test
+docker build --target runtime -t myapp-ai:runtime .
+```
+
+Backend 契约或工具边界改动必须在 Backend 容器使用 bench Python 运行定向和全量 unit；Web 事件契约改动执行 TypeScript、Biome、Jest 和 production build。每个相关仓库以及父仓库都必须运行 `git diff --check`。
+
+#### 禁止事项与风险
+
+- 不得为了快速看到 Agent Step 而直接在数据库创建/发布 Policy、修改灰度结果、关闭治理或伪造 full-gate 报告。
+- 不得继续把数据集 expected/replay trajectory 当成 actual trajectory，也不得只依靠 Mock 单元测试宣称真实模型工具选择已通过。
+- 不得在统一核心循环前继续分别修补同步和 SSE 分支；否则控制流差异会继续扩大。
+- 不得把当前四类写草稿强行并入开放只读 Agent。正式写操作继续经过草稿、用户确认、领域服务和业务幂等。
+- 不得在没有评测证据时引入多 Agent、MCP、A2A 或长期用户记忆；这些都不是 P0/P1 完成条件。
+- Grounding Guardrail 不能只依赖另一个模型判断。业务标识符、金额、数量、库存、状态、公司和截断完整性优先使用确定性校验，模型判定器只能作为受限补充。
 
 ### 2026-07-28 AI 只读查询改为模型优先语义路由（已提交、推送并部署 staging）
 

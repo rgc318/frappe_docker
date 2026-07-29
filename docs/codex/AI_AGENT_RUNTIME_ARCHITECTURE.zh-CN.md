@@ -2,7 +2,7 @@
 
 更新时间：2026-07-28
 
-本文是 MyApp 生产级单 Agent Runtime 的设计事实源。自然语言检索、实体解析和向量召回的细节继续以 `AI_NL_RETRIEVAL_ARCHITECTURE.zh-CN.md` 为准；本文负责 Agent 循环、工具协议、身份委托、运行状态、审批恢复、观测和评测边界。
+本文是 MyApp 生产级单 Agent Runtime 的设计事实源。自然语言检索、实体解析和向量召回的细节继续以 `AI_NL_RETRIEVAL_ARCHITECTURE.zh-CN.md` 为准；本文负责 Agent 循环、工具协议、身份委托、运行状态、审批恢复、观测和评测边界。当前从兼容查询路径升级为经过真实轨迹评测和受控策略发布的主流 Agent 的实施顺序、工作包和验收门禁，以 `AI_AGENT_MAINSTREAM_TRANSFORMATION_PLAN.zh-CN.md` 为准。
 
 ## 当前实现状态
 
@@ -15,6 +15,7 @@
 - 模型治理已增加强制 Function Calling 探测和 `supports_tools`，生产 Agent 对未验证模型失败关闭。
 - 上下文按估算 Token 预算保留最近完整会话/工具单元，不再只依赖 20 条消息上限。
 - Agent Runtime 已增加统一 Run deadline、累计 Token 上限和模型等待期间的主动取消轮询；用户取消不再只修改数据库状态，也会取消 Orchestrator 中正在等待的异步上游请求。
+- 同步、SSE、同步恢复和 SSE 恢复已统一到事件驱动 `AgentEngine`。同步接口收集规范化事件，SSE 只负责传输映射；工具结果后的真实上游 SSE 同时支持继续增量 Function Calling 或形成最终文本，达到工具预算后才固定 `tool_choice=none`。多工具回放测试已验证四个入口的模型决策、工具调用、检查点和终态一致。
 - 输入、工具结果和输出 Guardrail 已成为独立可阻断运行步骤；工具参数按与模型定义一致的严格 Schema 二次校验，工具结果进入模型前清除敏感键并移除指令式内容。
 - Langfuse 已记录 Agent Run、Model Decision、Tool Call 和 Guardrail 父子 Span；固定评测已覆盖工具选择、参数、空结果有限重试、调用预算和禁止越权工具。
 - Frappe 已持久化 `agent-state-v1` 安全检查点：输入 Guardrail、模型工具决策、每个正式 `role=tool` 结果和输出 Guardrail 都是可恢复边界；模型决策中的待执行工具调用也会随检查点保存。
@@ -168,7 +169,9 @@ RUNNING
 
 ### 输出
 
-- 正式业务事实必须能映射到本 Run 的工具结果或引用。
+- Frappe 工具信封使用 `agent-grounding-v1` 绑定公司、citation 引用和结果集三态完整性；正式业务事实必须能映射到本 Run 的权限过滤工具结果或引用。
+- Orchestrator 在同步/SSE 内容可见前确定性校验业务标识符、日期、金额/价格、库存/数量、计数、业务状态、公司和绝对完整性结论。
+- 首次 Grounding 失败只允许一次基于既有 `role=tool` 消息、`tool_choice=none` 的受控重写；第二次失败以 `AI_AGENT_OUTPUT_GROUNDING_FAILED` 关闭，两个违规候选均不得向客户端发出。
 - 禁止把草稿描述成已执行单据。
 - 禁止泄露系统 Prompt、Token、内部错误和未授权记录。
 

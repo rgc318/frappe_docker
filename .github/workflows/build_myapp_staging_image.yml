@@ -148,4 +148,6 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: ${{ steps.ai_meta.outputs.tags }}
+          build-args: |
+            MYAPP_AI_RUNTIME_REVISION=${{ steps.ai_source.outputs.sha }}
           labels: ${{ steps.ai_meta.outputs.labels }}
