@@ -1,12 +1,32 @@
 # 当前交接状态
 
-更新时间：2026-07-29 CST
+更新时间：2026-07-31 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
 下方较早日期章节是历史执行记录；其中嵌入的“当前状态 / 下一步”只代表当时截面，最新口径始终以本页顶部“当前最终状态”和最新工作总结为准。
 
 ## 当前最终状态
+
+### 2026-07-31 A1.2 staging Runtime Policy 试发失败关闭（已暂停，需先本地收敛）
+
+- 当前安全状态：staging 运行统一标签 `staging-20260731-7a4859d6`，父仓库部署 revision `7a4859d6aff601aa6360ad60c7afa86063809652`，Backend revision `822963f5d30a12ec72a20aea43ed51fb4051f003`，AI runtime revision `446d716e4a0cfee998dc2666abc27a601a9c80a3`。Runtime Policy 当前为 v24、rollout `0%`，readiness 为 `no_matching_policy`；production 未改动。
+- AI `446d716` 修复结果计数与后续库存子句互相污染：数字分类先按中英文逗号、句号、分号和换行切分当前事实子句，同时扩展“匹配到/匹配结果/若干项匹配结果”等计数表达，并保持“库存有 1 个”仍按库存数量严格校验。宿主机与 Docker 均为 `151 tests OK`，Ruff、pre-commit、runtime 镜像和 eval fixture isolation 通过；远端 CI [30608385875](https://github.com/rgc318/myapp-ai/actions/runs/30608385875) 与 CodeQL [30608385873](https://github.com/rgc318/myapp-ai/actions/runs/30608385873) 成功。
+- 绑定 `446d716` 的正式 Offline full gate 为 `36/36 PASS`，Sol/Terra Live full gate 首次因 Terra 瞬时 `AI_AGENT_MODEL_EMPTY_DECISION` 得到 `71/72 FAIL`；单例诊断恢复后，完整复跑达到 `72/72 PASS`。最终报告为 `/tmp/myapp-ai-eval-offline-446d716.json`、`/tmp/myapp-ai-eval-live-446d716-sol-terra-rerun.json`，SHA256 分别为 `f1a4bb77f8d2b33434d550d1660f210aae17a7b5dd5915ef75817404eec0c66c`、`e4798839f36e3cab1f6204cab22c354b9e58281013f57002d8a0e38bb5e5c110`；Prompt manifest 为 `156adc2eab5f2c8614bc73be4a0ffe6356a246a8baf6c53c6959a38e3f53ff51`，Tool manifest 为 `3c84ef2cf105079d07c8eaf354c653ccfaf30b99eaeb37138c7321993fb4a2d0`，数据集 SHA 为 `8b666dd9446c8592f546e289b4641c460ec93df367a03b04dbe4f7de606ea0d0`。本地治理验证返回 `release_gate_eligible=true`、无错误和警告；服务器 canonical 报告与该 revision 匹配，旧报告保留为 `before-446d716`。
+- 父仓库 `7a4859d6 fix: advance agent grounding runtime` 只将 `services/myapp-ai` gitlink 推进到 `446d716`。Lint run [30610683989](https://github.com/rgc318/frappe_docker/actions/runs/30610683989) 成功；首次构建 run [30611178276](https://github.com/rgc318/frappe_docker/actions/runs/30611178276) 因错误把 Backend commit SHA 传给只接受 branch/tag 的 `myapp_ref` 而失败，确认远端 `develop` 仍精确指向 `822963f` 后，以 `myapp_ref=develop` 重跑 [30611528329](https://github.com/rgc318/frappe_docker/actions/runs/30611528329) 成功；部署、migrate 和 health check run [30612043808](https://github.com/rgc318/frappe_docker/actions/runs/30612043808) 成功。
+- 真实 ERP E2E 发布 v23/100% 后 readiness 为 `ready`。单据 Run `AI-RUN-923f51740ad84732ab7bdb8006d817ae` 由 Sol 自主选择 `query_business_documents`，参数为销售订单、最新排序、limit 3，7 个持久 Agent Step、4 个 citations、`agent-grounding-v1` 和 Output Guardrail 均通过；商品 Run `AI-RUN-47bcbd90002b49a6bbc048bf56fb1154` 自主选择 `search_products(query="莫")`，真实返回“迪莫”、库存 1000、价格 5，7 个 Agent Step、citation 和 Output Guardrail 通过。
+- 销售报表 SSE Run `AI-RUN-b694396c74d14d8fbf5c810bf3b0cc6c` 自主选择 `get_business_report(report_type="sales", date_from="2026-07-01", date_to="2026-07-22")`，工具成功返回 `received_amount_total=15360` 等真实指标；模型用“实际收款 15,360”表达时，Guardrail 因金额词表只覆盖“实收”而未覆盖“收款”，将其误分为 `number:15360`。一次受控重写后仍失败，SSE 在发送业务内容前以 `AI_AGENT_OUTPUT_GROUNDING_FAILED` 关闭。E2E 脚本随后自动发布 v24/0%，最终 readiness 恢复 `no_matching_policy`；采购多轮场景未执行，A1.2 尚未完成。
+- AI `0f8237f78104e4bf128396fcd44d56fa3be7c792` 已扩展实付、收付款、回款、到账等金额语义并增加真实报表型回归；宿主机与 Docker 为 `152 tests OK + 9 subtests`，Ruff、pre-commit、runtime fixture isolation、Offline `36/36 PASS` 均通过，远端 CI [30614173268](https://github.com/rgc318/myapp-ai/actions/runs/30614173268) 和 CodeQL [30614173266](https://github.com/rgc318/myapp-ai/actions/runs/30614173266) 成功。其 Sol/Terra Live full gate 按用户要求已中止，进程退出 `130`，没有可用于发布的完整报告；该 revision 未部署。
+- AI 文档提交 `2db386a3a3fde386f5b7d5830fce83e02e8954ed` 已在 `docs/TESTING_AND_EVALUATION.zh-CN.md` 固化“本地优先、单一最终候选”流程：staging 失败先回收为本地裁剪工具信封、语义矩阵、确定性回归和 targeted live 旁证，中间提交不生成 canonical 报告、不部署；仅最终不可变候选执行一次 Offline/Live full gate 和一次 staging 发布。CI [30614784649](https://github.com/rgc318/myapp-ai/actions/runs/30614784649) 与 CodeQL [30614784699](https://github.com/rgc318/myapp-ai/actions/runs/30614784699) 成功。由于 revision 又变化，`0f8237f` 的 Offline 报告也已过期，不能复用；`2db386a` 未执行正式 full gate、未部署。
+- 当前 staging 主机磁盘约 96% 使用、仅余约 4.3GB，`docker system df` 曾显示约 24.7GB 未使用镜像可回收；后续部署前应先做只读盘点，只有明确目标和回滚方式时才清理未被容器引用的旧镜像。服务器父仓库工作树保留既有 `backups/`、`tmp/`，且 `services/myapp-ai` 工作树当前为 `3233f6b`、与父仓库 gitlink 不一致；不要执行广泛 reset/checkout 或把该服务器源码状态冒充正在运行的镜像 revision，运行事实以容器 OCI label/env 中的 `446d716` 为准。
+
+#### 下一会话接手顺序
+
+1. 不进行服务器部署或 Policy 放量。基于销售报表失败现场的裁剪工具信封，在本地补齐金额、计数、数量、标点、单位省略和相邻子句的语义矩阵；不能只保留单个“实际收款”句式。
+2. 在本地完成受影响场景的 targeted live 诊断，至少覆盖商品结果计数、销售报表收款/应收、同会话销售转采购报表；partial 只作旁证。
+3. 形成新的单一最终 AI release candidate 后，再执行宿主机全量、Ruff、pre-commit、Docker test/runtime、fixture isolation、Offline 36/36 和 Sol/Terra Live 72/72。任何 revision 变化都必须重跑，旧报告不能复用。
+4. AI 提交和报告完成后再更新父仓库 gitlink，部署前处理磁盘容量风险；只构建和部署一次。下一次 Policy 成功候选应从 v25/100% 开始，失败自动恢复为 v26/0%。
+5. staging E2E 必须重新覆盖单据、商品、销售报表 SSE、同会话采购报表，并验证 `message_delta/completed`、citations、Run completed、Agent Step > 0、Policy 版本绑定和 `agent-grounding-v1`。A1.2 全部通过前不得发布 production Runtime Policy。
 
 ### 2026-07-29 A1.1 增强 Agent 自主选工具证据（offline/live full gate 已通过，待 staging 发布）
 

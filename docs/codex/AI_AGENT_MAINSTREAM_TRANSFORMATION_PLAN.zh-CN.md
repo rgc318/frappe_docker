@@ -667,6 +667,10 @@ Mobile 在 Agent Policy 扩大到普通用户前必须补齐：
 
 所有者：`apps/myapp`、父部署仓库
 
+状态：2026-07-31 已完成第一次限范围试发，但未达到完成标准。staging 曾发布 v23/100%，真实单据与商品 Run 已证明模型在完整运行链路中自主选择 `query_business_documents` 和 `search_products`，Policy 握手、持久 Agent Step、citation、`agent-grounding-v1` 和 Output Guardrail 均通过；销售报表 SSE 随后因合法“实际收款 15,360”被数字分类器误判为通用 number 而失败关闭，脚本自动发布 v24/0%，readiness 恢复 `no_matching_policy`，采购多轮场景未执行。staging 当前仍运行 AI `446d716`，后续金额语义修复 `0f8237f` 与本地优先发布文档 `2db386a` 已推送但未部署，也没有绑定最终 revision 的完整 Live full gate。A1.2 继续保持未完成。
+
+后续必须先在本地使用失败现场的裁剪工具信封形成数字语义矩阵和 targeted live 旁证，再形成单一不可变候选并执行一次最终 full gate、一次 staging 部署。禁止按单个模型措辞缺口反复提交和部署；下一次测试 Policy 从 v25 开始，失败自动关闭到 v26/0%。
+
 - 创建、评审并发布测试范围 Policy。
 - 验证 readiness 和策略快照握手。
 - 执行同步、SSE、取消、恢复和真实权限 E2E。
