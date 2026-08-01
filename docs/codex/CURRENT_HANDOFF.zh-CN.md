@@ -8,14 +8,18 @@
 
 ## 当前最终状态
 
-### 2026-08-01 AI 工作台写意图自动分流修复（已提交并推送，未部署）
+### 2026-08-01 AI 工作台写意图自动分流修复（已部署 staging）
 
 - 已确认浏览器页面调用链为 `resolve_ai_scenario_v1` 自动识别后再选择四类专用草稿接口或 `stream_ai_message_v1`。此前成功测试只直接调用了商品草稿 Backend 服务，绕过了页面自动分流，因此不能证明浏览器端问题已修复。
 - Backend `apps/myapp/myapp/services/ai_service.py` 已补全确定性写意图边界：`给迪莫添加10个库存` 识别为 `inventory_adjustment_draft`，`完善迪莫商品资料` 识别为 `product_setup_draft`；库存判断继续优先于商品主数据判断，`更新迪莫商品库存` 不会误进入商品资料草稿。
 - 普通聊天兼容路径的前置结构化意图解析现在继承 Frappe 已授权、已解析的 `model_alias`，并传入 Orchestrator `/internal/v1/intent/parse`。固定模型不再只作用于后续 Chat/SSE 主请求；`apps/myapp/API_GATEWAY.zh-CN.md` 已同步契约说明。AI Orchestrator 的 `ChatRequest` 和 intent 路由原本已支持 `model_alias`，本次无需修改 `services/myapp-ai`。
 - Web 生产编排无需修改：`frontend/myapp-web/src/pages/AI/index.tsx` 已按 Backend 返回的四类写场景调用专用草稿 Service，并携带同一 `modelAlias`。新增页面级回归覆盖两个用户原句，确认固定模型透传且不调用 `streamAiChatMessage`；领域 Service 回归同时覆盖库存与商品草稿的 `model_alias` 请求映射。
 - Backend 容器内 `test_ai_service + test_gateway_wrappers` 共 221 项通过；本地 `localhost` 通过真实 Gateway 函数执行两个原句，分别返回 `inventory_adjustment_draft` 和 `product_setup_draft`。保留既有 `Failed to log error in db: AI Orchestrator 流式调用失败` 测试日志，退出码为 0。Web 定向 2 套/47 项、全量 37 套/257 项 Jest、`npm run tsc`、`npm run biome:lint` 和 `npm run build` 全部通过；Backend/Web `diff --check` 通过。
-- Backend 提交 `33c60f3 fix: route AI write intents to draft workflows` 已推送 `origin/develop`；Web 提交 `a63e31b test: cover AI draft auto-routing` 已推送 `origin/main`。本次父仓库提交包含 Backend gitlink 与本交接记录；既有未跟踪 `.codex` 不纳入提交，AI Orchestrator 保持干净。当前未构建镜像、未部署；如用户后续要求发布，应基于这些不可变提交形成单一 staging 候选，执行一次部署与浏览器人工验收。
+- Backend 提交 `33c60f3 fix: route AI write intents to draft workflows` 已推送 `origin/develop`；Web 提交 `a63e31b test: cover AI draft auto-routing` 已推送 `origin/main`；父仓库提交 `dd95d371 fix: advance AI draft routing correction` 已推送 `origin/develop`。既有未跟踪 `.codex` 未纳入提交，AI Orchestrator 源码未修改。
+- 首次构建 run `30695953474` 因 workflow 将完整 Backend commit SHA 作为只接受 branch/tag 的 `git clone --branch` 参数而失败，未触碰服务器。再次确认远端 `develop` 精确指向 `33c60f3` 后，以相同父提交、相同唯一标签 `staging-20260801-dd95d371` 和 `myapp_ref=develop` 重跑；构建 run `30696066047` 成功，部署、migrate 与 health check run `30696203525` 成功。
+- staging 当前 ERP 镜像为 `ghcr.io/rgc318/myapp-erpnext:staging-20260801-dd95d371`，父 revision `dd95d371`；AI 镜像使用同标签但源码 revision 保持 `2dc1f53`。运行容器中的 `ai_service.py` SHA-256 与本地 `33c60f3` 文件完全一致。旧 `staging-20260801-49f6893f` ERP 回滚镜像仍保留。
+- 服务器真实 Gateway 验收中，`给迪莫添加10个库存` 返回 `inventory_adjustment_draft`，`完善迪莫商品资料` 返回 `product_setup_draft`。直接调用 Orchestrator 的 GPT-5.5 商品/库存结构化端点均 HTTP 200，分别提取 `operation=update, item_name=迪莫` 与 `adjustment_type=increase, quantity=10, uom=个`；该旁证未创建 ERP 草稿、未修改商品或库存。
+- `check-staging.sh` 通过：AI `status=ok`、Backend 到 Orchestrator 鉴权正常、Agent Runtime Policy 已发布、首页与 Ping HTTP 200。Backend、Frontend、AI、MariaDB 重启数均为 0；根分区可用约 29GB、使用率 70%。独立 Web 生产代码本次未变化，因此 `myapp-web-staging` 保持 `staging-20260801-49f6893f`，`/healthz` 与 Gateway Ping 均为 200。此前 `opencode-deepseek-v4-flash` 的 Provider 502 是独立上游可用性问题；本次写意图选择 GPT-5.5 时已验证可用。
 
 ### 2026-07-31 A1.2 staging Runtime Policy 试发失败关闭（已暂停，需先本地收敛）
 
