@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-07-31 CST
+更新时间：2026-08-01 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -27,6 +27,15 @@
 3. 形成新的单一最终 AI release candidate 后，再执行宿主机全量、Ruff、pre-commit、Docker test/runtime、fixture isolation、Offline 36/36 和 Sol/Terra Live 72/72。任何 revision 变化都必须重跑，旧报告不能复用。
 4. AI 提交和报告完成后再更新父仓库 gitlink，部署前处理磁盘容量风险；只构建和部署一次。下一次 Policy 成功候选应从 v25/100% 开始，失败自动恢复为 v26/0%。
 5. staging E2E 必须重新覆盖单据、商品、销售报表 SSE、同会话采购报表，并验证 `message_delta/completed`、citations、Run completed、Agent Step > 0、Policy 版本绑定和 `agent-grounding-v1`。A1.2 全部通过前不得发布 production Runtime Policy。
+### 2026-07-31 staging 历史部署资源清理（已完成，服务正常）
+
+- 按用户要求以 `vivy@192.168.31.229` 执行先盘点后精确清理。清理前根分区为 98GB、已用 89GB、可用 4.8GB、使用率 95%；Docker 有 85 个镜像，其中约 25.7GB 可回收。
+- 删除 56 个未被任何容器引用的历史 `ghcr.io/rgc318/myapp-erpnext`、`myapp-ai`、`myapp-web` staging 镜像及一个本地 gate 镜像。当前运行的 ERP/AI `staging-20260731-7a4859d6` 和 Web `staging-20260728-7ceba511` 镜像保留；历史镜像如需回滚可从 GHCR 重新拉取。
+- 删除已废弃、无容器引用且 Compose 标签明确属于 staging 的 `staging_bench-env-vol`，清理前约 423MB。现行 staging 已不再使用持久 bench env 卷。
+- 未删除 `staging_db-data`、`staging_sites`、`staging_ai-vector-data`、Redis 数据卷、`backups/`、`tmp/`、治理/性能报告、其他项目镜像或未能确认归属的匿名卷；未执行全局 image/volume/system prune。
+- 清理后根分区已用约 63GB、可用 31GB、使用率 68%；Docker 镜像由 85 个降至 29 个，历史 MyApp 镜像只剩三个当前运行镜像。
+- 清理后 `deploy/staging/check-staging.sh` 通过：AI `status=ok`、Backend 到 AI 鉴权正常、ERP 首页和 Ping HTTP 200。Web `/healthz`、登录页和 Gateway Ping 均 HTTP 200；AI、Backend、Frontend、MariaDB、Qdrant 和 Web 容器均在运行，带健康检查的服务为 healthy，关键容器重启数均为 0。
+- 后续执行长期规则：本地可覆盖的开发、回归、Docker 和评测必须先在本地收敛；除真实 Provider/模型、Runtime Policy、角色权限、网络/Secret、部署 workflow 或故障注入等必须依赖服务器的场景外，不再用 staging 做中间试探。最终候选原则上只构建、部署和验收一次。
 
 ### 2026-07-29 A1.1 增强 Agent 自主选工具证据（offline/live full gate 已通过，待 staging 发布）
 
@@ -1990,3 +1999,36 @@ Backend 契约或工具边界改动必须在 Backend 容器使用 bench Python �
 3. 后续可增加整站黄金快照自动恢复、large 容量基线和定时 QA 刷新。
 4. 父仓库后续提交继续精确排除既有 `AGENTS.md`、`README.md`、`.codex/` 和业务工作台草稿文档。
 5. Mobile 后续单独建立“新接口适配与发布验收”任务，再处理现有 5 个脏文件、TypeScript/依赖和端到端回归。
+
+---
+
+## 2026-08-01 AI 草稿业务数据一致性改造（本地最终候选已验证，待 staging 部署）
+
+### 问题与结论
+
+- 已确认“迪莫商品详情存在价格、AI 商品草稿却显示 0”不是单纯前端渲染问题：旧商品草稿只支持创建，模型又只能从用户原文提取字段，Frappe 没有把现有 Item / Item Price 水合进草稿。
+- 已新增统一草稿业务事实状态层 `myapp/services/ai_draft_state.py`，在 payload / line 的 `_state` 中区分权威 baseline、用户 patch、effective、字段来源、`missing` 与 `explicit_zero`，并通过稳定 `source_hash` 检测漂移。
+- 商品 Prompt 升级为 `product-setup-draft-v4`，新增 `operation=auto|create|update`。精确命中现有商品时，auto 进入完善模式，读取四类价格和公司库存；库存只读且不会成为初始库存。完善模式只调用 `update_product_v2` 并提交用户真正修改的字段。
+- 销售/采购行已分离系统参考价和人工覆盖价；库存行保存实时库存、估值和 UOM 换算快照。执行前重新解析当前事实，漂移时先保存新版本，再返回 `AI_DRAFT_VERSION_CONFLICT` 要求重新确认；人工覆盖价保持不变。
+- Web 已增加“完善现有商品”模式：商品编码禁用、初始库存字段隐藏、显示 baseline → patch、当前库存只读提示；草稿保存保留 `_state`，摘要和复核页展示已水合价格与当前库存。
+
+### 提交状态
+
+- Backend `apps/myapp`：`64ddb874c5c57e8211a66c74faaa367e61c56c4e feat: unify AI draft business state`，基于最新 `origin/develop`。
+- AI `services/myapp-ai`：`2dc1f53fc14a90d98064c246be9c0791a7a73491 feat: hydrate AI drafts from business state`，基于最新 `origin/develop`；rebase 后上游已有的 Guardrail 重复修改已自动消除。
+- Web `frontend/myapp-web`：`4272089 feat: distinguish AI draft baseline from edits`，基于最新 `origin/main`。
+- Parent：`ec90148e feat: publish unified AI draft business state`，固定 Backend/AI gitlink 并更新设计与交接文档；`.codex` 继续保持未跟踪且不得提交。
+
+### 已验证
+
+- Backend 容器：`env/bin/python -m unittest apps.myapp.myapp.tests.unit.test_ai_draft_state apps.myapp.myapp.tests.unit.test_ai_service`：`91` 项通过。
+- AI：`uv run pytest`：`152` 项通过；`uv run ruff check .`、`uv run pre-commit run --all-files` 通过。测试使用本地临时 Service Token 环境变量，未输出真实 Secret。
+- Web：`npm run tsc`、`npm run biome:lint`、全量 `npm test -- --runInBand`（`37` 套 / `255` 项）和 `npm run build` 通过。Jest 仍有既有 open handle 提示，但退出码为 0。
+- Parent、Backend、AI、Web `git diff --check` 均通过。
+- 本地最终候选验证完成后，只读检查 `vivy@192.168.31.229`：根分区可用约 31GB、使用率 68%，当前服务健康；未删除备份、站点数据、数据库或业务卷。
+
+### 当前部署步骤
+
+1. 按 Backend → AI → Web → Parent 顺序推送对应分支，使用唯一 staging 标签只构建一组 ERP/AI/Web 镜像。
+2. 部署到 `vivy@192.168.31.229` 后执行健康检查、容器重启数和错误日志检查。
+3. 使用 staging 真实“迪莫”记录验收完善模式：显示现有价格、当前库存只读、初始库存为空，保存后的 `_state.patch` 只包含用户修改；不修改正式库存。

@@ -24,6 +24,7 @@ AI 工作台不是“生成文本和跳转链接的聊天页”，而是当前�
 6. **一次草稿一次正式结果**：草稿执行后进入 `executed`，保存正式对象回执，不允许重复创建。
 7. **可恢复**：网络超时后使用同一草稿 ID 和版本幂等键重试；成功回执可从草稿重新加载。
 8. **可审计**：保存执行人、执行时间、目标 DocType、目标名称、请求哈希和结果哈希。
+9. **业务事实可刷新**：草稿保存权威 baseline、用户 patch 和字段来源；执行前重新读取价格、UOM 换算和实时库存，漂移时生成新版本并要求重新确认。
 
 ## 3. 用户流程
 
@@ -113,7 +114,8 @@ Drawer 展示单据状态、公司、往来单位、日期、金额、已结/未
 2. 检查 `confirmed=1`、`status=draft`、`expected_version` 和 `ready_for_handoff`。
 3. 按草稿 ID 获取执行锁。
 4. 调用既有领域服务：
-   - `product_setup` → `create_product_v2`
+   - `product_setup/create` → `create_product_v2`
+   - `product_setup/update` → `update_product_v2`，仅提交用户补丁，不携带库存目标
    - `sales_order` → `create_order_v2`
    - `purchase_order` → `create_purchase_order`
    - `inventory_adjustment` → `reconcile_inventory_stock_v1`

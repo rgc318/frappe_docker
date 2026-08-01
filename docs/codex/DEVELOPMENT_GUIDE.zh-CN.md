@@ -195,3 +195,12 @@ git -C services/myapp-ai diff --check
 - Web 提交在 `frontend/myapp-web`。
 - 不要提交父仓库 `.codex`。
 - 不要把未验证的大范围重构和业务功能混在一个提交里。
+
+## 6. 本地优先与 staging 使用边界
+
+- 功能开发、缺陷修复、Prompt/Guardrail 调整、确定性回归、容器构建和可在本地复现的集成测试，必须先在本地完整收敛。不要为了诊断中间提交而频繁推送、构建和部署 staging 镜像。
+- 只有本地无法真实覆盖的条件才使用 staging，例如真实 Provider/模型链路、服务器网络与 Secret、Runtime Policy、真实角色与权限、部署 workflow、反向代理、进程中断、故障注入或目标机器资源约束。
+- staging 发布前应形成单一、不可变的最终候选，并完成相关单元测试、静态检查、Docker test/runtime、离线评测和必要的 targeted live 旁证。候选 revision 变化后，旧报告不能冒充新候选证据。
+- 同一任务原则上只对最终候选执行一次镜像构建、一次部署和一次完整服务器验收。staging 失败后先回到本地复现并补回归，不连续部署多个试探性修复。
+- 部署前只读检查目标主机磁盘和 Docker 可回收空间。清理时只删除已确认未被任何容器引用的本项目历史镜像、构建缓存或明确废弃的 staging 卷；不得使用带 `--volumes` 的全局 prune，也不得删除数据库、sites、Qdrant、Redis、备份、报告或其他项目资源。
+- 服务器测试结束后记录镜像 revision、Policy 状态、健康检查、磁盘变化和遗留资源；若产生大量历史镜像，应在确认当前运行镜像和回滚路径后及时回收。
