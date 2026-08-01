@@ -2002,7 +2002,7 @@ Backend 契约或工具边界改动必须在 Backend 容器使用 bench Python �
 
 ---
 
-## 2026-08-01 AI 草稿业务数据一致性改造（本地最终候选已验证，待 staging 部署）
+## 2026-08-01 AI 草稿业务数据一致性改造（已部署 staging，真实“迪莫”验收通过）
 
 ### 问题与结论
 
@@ -2017,7 +2017,7 @@ Backend 契约或工具边界改动必须在 Backend 容器使用 bench Python �
 - Backend `apps/myapp`：`64ddb874c5c57e8211a66c74faaa367e61c56c4e feat: unify AI draft business state`，基于最新 `origin/develop`。
 - AI `services/myapp-ai`：`2dc1f53fc14a90d98064c246be9c0791a7a73491 feat: hydrate AI drafts from business state`，基于最新 `origin/develop`；rebase 后上游已有的 Guardrail 重复修改已自动消除。
 - Web `frontend/myapp-web`：`4272089 feat: distinguish AI draft baseline from edits`，基于最新 `origin/main`。
-- Parent：`ec90148e feat: publish unified AI draft business state`，固定 Backend/AI gitlink 并更新设计与交接文档；`.codex` 继续保持未跟踪且不得提交。
+- Parent：`49f6893fa4e51a5803b03f7a033a9ed924828e9a feat: publish unified AI draft business state`，固定 Backend/AI gitlink并更新设计与交接文档；`.codex` 继续保持未跟踪且不得提交。
 
 ### 已验证
 
@@ -2027,8 +2027,11 @@ Backend 契约或工具边界改动必须在 Backend 容器使用 bench Python �
 - Parent、Backend、AI、Web `git diff --check` 均通过。
 - 本地最终候选验证完成后，只读检查 `vivy@192.168.31.229`：根分区可用约 31GB、使用率 68%，当前服务健康；未删除备份、站点数据、数据库或业务卷。
 
-### 当前部署步骤
+### staging 部署与真实数据验收
 
-1. 按 Backend → AI → Web → Parent 顺序推送对应分支，使用唯一 staging 标签只构建一组 ERP/AI/Web 镜像。
-2. 部署到 `vivy@192.168.31.229` 后执行健康检查、容器重启数和错误日志检查。
-3. 使用 staging 真实“迪莫”记录验收完善模式：显示现有价格、当前库存只读、初始库存为空，保存后的 `_state.patch` 只包含用户修改；不修改正式库存。
+- 四个仓库已按 Backend → AI → Web → Parent 顺序推送。唯一镜像标签为 `staging-20260801-49f6893f`，未覆盖 `latest`。ERP/AI 构建 run `30682540205`、Web 构建 run `30682555172`、ERP/AI 部署 run `30682859887`、Web 部署 run `30682933997` 均成功。
+- 运行镜像 digest：ERP `sha256:85b38ca6d9c0d8a48eaf6ccc8ec31cfc9d772eb5822b74e982fb2c2601518517`，AI `sha256:034f4a50215b9604b89f8270217dc5adf770907be657522368a45cadf2976e7f`，Web `sha256:1f7e8613e7a6ff0f0a1e36985e5eec5b6d52865e9f2c2889ff95b45b7f92a5f7`。AI `/health` 报告 runtime revision `2dc1f53` 和 `product-setup-draft-v4`；Web OCI revision 为 `4272089`；Backend 新状态层和服务文件哈希与本地 `64ddb87` 完全一致。
+- `deploy/staging/check-staging.sh` 通过；ERP 首页/Ping、Web health/login/Ping 均 HTTP 200。Backend、Frontend、AI、各 worker、Scheduler、WebSocket 和 Web 容器重启数均为 0；AI 与 Web 为 healthy。部署后根分区使用率 69%、可用约 30GB。
+- staging 真实“迪莫”仍为标准售价 `5 CNY`、标准采购价 `3 CNY`、公司库存 `1000 件`。真实 AI 草稿 run `AI-RUN-978d05c8fad94e1e99967c3ac349ec75` 使用 `gpt-5.5` 成功：`operation=update`，baseline/effective 正确水合售价 5 和采购价 3，批发价/零售价为 `missing` 而不是 0，`opening_qty=null`，库存上下文 `inventory_read_only=true`；草稿未执行，随后已放弃并归档测试会话，商品价格和库存未改变。
+- 确定性补丁验收把售价候选设为 6 时，`_state.patch` 仅包含 `standard_selling_rate: 6`，baseline 仍为 5，effective 为 6，`ready_for_handoff=true`；该调用不持久化也不修改商品。
+- 默认 `opencode-deepseek-v4-flash` 与 `nvap-gpt-5.6-sol` 验收时分别遇到 Provider 502/503；抓取的 Sol 原始错误为 `Service temporarily unavailable`。这不是 Prompt/Schema 版本漂移，也不影响 `gpt-5.5` 的真实草稿成功结果；后续应单独完善结构化草稿的模型能力路由，避免选择治理登记中 `supports_json_schema=false` 且当时不可用的默认模型。
