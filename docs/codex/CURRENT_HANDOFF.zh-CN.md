@@ -8,6 +8,15 @@
 
 ## 当前最终状态
 
+### 2026-08-01 AI 工作台写意图自动分流修复（已提交并推送，未部署）
+
+- 已确认浏览器页面调用链为 `resolve_ai_scenario_v1` 自动识别后再选择四类专用草稿接口或 `stream_ai_message_v1`。此前成功测试只直接调用了商品草稿 Backend 服务，绕过了页面自动分流，因此不能证明浏览器端问题已修复。
+- Backend `apps/myapp/myapp/services/ai_service.py` 已补全确定性写意图边界：`给迪莫添加10个库存` 识别为 `inventory_adjustment_draft`，`完善迪莫商品资料` 识别为 `product_setup_draft`；库存判断继续优先于商品主数据判断，`更新迪莫商品库存` 不会误进入商品资料草稿。
+- 普通聊天兼容路径的前置结构化意图解析现在继承 Frappe 已授权、已解析的 `model_alias`，并传入 Orchestrator `/internal/v1/intent/parse`。固定模型不再只作用于后续 Chat/SSE 主请求；`apps/myapp/API_GATEWAY.zh-CN.md` 已同步契约说明。AI Orchestrator 的 `ChatRequest` 和 intent 路由原本已支持 `model_alias`，本次无需修改 `services/myapp-ai`。
+- Web 生产编排无需修改：`frontend/myapp-web/src/pages/AI/index.tsx` 已按 Backend 返回的四类写场景调用专用草稿 Service，并携带同一 `modelAlias`。新增页面级回归覆盖两个用户原句，确认固定模型透传且不调用 `streamAiChatMessage`；领域 Service 回归同时覆盖库存与商品草稿的 `model_alias` 请求映射。
+- Backend 容器内 `test_ai_service + test_gateway_wrappers` 共 221 项通过；本地 `localhost` 通过真实 Gateway 函数执行两个原句，分别返回 `inventory_adjustment_draft` 和 `product_setup_draft`。保留既有 `Failed to log error in db: AI Orchestrator 流式调用失败` 测试日志，退出码为 0。Web 定向 2 套/47 项、全量 37 套/257 项 Jest、`npm run tsc`、`npm run biome:lint` 和 `npm run build` 全部通过；Backend/Web `diff --check` 通过。
+- Backend 提交 `33c60f3 fix: route AI write intents to draft workflows` 已推送 `origin/develop`；Web 提交 `a63e31b test: cover AI draft auto-routing` 已推送 `origin/main`。本次父仓库提交包含 Backend gitlink 与本交接记录；既有未跟踪 `.codex` 不纳入提交，AI Orchestrator 保持干净。当前未构建镜像、未部署；如用户后续要求发布，应基于这些不可变提交形成单一 staging 候选，执行一次部署与浏览器人工验收。
+
 ### 2026-07-31 A1.2 staging Runtime Policy 试发失败关闭（已暂停，需先本地收敛）
 
 - 当前安全状态：staging 运行统一标签 `staging-20260731-7a4859d6`，父仓库部署 revision `7a4859d6aff601aa6360ad60c7afa86063809652`，Backend revision `822963f5d30a12ec72a20aea43ed51fb4051f003`，AI runtime revision `446d716e4a0cfee998dc2666abc27a601a9c80a3`。Runtime Policy 当前为 v24、rollout `0%`，readiness 为 `no_matching_policy`；production 未改动。
