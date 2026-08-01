@@ -27,6 +27,7 @@
 3. 形成新的单一最终 AI release candidate 后，再执行宿主机全量、Ruff、pre-commit、Docker test/runtime、fixture isolation、Offline 36/36 和 Sol/Terra Live 72/72。任何 revision 变化都必须重跑，旧报告不能复用。
 4. AI 提交和报告完成后再更新父仓库 gitlink，部署前处理磁盘容量风险；只构建和部署一次。下一次 Policy 成功候选应从 v25/100% 开始，失败自动恢复为 v26/0%。
 5. staging E2E 必须重新覆盖单据、商品、销售报表 SSE、同会话采购报表，并验证 `message_delta/completed`、citations、Run completed、Agent Step > 0、Policy 版本绑定和 `agent-grounding-v1`。A1.2 全部通过前不得发布 production Runtime Policy。
+
 ### 2026-07-31 staging 历史部署资源清理（已完成，服务正常）
 
 - 按用户要求以 `vivy@192.168.31.229` 执行先盘点后精确清理。清理前根分区为 98GB、已用 89GB、可用 4.8GB、使用率 95%；Docker 有 85 个镜像，其中约 25.7GB 可回收。
