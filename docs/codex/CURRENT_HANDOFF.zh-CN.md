@@ -1,6 +1,6 @@
 # 当前交接状态
 
-更新时间：2026-08-01 CST
+更新时间：2026-08-02 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。长期规则见 `AGENTS.md` 与 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`。
 
@@ -2052,7 +2052,7 @@ Backend 契约或工具边界改动必须在 Backend 容器使用 bench Python �
 
 ---
 
-## 2026-08-01 AI 模型故障诊断与健康检测改造（已提交，待部署）
+## 2026-08-01 AI 模型故障诊断与健康检测改造（已部署 staging）
 
 ### 实现结果
 
@@ -2071,5 +2071,16 @@ Backend 契约或工具边界改动必须在 Backend 容器使用 bench Python �
 
 ### 当前状态与下一步
 
-- AI `a8425b6 feat: expose model provider diagnostics`、Backend `4481fa4 feat: add AI model health diagnostics`、Web `e8c5d65 feat: improve AI model health controls` 已分别推送 `develop`、`develop`、`main`；父仓库待固定 Backend/AI gitlink。既有未跟踪 `.codex` 保持原样。
-- 下一步使用唯一 staging 标签构建 ERP/AI/Web 镜像并部署，随后验收真实不可用模型、自动策略实际模型展示、单项/多选/全量检测和定时任务配置。
+- AI `a8425b6 feat: expose model provider diagnostics`、Backend `4481fa4 feat: add AI model health diagnostics`、Web `e8c5d65 feat: improve AI model health controls` 已分别推送 `develop`、`develop`、`main`；父仓库 `726f0102 feat: publish AI model health diagnostics` 已固定 Backend/AI gitlink并推送 `develop`。既有未跟踪 `.codex` 保持原样。
+- staging 已部署并完成真实 Provider、单项/多选检测、定时任务注册、镜像 revision、HTTP 和容器健康验收；production 未变更。
+
+### staging 部署与真实验收
+
+- 统一不可变标签为 `staging-20260802-726f0102`，没有覆盖 `latest`。ERP/AI 构建 run `30740909228`、Web 构建 run `30740956116`、ERP/AI 部署与 migrate/health check run `30742676563` 均成功。
+- Web 自动部署 run `30742823306` 在 `docker login ghcr.io` 遇到 EOF，重跑 `30744737064` 在 `docker pull` 遇到 GHCR TLS handshake timeout；两次都发生在删除旧容器前，旧 Web 始终健康。随后在 `vivy@192.168.31.229` 按同一 workflow 的回滚边界对精确镜像执行 8 次上限的有限拉取重试，第 4 次成功后切换容器，三项健康检查通过；没有修改代码、镜像或标签。
+- 运行 digest：ERP `sha256:103fefce3fcb6d726ea4ca24c68004f907a261c41205f7b8f6c1fdeffad8d861`，AI `sha256:2cb1b26c2078625a7f68d80882a6e138ec719248cc783637111db895efffda0b`，Web `sha256:bbf3a4a47600a373480cb5572db1a2e05b345db8d53a40bef0ee442af39c3958`。OCI revision 分别为父仓库 `726f0102`、AI `a8425b6`、Web `e8c5d65`。
+- 服务器父仓库精确为 `726f0102`；Backend、Frontend、AI Orchestrator、Scheduler、Web 重启数均为 0，AI/Web 为 healthy。`check-staging.sh`、ERP 首页/Ping、Web `/healthz`、登录页、Gateway Ping 和模型管理 SPA 路由均通过。
+- 定时任务已进入 `Scheduled Job Type`：`myapp.tasks.check_ai_model_availability`，`frequency=Cron`、`cron_format=15 3 * * *`、`stopped=0`。治理配置返回 `enabled=true`、站点时区、默认范围 `all_enabled`。
+- 单项真实检测 `opencode-deepseek-v4-flash` 返回 `requested_count=1`、`checked_count=1`、`available=false`、`error_code=PROVIDER_HTTP_403`。双模型真实检测返回 `requested_count=2`、`checked_count=2`：`gpt-5.5` 本次为 `PROVIDER_TIMEOUT`，DeepSeek Flash 为 `PROVIDER_HTTP_403`；结果已按正式健康检测流程更新注册表和审计。
+- 直接从 Backend 容器调用新 Orchestrator Chat 契约得到 HTTP 502，安全响应为 `MODEL_PROVIDER_REJECTED`，包含实际 `model_alias=opencode-deepseek-v4-flash` 和 `provider_error_code=PROVIDER_HTTP_403`，未暴露 Provider 原始正文或 Secret。最近运行日志只有该预期 502，没有 Traceback、ERROR 或 CRITICAL。
+- 部署后根分区可用约 28GB、使用率 71%，未执行清理。服务器既有 `services/myapp-ai` 脏 gitlink及 `backups/`、`tmp/` 保持原样；运行事实以不可变镜像 revision/digest 为准。
