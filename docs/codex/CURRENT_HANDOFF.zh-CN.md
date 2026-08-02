@@ -2049,3 +2049,27 @@ Backend 契约或工具边界改动必须在 Backend 容器使用 bench Python �
 - staging 真实“迪莫”仍为标准售价 `5 CNY`、标准采购价 `3 CNY`、公司库存 `1000 件`。真实 AI 草稿 run `AI-RUN-978d05c8fad94e1e99967c3ac349ec75` 使用 `gpt-5.5` 成功：`operation=update`，baseline/effective 正确水合售价 5 和采购价 3，批发价/零售价为 `missing` 而不是 0，`opening_qty=null`，库存上下文 `inventory_read_only=true`；草稿未执行，随后已放弃并归档测试会话，商品价格和库存未改变。
 - 确定性补丁验收把售价候选设为 6 时，`_state.patch` 仅包含 `standard_selling_rate: 6`，baseline 仍为 5，effective 为 6，`ready_for_handoff=true`；该调用不持久化也不修改商品。
 - 默认 `opencode-deepseek-v4-flash` 与 `nvap-gpt-5.6-sol` 验收时分别遇到 Provider 502/503；抓取的 Sol 原始错误为 `Service temporarily unavailable`。这不是 Prompt/Schema 版本漂移，也不影响 `gpt-5.5` 的真实草稿成功结果；后续应单独完善结构化草稿的模型能力路由，避免选择治理登记中 `supports_json_schema=false` 且当时不可用的默认模型。
+
+---
+
+## 2026-08-01 AI 模型故障诊断与健康检测改造（已提交，待部署）
+
+### 实现结果
+
+- 已确认当前错误属于模型 Provider 拒绝请求，不是 AI Orchestrator 未启动。AI 层新增安全的 `MODEL_PROVIDER_REJECTED` 契约，携带实际 `model_alias` 与归一化 `provider_error_code`，但不透传 Provider 原始正文或 Secret。
+- Backend Gateway 不再把安全的模型错误统一覆盖成“AI 上游服务暂时不可用”；成功响应、SSE 错误、Run 历史均补充 `model_display`。自动策略失败时会从 Orchestrator 错误回填本次实际模型，普通用户显示友好模型名，高级诊断角色可查看 alias 和 Provider 错误码。
+- Web AI 对话、失败恢复卡和 Run Inspector 均显示“本次模型”；`MODEL_PROVIDER_REJECTED` 明确提示“本次模型不可用”，允许手动重试和切换模型，不进行无意义的自动重试。
+- 模型管理页新增单行检测、表格多选和“检测已选（N）”，并保留全量检测。Backend `check_ai_model_availability_v1` 支持一个或多个 `model_aliases`；显式空列表、未知、停用或退役模型会被拒绝，避免误触全量检测。
+- 新增每日 `03:15`（站点时区）定时健康检查，默认启用；可通过 `myapp_ai_model_healthcheck_enabled` 开关，通过 `myapp_ai_model_healthcheck_aliases` 限定检测范围。任务使用 Redis 锁防止并发，治理概览返回定时检测启停、范围和最近执行状态供 Web 展示。
+
+### 已验证
+
+- Backend 容器定向单测：`290` 项通过。
+- AI：Ruff、全量 pre-commit、`tests/test_main.py`（`20` 项）通过；Docker test 镜像内全量 `153` 项通过；runtime 镜像 `myapp-ai:runtime` 构建成功。
+- Web：TypeScript、Biome、全量 Jest（`37` 套 / `260` 项）和 production build 全部通过。
+- Parent、Backend、AI、Web 的 `git diff --check` 全部通过。
+
+### 当前状态与下一步
+
+- AI `a8425b6 feat: expose model provider diagnostics`、Backend `4481fa4 feat: add AI model health diagnostics`、Web `e8c5d65 feat: improve AI model health controls` 已分别推送 `develop`、`develop`、`main`；父仓库待固定 Backend/AI gitlink。既有未跟踪 `.codex` 保持原样。
+- 下一步使用唯一 staging 标签构建 ERP/AI/Web 镜像并部署，随后验收真实不可用模型、自动策略实际模型展示、单项/多选/全量检测和定时任务配置。
