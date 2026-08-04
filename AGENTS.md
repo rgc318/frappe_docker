@@ -39,6 +39,7 @@ Read these documents when the task touches the matching area:
 - Frappe Docker development guide: `docs/05-development/01-development.md`
 - Local services connection guide: `docs/05-development/03-local-services-connection.md`
 - AI business workbench design: `docs/05-development/04-ai-business-workbench.zh-CN.md`
+- Unified media upload and image editing design: `docs/05-development/05-media-upload-and-image-editing.zh-CN.md`
 - Staging deployment notes: `STAGING_DEPLOYMENT.zh-CN.md`
 
 ### Backend: `apps/myapp`

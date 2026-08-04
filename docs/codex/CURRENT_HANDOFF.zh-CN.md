@@ -6,25 +6,43 @@
 
 ## 当前目标与结果
 
-- 本轮目标：让商品图片能力在所有高价值 Web 场景中保持可发现，统一无图 / 加载失败占位，并允许用户在 AI 当前商品详情中直接上传、替换和删除正式商品图片。
-- 当前结果：Web 代码、测试和文档已完成并提交推送；staging Web 已切换到 `staging-20260804-01544c4`，容器健康、登录页和 Frappe Ping 通过，静态资源已确认包含 AI 直接图片维护代码。Backend、AI Orchestrator 和 production 均未变更。
-- 涉及仓库：`frontend/myapp-web` 和父仓库交接文档。Backend、AI Orchestrator、Mobile 未修改。
+- 本轮目标：统一商品图片与用户头像的裁剪、缩放、旋转、压缩、格式化和重新编辑能力，并让后端对所有客户端执行同一图片规范化与真实内容校验。
+- 当前结果：Backend `b3a0d38`、Web `0e715f9`、Mobile `06e135f` 已分别提交并推送；父仓库发布提交和 staging 部署正在进行。Web 商品图和头像已统一进入 profile 驱动编辑器；Mobile 商品图策略已对齐；Backend 会真实解码、限制像素、纠正 EXIF、按 profile 裁剪并输出 WebP。
+- 涉及仓库：父仓库、`apps/myapp`、`frontend/myapp-web`、`frontend/myapp-mobile`。AI Orchestrator 未修改，production/staging 均未部署本次增量。
 
-本次图片工作实际分为两个连续阶段：第一阶段完成上传、暂存、正式保存、AI 商品草稿和主要业务页面的数据链路；第二阶段针对 staging 验收中“无图时整块消失，容易误判为功能未发布”的问题，统一所有高价值 Web 场景的图片占位，并把现有商品的图片维护入口直接放入 AI 当前商品详情。
+本次是在已部署的图片上传、暂存、正式保存、统一占位和跨业务展示能力之上增加第三阶段媒体治理。CSV/XLSX/PDF 等非图片文件不进入裁剪器，继续使用各自的导入、预览和校验流程。
 
 ## 当前仓库状态
 
 | 仓库                           | 分支 / HEAD                              | 工作树状态                      | 本轮责任                                       |
 | ------------------------------ | ---------------------------------------- | ------------------------------- | ---------------------------------------------- |
-| Parent `frappe_docker`         | `develop` / `5f224653`（本次交接更新前） | 仅既有未跟踪 `.codex`；不得提交 | 发布编排、Backend / AI gitlink、跨仓库交接     |
-| Backend `apps/myapp`           | `develop` / `5a23dd1`                    | 干净                            | 第一阶段图片事务、媒体服务、商品接口和草稿执行 |
+| Parent `frappe_docker`         | `develop` / `79c35d4a`                    | 待提交 Backend gitlink、`AGENTS.md`、交接和新媒体设计；既有 `.codex` 不提交 | 统一设计索引与跨仓库交接 |
+| Backend `apps/myapp`           | `develop` / `b3a0d38`                    | 干净，已推送                     | 图片规范化、商品图/头像服务、契约和测试 |
 | AI `services/myapp-ai`         | `develop` / `ca5448c`                    | 干净                            | 本轮运行时代码未变；仅沿用既有编排契约         |
-| Web `frontend/myapp-web`       | `main` / `01544c4`                       | 干净                            | 第二阶段统一占位、AI 直接图片维护及页面接入    |
-| Mobile `frontend/myapp-mobile` | `develop` / `15a1a87`                    | 有 5 个既有未提交修改           | 本轮未修改，不得覆盖或提交这些用户改动         |
+| Web `frontend/myapp-web`       | `main` / `0e715f9`                       | 干净，已推送                     | 统一编辑器、商品图/头像接入、媒体元数据和测试 |
+| Mobile `frontend/myapp-mobile` | `develop` / `06e135f`                    | 本次提交已推送；仍有既有 5 个用户修改 | 对齐 1:1 裁剪、质量、媒体响应和文档 |
 
-Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮图片提交。
+Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮图片增量，不得覆盖或提交。本次只修改 `components/item-image-field.tsx`、`services/media.ts`、`DEVELOPMENT.md`。
 
-## 本轮已完成
+## 本次媒体治理增量
+
+- 新增统一设计文档 `docs/05-development/05-media-upload-and-image-editing.zh-CN.md`，记录 Ant Design、Cloudinary、MDN 和 OWASP 调研依据、profile、生命周期和后续扩展。
+- Web 新增 `ImageEditorUpload` 与 `image-processing`：支持 1:1 裁剪、拖动、缩放、左右旋转、重新裁剪已有图片、Canvas WebP 输出和自适应质量。
+- 商品图统一使用 `item-square-v1`：1600 × 1600 WebP，起始质量 82，来源最短边至少 300px，来源最大 20MB/4000 万像素，输出最大 5MB。
+- 头像统一使用 `avatar-square-v1`：512 × 512 WebP，起始质量 85，来源最短边至少 128px，输出最大 2MB。
+- Backend 新增 `myapp.utils.image_processing`：真实解码、解压炸弹防护、EXIF 方向纠正、居中兜底裁剪、LANCZOS 缩放、元数据移除、WebP 自适应质量和输出上限。
+- 商品图片与头像响应增加 `content_type`、`file_size`、`width`、`height`、`profile`、`quality`、`source_width`、`source_height`、`source_format`。
+- Mobile 原生和 Web fallback 对齐 1:1 商品图裁剪，客户端质量从 0.78 调整为 0.82；最终正式格式仍由 Backend 统一为 WebP。
+
+## 本次验证
+
+- Backend：容器内 `202 tests` 通过，覆盖图片处理、媒体服务、头像、Gateway、安全契约和商品写事务。
+- Web：`npm run tsc`、`npm run biome:lint`、全量 `41 suites / 283 tests`、`npm run build` 均通过；Jest 仍有仓库既有 open handle 提示但退出码为 0。
+- Mobile：`npm run lint` 通过。
+- Backend 容器无 `env/bin/ruff`，因此本次无法运行独立 Ruff 命令；相关 Python 代码已由容器单元测试导入执行。
+- 尚未执行真实浏览器拖拽/裁剪人工验收、真实 HTTP 图片上传 smoke 或 staging 部署。
+
+## 已部署基线能力
 
 - `ItemImageUpload` 默认使用 `staged`：选择、替换和删除图片只更新表单值，正式 `Item.image` 随商品保存接口变更；保留 `commitMode="immediate"` 供明确的独立图片动作。
 - `update_product_v2` 在回滚时清理新暂存图片、提交后清理旧受管图片；显式 `image=""` 删除图片，省略字段保持不变。
@@ -56,7 +74,7 @@ Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts
 4. 发布只增加上传、保存、展示和占位能力，不自动生成图片，也不为旧商品批量补图；历史商品是否有图仍以 `Item.image` 为事实源。
 5. 交易单据行只展示当前领域接口返回的商品图片，没有引入不可变单据行图片快照；历史单据长期审计如需“下单时图片”，应在后续阶段设计独立快照字段。
 
-## 本轮验证
+## 已部署基线验证（历史）
 
 - Backend：容器内 4 个相关 suite，`137 tests` 通过。模拟 Orchestrator 502/503 日志和 ResourceWarning 为测试预期输出。
 - Web：`npm run tsc` 通过；`npm run biome:lint` 通过，检查 `234 files`。
@@ -94,7 +112,7 @@ Container state: running / healthy
 静态资源命中 AI 直接图片维护文案：_c328d2da.45d5e3be.async.js
 ```
 
-## 当前提交与部署版本
+## 已部署基线提交与版本
 
 - Backend：`5a23dd1 feat: add transactional product image workflows`，已推送 `origin/develop`。
 - Web：`01544c4 feat: make product images discoverable across workflows`，已推送 `origin/main`。
@@ -128,18 +146,19 @@ Container state: running / healthy
 
 ## 当前风险与下一步
 
-1. 使用有 Item 写权限的 staging 账号做浏览器人工 UI 验收：打开“迪莫”应看到无图占位和“上传图片”，上传后应自动刷新为实际图片；同时抽查商品列表、库存作业、订单 / 退货明细和 AI 草稿的占位尺寸。当前环境没有 Playwright/Puppeteer，因此自动验收覆盖组件、构建、路由资源和部署健康门禁。
-2. 若要把登录态商品图片链路加入部署门禁，为 staging workflow 配置受限测试账号或专用 Bearer/API Token，并新增不会污染业务数据的图片生命周期 HTTP case。
-3. 第二阶段可补 Mobile 的表单暂存边界、不可变单据行图片快照、缩略图派生、真实文件头/像素校验、上传配额和正式 Media Reference 表；当前 AI 草稿引用保护仍是对 `payload_json` 的轻量查询。
-4. 本地默认模型 `opencode-deepseek-v4-flash` 当前仍被 LiteLLM 以 `PROVIDER_HTTP_403` 拒绝；本次 AI 图片验收显式使用健康的 `gpt-5.5`，没有修改默认模型或 Runtime Policy。Provider 恢复后应重新执行健康检测。
+1. 需要在真实浏览器人工验证横图/竖图拖动、缩放、左右旋转、透明 PNG、已有图片重新裁剪和取消编辑；当前自动测试覆盖策略、入口和上传调用，但 JSDOM 不验证 Canvas 视觉结果。
+2. 需要使用登录态 HTTP smoke 确认 Gateway 最终保存为 WebP、尺寸与 profile 元数据正确，并清理测试 Item/File；本次未创建真实业务数据。
+3. Mobile 原生裁剪器依赖 dev client/APK；合并前建议至少在 Android 或 iOS 真机验证相册与拍照各一次，Web fallback 也验证一次。
+4. Backend、Web、Mobile 已按仓库边界提交推送；父仓库只提交 Backend gitlink、设计索引和交接，不得夹带 Mobile 既有 5 个用户修改或 `.codex`。
+5. 当前只保存规范化正式图片，不长期保留原图；未来若需要无损反复编辑、印刷原稿或 DAM，应增加独立 original asset 和版本/保留策略。
 
 ## 接手建议
 
-1. 先用有 Item 写权限的 staging 账号打开 AI 中的“迪莫”商品详情，确认同时能看到“回答时图片”的历史占位和“当前商品图片”的上传入口。
-2. 上传一张真实业务图片，确认上传成功后当前详情自动刷新，商品模块列表 / 详情和库存相关页面能够读取同一 URL；如只是验收临时图片，验收后通过正式删除按钮清理，不直接改数据库。
-3. 抽查一条无图商品和一条有图商品在商品选择器、订单明细、退货、库存盘点和 AI 草稿摘要中的尺寸与表格对齐情况。
-4. 若要继续第二阶段媒体治理，优先级建议为：真实文件头 / 像素校验与配额 → 缩略图派生 → 不可变交易行图片快照 → Mobile staged 边界 → 正式 Media Reference 模型。
-5. 后续触发 Web staging build 时，当前 workflow 的 `web_ref` 应传 branch 或 tag；不要传短 SHA。若需要不可变 SHA 构建，应先改造 checkout 的 fetch / checkout 逻辑并补 workflow 回归。
+1. 先查看三个仓库状态并严格区分 Mobile 既有修改与本次媒体文件。
+2. 复跑 Backend `202 tests`、Web tsc/lint/full Jest/build、Mobile lint 和四仓 `git diff --check`。
+3. 使用本地站点或受限测试账号完成一轮真实图片生命周期：横图上传 → 确认 1600 × 1600 WebP/profile → 重新裁剪 → 替换 → 删除 → 确认 File 无残留。
+4. 浏览器人工确认商品创建、商品编辑、AI 当前商品详情和个人头像均进入同一编辑器；Mobile 验证相册和相机的正方形裁剪。
+5. 验收后再按仓库边界提交和部署；本次不需要修改 AI Orchestrator。
 
 ## 上一轮目标（2026-08-03，已完成）
 
