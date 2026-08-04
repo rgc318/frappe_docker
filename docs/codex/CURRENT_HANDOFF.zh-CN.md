@@ -10,6 +10,20 @@
 - 当前结果：Web 代码、测试和文档已完成并提交推送；staging Web 已切换到 `staging-20260804-01544c4`，容器健康、登录页和 Frappe Ping 通过，静态资源已确认包含 AI 直接图片维护代码。Backend、AI Orchestrator 和 production 均未变更。
 - 涉及仓库：`frontend/myapp-web` 和父仓库交接文档。Backend、AI Orchestrator、Mobile 未修改。
 
+本次图片工作实际分为两个连续阶段：第一阶段完成上传、暂存、正式保存、AI 商品草稿和主要业务页面的数据链路；第二阶段针对 staging 验收中“无图时整块消失，容易误判为功能未发布”的问题，统一所有高价值 Web 场景的图片占位，并把现有商品的图片维护入口直接放入 AI 当前商品详情。
+
+## 当前仓库状态
+
+| 仓库 | 分支 / HEAD | 工作树状态 | 本轮责任 |
+| --- | --- | --- | --- |
+| Parent `frappe_docker` | `develop` / `5f224653`（本次交接更新前） | 仅既有未跟踪 `.codex`；不得提交 | 发布编排、Backend / AI gitlink、跨仓库交接 |
+| Backend `apps/myapp` | `develop` / `5a23dd1` | 干净 | 第一阶段图片事务、媒体服务、商品接口和草稿执行 |
+| AI `services/myapp-ai` | `develop` / `ca5448c` | 干净 | 本轮运行时代码未变；仅沿用既有编排契约 |
+| Web `frontend/myapp-web` | `main` / `01544c4` | 干净 | 第二阶段统一占位、AI 直接图片维护及页面接入 |
+| Mobile `frontend/myapp-mobile` | `develop` / `15a1a87` | 有 5 个既有未提交修改 | 本轮未修改，不得覆盖或提交这些用户改动 |
+
+Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮图片提交。
+
 ## 本轮已完成
 
 - `ItemImageUpload` 默认使用 `staged`：选择、替换和删除图片只更新表单值，正式 `Item.image` 随商品保存接口变更；保留 `commitMode="immediate"` 供明确的独立图片动作。
@@ -22,6 +36,25 @@
 - 新增统一 `ProductImage` 展示组件：真实图片、无图和加载失败使用同一尺寸边界；商品主数据、库存列表 / 详情 / 调整 / 盘点 / 转仓、销售 / 采购订单明细、销售 / 采购退货、AI 商品 citation、AI 草稿摘要 / 复核和 AI 当前单据明细不再隐藏空图片位置或只显示横杠。
 - AI `ProductDetailDrawer` 同时展示回答时图片快照和当前商品图片；当前图片区始终可见，并通过 `ItemImageUpload commitMode="immediate"` 直接上传、替换或删除正式 `Item.image`，成功后自动重新读取服务器数据。实际写权限继续由 Frappe Item 保存裁决。
 - 已确认 staging 商品“迪莫”的 `Item.image` 为 `null`；旧商品不会因部署自动生成图片。新 UI 会明确显示占位和上传入口，仍需业务用户选择实际商品图片。
+
+## Web 图片覆盖清单
+
+| 业务范围 | 已覆盖位置 | 无图行为 | 图片维护方式 |
+| --- | --- | --- | --- |
+| AI 商品查询 | 商品 citation、回答时图片快照、当前商品详情 | 固定尺寸“无图 / 当时无图片”占位 | 当前商品详情可立即上传、替换、删除并自动刷新 |
+| AI 商品草稿 | 紧凑摘要、编辑器、业务复核、版本差异所引用的 payload | 显示“未设置”占位 | 草稿内使用 staged 上传，执行时才原子写入正式商品 |
+| AI 单据查询 | 当前销售 / 采购订单和发票明细 | 每行保留商品图片占位 | 只读，正式维护走商品或 AI 当前商品详情 |
+| 商品主数据 | 商品列表、商品详情、创建 / 编辑表单、商品选择器 | 列表与详情均显示统一占位 | 表单 staged 保存；商品详情编辑随正式保存提交 |
+| 库存 | 库存列表 / 详情、调整、盘点、转仓 | 列表、详情和已选商品区均保留占位 | 只读展示，图片维护走商品或 AI 当前商品详情 |
+| 销售 / 采购 | 订单编辑、订单 / 发货 / 收货 / 发票共享明细、销售 / 采购退货 | 所有商品行统一占位 | 交易页面只读展示，避免交易动作顺带修改主数据 |
+
+## 关键设计决策
+
+1. `ProductImage` 只负责展示真实图片、空值占位和加载失败降级，不负责拼接存储地址。媒体 URL 继续由领域 Service 和 `resolveMediaUrl` 解析，页面不假设 Frappe File、OSS、S3 或 MinIO。
+2. 表单和 AI 商品草稿默认使用 staged 模式，取消编辑不会提前修改正式 `Item.image`；AI 当前商品详情属于用户明确触发的独立图片动作，使用 `commitMode="immediate"`。
+3. 直接上传、替换和删除仍由 Backend 的 Item 保存权限裁决。Web 显示入口不代表权限提升，失败时沿用正式 Gateway 错误响应。
+4. 发布只增加上传、保存、展示和占位能力，不自动生成图片，也不为旧商品批量补图；历史商品是否有图仍以 `Item.image` 为事实源。
+5. 交易单据行只展示当前领域接口返回的商品图片，没有引入不可变单据行图片快照；历史单据长期审计如需“下单时图片”，应在后续阶段设计独立快照字段。
 
 ## 本轮验证
 
@@ -36,6 +69,31 @@
 - 本地残留检查：`ai-image-smoke-*` File 数量为 `0`；2 个测试草稿均为 `discarded`；3 个测试会话均已归档。
 - 本地运行态 smoke：Backend Ping、Web `/ai`、Web `/master-data/products` 均返回 `200`。Backend 与 Web 当前由手动开发进程提供服务，避免重启相关容器后忘记重新启动。
 
+最终 Web 验证命令：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+npm run build
+git diff --check
+```
+
+最终结果：TypeScript 通过；Biome 检查 `234 files`；Jest `39 suites / 277 tests` 通过；生产构建通过。提交钩子格式化后又定向复跑 `ProductImage`、`ItemImageUpload`、`ProductDetailDrawer` 和 `AiDraftEditorModal`，`4 suites / 24 tests` 通过。
+
+staging 只读诊断与部署后核验：
+
+```text
+Item “迪莫”: image=null, modified=2026-07-25 17:47:56.681994
+Web container: ghcr.io/rgc318/myapp-web:staging-20260804-01544c4
+Container state: running / healthy
+/healthz: ok
+/user/login: HTTP 200
+/api/method/ping: {"message":"pong"}
+静态资源命中 AI 直接图片维护文案：_c328d2da.45d5e3be.async.js
+```
+
 ## 当前提交与部署版本
 
 - Backend：`5a23dd1 feat: add transactional product image workflows`，已推送 `origin/develop`。
@@ -49,7 +107,10 @@
 
 | 范围                       | Workflow Run                                                                    | 结果 |
 | -------------------------- | ------------------------------------------------------------------------------- | ---- |
+| Parent 文档 lint           | [30897069367](https://github.com/rgc318/frappe_docker/actions/runs/30897069367) | 成功 |
 | Backend + AI build         | [30881015149](https://github.com/rgc318/frappe_docker/actions/runs/30881015149) | 成功 |
+| Web push CI                | [30896266250](https://github.com/rgc318/myapp-web/actions/runs/30896266250)     | 成功 |
+| Web coverage CI            | [30896266169](https://github.com/rgc318/myapp-web/actions/runs/30896266169)     | 成功 |
 | Web build                  | [30896446600](https://github.com/rgc318/myapp-web/actions/runs/30896446600)     | 成功 |
 | Backend + AI deploy/health | [30884538936](https://github.com/rgc318/frappe_docker/actions/runs/30884538936) | 成功 |
 | Web deploy/health          | [30896861740](https://github.com/rgc318/myapp-web/actions/runs/30896861740)     | 成功 |
@@ -71,6 +132,14 @@
 2. 若要把登录态商品图片链路加入部署门禁，为 staging workflow 配置受限测试账号或专用 Bearer/API Token，并新增不会污染业务数据的图片生命周期 HTTP case。
 3. 第二阶段可补 Mobile 的表单暂存边界、不可变单据行图片快照、缩略图派生、真实文件头/像素校验、上传配额和正式 Media Reference 表；当前 AI 草稿引用保护仍是对 `payload_json` 的轻量查询。
 4. 本地默认模型 `opencode-deepseek-v4-flash` 当前仍被 LiteLLM 以 `PROVIDER_HTTP_403` 拒绝；本次 AI 图片验收显式使用健康的 `gpt-5.5`，没有修改默认模型或 Runtime Policy。Provider 恢复后应重新执行健康检测。
+
+## 接手建议
+
+1. 先用有 Item 写权限的 staging 账号打开 AI 中的“迪莫”商品详情，确认同时能看到“回答时图片”的历史占位和“当前商品图片”的上传入口。
+2. 上传一张真实业务图片，确认上传成功后当前详情自动刷新，商品模块列表 / 详情和库存相关页面能够读取同一 URL；如只是验收临时图片，验收后通过正式删除按钮清理，不直接改数据库。
+3. 抽查一条无图商品和一条有图商品在商品选择器、订单明细、退货、库存盘点和 AI 草稿摘要中的尺寸与表格对齐情况。
+4. 若要继续第二阶段媒体治理，优先级建议为：真实文件头 / 像素校验与配额 → 缩略图派生 → 不可变交易行图片快照 → Mobile staged 边界 → 正式 Media Reference 模型。
+5. 后续触发 Web staging build 时，当前 workflow 的 `web_ref` 应传 branch 或 tag；不要传短 SHA。若需要不可变 SHA 构建，应先改造 checkout 的 fetch / checkout 逻辑并补 workflow 回归。
 
 ## 上一轮目标（2026-08-03，已完成）
 
