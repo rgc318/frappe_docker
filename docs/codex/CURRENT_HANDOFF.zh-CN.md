@@ -7,7 +7,7 @@
 ## 当前目标与结果
 
 - 本轮目标：为商品图片建立可靠的暂存/保存事务边界，并把图片能力贯通 AI 商品草稿、商品编辑和高价值业务详情/操作页面。
-- 当前结果：第一阶段代码与文档已完成，并通过本地自动化、真实商品图片 HTTP 回路和 AI 商品草稿图片链路验证；Backend、AI 文档和 Web 候选已提交并推送，父仓库 release 提交和 staging 部署正在收口，production 不变。
+- 当前结果：第一阶段代码与文档已完成并提交推送；本地自动化、真实商品图片 HTTP 回路、AI 商品草稿图片链路和 staging 部署健康检查均通过。staging 已切换到统一标签 `staging-20260804-b1d0e8e8`，production 不变。
 - 涉及仓库：`apps/myapp`、`frontend/myapp-web`、父仓库和 `services/myapp-ai` 文档。Mobile 未修改。
 
 ## 本轮已完成
@@ -33,17 +33,38 @@
 - 本地残留检查：`ai-image-smoke-*` File 数量为 `0`；2 个测试草稿均为 `discarded`；3 个测试会话均已归档。
 - 本地运行态 smoke：Backend Ping、Web `/ai`、Web `/master-data/products` 均返回 `200`。Backend 与 Web 当前由手动开发进程提供服务，避免重启相关容器后忘记重新启动。
 
-## 当前提交与发布候选
+## 当前提交与部署版本
 
 - Backend：`5a23dd1 feat: add transactional product image workflows`，已推送 `origin/develop`。
 - Web：`e1cce5a feat: add product images to AI and operations`，已推送 `origin/main`。
 - AI Orchestrator：`ca5448c docs: document AI model fallback behavior`，已推送 `origin/develop`；本轮只有文档提交，运行时代码未变。
-- Parent：当前基线 `a221a8ad`，正在提交上述 Backend/AI gitlink 和父仓库文档；`.codex` 仍为既有未跟踪目录，不提交。
+- Parent release：`b1d0e8e8 feat: release product image workflows`，固定 Backend/AI gitlink 并已推送 `origin/develop`。
+- 统一 staging 镜像标签：`staging-20260804-b1d0e8e8`。
+- `.codex` 仍为既有未跟踪目录，不提交。
+
+## staging 构建与部署
+
+| 范围                       | Workflow Run                                                                    | 结果 |
+| -------------------------- | ------------------------------------------------------------------------------- | ---- |
+| Backend + AI build         | [30881015149](https://github.com/rgc318/frappe_docker/actions/runs/30881015149) | 成功 |
+| Web build                  | [30881014803](https://github.com/rgc318/myapp-web/actions/runs/30881014803)     | 成功 |
+| Backend + AI deploy/health | [30884538936](https://github.com/rgc318/frappe_docker/actions/runs/30884538936) | 成功 |
+| Web deploy/health          | [30884538884](https://github.com/rgc318/myapp-web/actions/runs/30884538884)     | 成功 |
+
+部署事实：
+
+- Parent release 的 gitlink 精确固定 Backend `5a23dd1` 和 AI `ca5448c`；远端 Backend/AI/Web 分支头分别精确指向 `5a23dd1`、`ca5448c` 和 `e1cce5a`。
+- Backend、Frontend、Queue、Scheduler、Websocket 和 AI Orchestrator 均切换到统一标签；AI Orchestrator 状态为 `healthy`。
+- `bench --site staging.example.com migrate` 成功执行。
+- AI `/healthz` 返回 `status=ok`；LiteLLM、Runtime Governance 和 Vector Search 已配置；Backend 到 Orchestrator 内部认证通过。
+- Runtime Policy 已发布：`1 policies, 7 tool-ready models`。
+- `check-staging.sh` 的首页和 Ping 均返回 `200`；Web workflow 的 `/healthz`、`/user/login` 和 `/api/method/ping` 门禁通过。
+- staging 未配置本轮登录态关键 HTTP 回归输入，因此部署 workflow 保持 `run_http_regression=false`；真实商品图片和 AI 草稿图片链路已在本地使用登录态完成。
 
 ## 当前风险与下一步
 
-1. 完成父仓库 release 提交和推送，使用唯一镜像标签构建 Backend/AI 与 Web staging 镜像，再部署并执行健康检查。
-2. 部署后继续用浏览器做人工 UI 验收：商品编辑取消不应提前换图、保存后替换/删除生效、AI 新建/完善草稿图片可预览并原地执行、无图占位和窄屏表格正常；当前环境没有 Playwright/Puppeteer，因此自动验收只覆盖路由资源和 Jest。
+1. 使用有权限的 staging 账号做浏览器人工 UI 验收：商品编辑取消不应提前换图、保存后替换/删除生效、AI 新建/完善草稿图片可预览并原地执行、无图占位和窄屏表格正常；当前环境没有 Playwright/Puppeteer，因此自动验收只覆盖路由资源和 Jest。
+2. 若要把登录态商品图片链路加入部署门禁，为 staging workflow 配置受限测试账号或专用 Bearer/API Token，并新增不会污染业务数据的图片生命周期 HTTP case。
 3. 第二阶段可补 Mobile 的表单暂存边界、不可变单据行图片快照、缩略图派生、真实文件头/像素校验、上传配额和正式 Media Reference 表；当前 AI 草稿引用保护仍是对 `payload_json` 的轻量查询。
 4. 本地默认模型 `opencode-deepseek-v4-flash` 当前仍被 LiteLLM 以 `PROVIDER_HTTP_403` 拒绝；本次 AI 图片验收显式使用健康的 `gpt-5.5`，没有修改默认模型或 Runtime Policy。Provider 恢复后应重新执行健康检测。
 
