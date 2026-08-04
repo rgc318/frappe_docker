@@ -150,11 +150,48 @@ draft ──编辑/恢复──> draft（新版本）
 
 - Orchestrator 从 LiteLLM `/v1/models` 返回当前 Service Key 可见的完整模型库存，不再只暴露默认 Chat 和 Embedding 别名。
 - Frappe `sync_ai_model_registry_v1` 负责同步模型能力和健康状态；已消失模型标记为 `degraded / missing`，人工 `disabled / retired` 状态不会被覆盖。
-- 普通用户通过 `list_ai_selectable_models_v1` 只能看到 `active / validated` 且属于 `fast_chat / reasoning / structured` 的模型；Embedding 和不可用模型不进入选择器。
+- `list_ai_selectable_models_v1` 只返回 `active / validated` 且属于 `fast_chat / reasoning / structured` 的模型；Embedding、缺失、停用和退役模型不进入清单。最近健康失败不会自动改变人工生命周期，但接口会返回健康时间、状态和错误码；Web 将 `unavailable` 项标记并禁用，Backend 也拒绝新的固定模型请求。
 - Chat、SSE 和四类草稿统一接受可选 `model_alias`。省略时使用已发布策略；显式选择时由 Frappe 再次校验，并禁用本次请求的静默模型 fallback。
-- 最终 Run 返回的 `model_alias` 是实际执行事实，Web 不能只依据发送前的本地选择宣称模型已经切换。
+- 自动模式按策略主模型和有序 fallback 选择，跳过最近健康状态为 `unavailable` 的候选；Chat 只允许在首个可见正文 Token 前因 Provider 故障切换，避免拼接多个模型的正文。没有匹配已发布策略时，Orchestrator 可使用 `MYAPP_AI_MODEL + MYAPP_AI_FALLBACK_MODELS` 组成系统默认链。
+- 最终 Run 返回的 `model_alias` 是实际执行事实，`requested_model_alias` 是显式请求事实；Web 不能只依据发送前的本地选择宣称模型已经切换。
 - 只读 Agent 在创建 Run 前执行 Runtime Policy 就绪预检。没有唯一有效的已发布策略，或主模型、fallback、显式固定模型任一未达到 `active / validated + supports_tools=true` 时，本次请求使用兼容查询模式。同步响应和 SSE 都返回 warning，Web 按普通运行警告展示，不应把 `AI_AGENT_MODEL_TOOLS_UNVERIFIED` 等内部治理错误直接呈现给业务用户。
 - 兼容查询只发生在新 Run 路由阶段。它仍先通过 `erp-intent-v3` 结构化意图模型提取只读场景和工具参数，再由 Frappe 执行权限安全的商品、单据或报表查询；本地关键词/DSL 只在意图模型不可用、低置信度或输出非法时降级。完整 Agent 已开始后的失败不自动改走兼容路径，避免重复 Run、重复工具副作用或额外模型调用。
+
+### 5.5 模型执行事实、故障诊断与健康检查
+
+模型选择和模型执行必须分开建模：
+
+- `requested model`：用户显式选择的 alias；自动策略模式下可以为空。
+- `actual model`：本次最终执行或最终失败尝试的 `model_alias`，只能由 Backend/Orchestrator Run 事实确认。
+- `model_display`：面向普通业务用户的友好名称。
+- `provider model`：底层路由或供应商模型名，只属于高级诊断，不是业务选择事实。
+
+自动策略模式也必须在助手消息、失败卡、历史 Run 和 Run Inspector 中显示实际模型的友好名称。页面不能因为请求时选择了“自动”就隐藏模型，也不能仅依据发送前的固定选择宣称某模型已经执行。
+
+Provider 最终拒绝 Chat、意图解析或四类结构化草稿时，Orchestrator 统一返回 `MODEL_PROVIDER_REJECTED`、实际 `model_alias` 和可选稳定 `provider_error_code`。Frappe 负责生成权限安全的 `model_display`，高级诊断角色才可看到技术 alias 和 Provider 错误码。任何层都不得透传 Provider 原始正文、凭据、Authorization Header 或系统 Prompt。
+
+模型健康治理有三种人工范围：
+
+- 单项：只检测一个 alias。
+- 多选：检测明确选择的 1～100 个 alias。
+- 全量：检测全部未停用、未退役模型，必须作为独立明确动作确认。
+
+显式空选择不是全量；未知、停用或退役 alias 整体拒绝。Chat 探测包含最小回答和强制 Function Calling，Embedding 探测使用固定合成文本。检查会产生少量真实 Provider 调用和费用，只更新健康、能力和审计事实，不自动修改模型生命周期或发布策略。
+
+Frappe Scheduler 默认每天站点时间 `03:15` 执行健康检查，Redis 锁防止同站点并发重复探测。站点可关闭任务或把范围限制到指定 alias；未配置范围时检查全部未停用模型。治理页面展示启停、范围和最近检测时间，但 Scheduler 配置仍属于服务端运维边界。
+
+健康状态必须带时间解释：一次成功不代表长期可用，一次超时也不等于模型永久退役。运行路由、策略发布、人工排障和告警应共同参考最近检测时间、稳定错误码、工具能力、真实 Run 错误和 Provider SLA。
+
+### 5.6 消息级重试与 Run 审计
+
+“恢复输入供修改”和“重试失败消息”是两个不同动作：
+
+- 恢复输入只把原问题放回输入框，由用户修改后作为新消息发送。
+- 消息级重试绑定失败 `run_id`，恢复原问题、场景、会话和公司，但使用用户点击重试时页头当前选择的模型。
+
+普通 Chat 重试不重复插入用户消息。Backend 创建新 Run，把原失败助手占位原位绑定到新 Run；成功后在原位置更新正文和 citation。旧 Run 保留失败事实，新 Run 通过 `retry_of_run_id` 记录来源。`requested_model_alias` 记录本次固定请求，`model_alias` 记录实际执行模型；自动模式前者为空。
+
+草稿生成失败不复用普通 Chat 的消息级重试接口，而是继续调用对应四类草稿生成接口，因为草稿还需要版本、字段校验、幂等和人工确认生命周期。任何重试都必须由用户显式触发，不能由浏览器自动重复模型调用。
 
 ## 6. Web 组件
 

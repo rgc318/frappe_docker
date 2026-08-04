@@ -12,6 +12,7 @@
 
 - 父仓库状态：
 - `apps/myapp` 状态：
+- `services/myapp-ai` 状态：
 - `frontend/myapp-web` 状态：
 - `frontend/myapp-mobile` 状态：
 - 是否存在不应提交的本地文件：
@@ -43,11 +44,22 @@ docker exec frappe_docker-backend-1 bash -lc '
 '
 ```
 
+AI Orchestrator：
+
+```bash
+cd /home/rgc318/python-project/frappe_docker/services/myapp-ai
+uv run ruff check .
+uv run pre-commit run --all-files
+docker build --target test -t myapp-ai:test .
+docker run --rm myapp-ai:test
+```
+
 空白检查：
 
 ```bash
 git diff --check
 git -C apps/myapp diff --check
+git -C services/myapp-ai diff --check
 git -C frontend/myapp-web diff --check
 ```
 
@@ -74,6 +86,10 @@ git -C frontend/myapp-web diff --check
 ## 最新提交
 
 后端 `apps/myapp`：
+
+- `<hash> <message>`
+
+AI Orchestrator `services/myapp-ai`：
 
 - `<hash> <message>`
 

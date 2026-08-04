@@ -286,3 +286,47 @@ litellm_settings:
 - 不得通过删除 import 或 `pip check` 门禁来掩盖发布分支缺依赖；应修复 app release ref 或依赖声明。
 
 相关操作说明见 `STAGING_DEPLOYMENT.zh-CN.md` 的“本地构建代理边界”和 `deploy/staging/README.md`。
+
+## 12. GHCR EOF / TLS 超时导致部署失败但旧服务仍正常
+
+现象：
+
+- GitHub Actions 已成功构建并发布唯一镜像标签。
+- 部署 SSH 步骤在 `docker login ghcr.io` 或 `docker pull` 返回 `EOF`、`TLS handshake timeout`、`SSL_ERROR_SYSCALL`。
+- 旧容器仍在运行，健康检查正常。
+
+判断：
+
+- 如果失败发生在 workflow 删除旧容器之前，这是 Registry 网络瞬断，不是应用镜像或业务配置故障。
+- 如果返回 `manifest unknown`，优先检查构建是否完成、仓库名和标签是否正确；这不是同一类问题。
+- 不能因为 Registry 瞬断重新修改代码、生成新标签或连续构建多个候选。
+
+处理：
+
+1. 核对构建 run、唯一标签、源码 revision 和目标服务器当前容器。
+2. 保持旧容器运行，对同一不可变镜像做有限、可观测的拉取重试。
+3. 拉取成功后再按原 workflow 参数切换容器，并保留旧 image ID 作为回滚目标。
+4. 验证镜像 digest、OCI revision、重启数和 `/healthz`、登录页、Gateway Ping。
+5. 在交接记录自动 workflow 失败位置、人工操作原因和最终运行 digest。
+
+禁止使用全局 prune、删除业务卷或重新标记本地未知镜像来处理网络错误。完整操作边界见 `STAGING_DEPLOYMENT.zh-CN.md` 的“GHCR 登录或拉取出现 EOF / TLS handshake timeout”。
+
+## 13. staging 构建的 `myapp_ref` 不能直接传 commit SHA
+
+现象：
+
+- Backend commit 已推送，但 `Build myapp staging image` 在 `bench init` 阶段失败。
+- 日志显示 `git clone https://github.com/rgc318/myapp.git --branch <sha> --depth 1`。
+
+原因：
+
+- 当前 workflow 声明 `myapp_ref` 为通用字符串，但实际把它写进 `apps.staging.json.branch`。
+- Bench 最终调用 `git clone --branch`；branch 参数不接受普通 commit SHA，完整 SHA 和短 SHA 都不能解决。
+
+处理：
+
+- 先确认远端 branch/tag 精确指向目标提交，再用该 branch/tag 构建。
+- 保持原唯一 `image_tag`；输入修正前的失败 run 不会生成可部署镜像。
+- 若要支持不可变 SHA，必须改造 workflow 的 fetch/checkout 过程和输入说明，不能只修改文案。
+
+相关操作见 `STAGING_DEPLOYMENT.zh-CN.md` 的“`myapp_ref` 传 commit SHA 导致 `git clone --branch` 失败”。

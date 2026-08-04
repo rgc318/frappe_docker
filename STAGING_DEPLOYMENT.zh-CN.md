@@ -80,7 +80,7 @@ feature/* -> develop -> main -> build/deploy/release
 - 不建议日常直接推送开发中代码到 `main`
 - 需要正式测试包或 staging 镜像时，再把确认过的 `develop` 合入 `main`
 - 如果只是临时验证后端镜像或部署脚本，优先使用 `workflow_dispatch` 手动触发
-- `Build myapp staging image` 的 `myapp_ref` 应优先选择已验证的 `main`、tag 或明确 commit；只有调试时才建议填 `develop`
+- 当前 `Build myapp staging image` 的 `myapp_ref` 只支持远端可解析的 branch 或 tag，因为它会进入 `bench init` 的 `git clone --branch`；不要传 commit SHA。发布前先确认所选分支头精确指向目标 Backend 提交
 - AI 镜像默认从 workflow 所在父仓库提交固定的 `services/myapp-ai` gitlink 构建。需要升级 AI 时，先在 AI 仓库完成验证和推送，再更新父仓库子模块指针；不要在 workflow 中隐式追踪远程分支最新提交
 - `Build myapp staging image` 的 `frappe_ref` 与 `erpnext_ref` 默认固定为 `v16.18.3`，不要在常规 staging 发布中使用浮动 `version-16`
 - `image_tag` 建议使用唯一 tag，例如 `staging-20260526-bff502e`，不要只依赖 `staging-latest` 判断部署内容
@@ -143,11 +143,13 @@ runtime 镜像同时保留 `/home/frappe/frappe-bench/logs` 日志卷，并提�
 
 ## 3. 服务器准备
 
-测试服务器当前信息：
+目标主机和端口由 GitHub Actions 的 `STAGING_SSH_*` Secrets 决定，不在本 runbook 中声明为实时事实。当前活跃 staging 地址、运行 revision 和磁盘状态以 `docs/codex/CURRENT_HANDOFF.zh-CN.md` 为准。
 
-- 主机：`39.104.204.79`
-- SSH 端口：`10022`
-- 用户：`vivy`
+部署实例约定：
+
+- 主机：`<staging-host>`
+- SSH 端口：`<staging-ssh-port>`
+- 用户：通常为 `vivy`，以 Secret 为准
 - 部署目录：`/srv/frappe_docker`
 
 服务器需要准备：
@@ -198,11 +200,11 @@ runtime 镜像同时保留 `/home/frappe/frappe-bench/logs` 日志卷，并提�
 - `GHCR_TOKEN`
 - `STAGING_SITE_ADMIN_PASSWORD`
 
-当前建议值：
+配置模板：
 
-- `STAGING_SSH_HOST=39.104.204.79`
-- `STAGING_SSH_PORT=10022`
-- `STAGING_SSH_USER=vivy`
+- `STAGING_SSH_HOST=<staging-host>`
+- `STAGING_SSH_PORT=<staging-ssh-port>`
+- `STAGING_SSH_USER=<staging-user>`
 - `GHCR_USERNAME=<你的 GitHub 用户名>`
 - `GHCR_TOKEN=<具有 read:packages 的 classic PAT>`
 - `STAGING_SITE_ADMIN_PASSWORD=<首次建站管理员密码>`
@@ -261,7 +263,7 @@ ssh -i ~/.ssh/github_actions_staging_ci -p 10022 vivy@39.104.204.79
 手动触发时建议显式确认这些输入：
 
 - `Use workflow from`: 与部署脚本版本一致，例如 `develop`
-- `myapp_ref`: 要烘焙进镜像的 `myapp` 分支、tag 或 commit
+- `myapp_ref`: 要烘焙进镜像的 `myapp` 分支或 tag；当前 workflow 不支持 commit SHA
 - `frappe_ref`: 默认 `v16.18.3`
 - `erpnext_ref`: 默认 `v16.18.3`
 - `image_tag`: 唯一 tag，例如 `staging-20260526-bff502e`
@@ -929,6 +931,69 @@ bench --site localhost backup --with-files
 长期诊断与回退准则见：
 
 - `docs/codex/KNOWN_ISSUES.zh-CN.md` 的“代理恢复后是否回退 staging 镜像构建加固”
+
+### 14.12 GHCR 登录或拉取出现 EOF / TLS handshake timeout
+
+现象：
+
+- `docker login ghcr.io` 返回 `EOF`。
+- `docker pull` 返回 `net/http: TLS handshake timeout`、`SSL_ERROR_SYSCALL` 或 Registry 连接被重置。
+- 镜像构建 workflow 已成功，但部署 workflow 在 SSH 步骤早期失败。
+
+判断顺序：
+
+1. 确认失败发生在 `docker rm` 之前；此时旧容器仍运行，不需要回滚业务数据。
+2. 确认构建 run 成功、唯一 `image_tag` 不变，并从构建记录核对源码 revision。
+3. 在目标主机只读检查旧容器、`/healthz`、登录页和 Gateway Ping，确认现有服务仍健康。
+4. 区分 Registry 网络瞬断与 `manifest unknown`。后者通常表示标签未构建或输入错误，不能靠重试解决。
+
+处理原则：
+
+- 对同一不可变镜像执行有上限、可观测的拉取重试；不要重新构建、改标签或覆盖 `latest`。
+- 只有镜像完整拉取并校验成功后，才删除旧容器。
+- 容器切换必须保存旧 image ID，复用 workflow 的非 root、网络、端口、capabilities 和健康检查参数；新容器验收失败时恢复旧 image ID。
+- 不连续部署试探性代码。Registry 瞬断恢复后继续使用原候选、原 digest 和原验收计划。
+- 若 workflow 本身缺少拉取重试，可由受控运维在服务器执行与 workflow 等价的有限重试；交接必须记录自动部署 run、失败位置、人工切换原因、最终 digest 和健康结果。
+
+成功后至少核对：
+
+```text
+容器 Config.Image = 目标唯一标签
+OCI revision = 预期提交
+RepoDigest = 构建产物 digest
+RestartCount = 0
+/healthz = 200
+/user/login = 200
+/api/method/ping = 200
+```
+
+禁止做法：
+
+- 失败后直接删除旧容器再排查。
+- 使用 `docker system prune --volumes` 试图解决网络错误。
+- 把本地缓存镜像重新标记为目标版本而不核对 digest。
+- 因一次 GHCR 瞬断修改业务代码并重新发布多个候选。
+
+### 14.13 `myapp_ref` 传 commit SHA 导致 `git clone --branch` 失败
+
+现象：
+
+- `Build myapp staging image` 在 `bench init` 阶段连续重试后失败。
+- 日志包含 `git clone ... --branch <commit-sha> --depth 1` 和 `CommandFailedError`。
+- Backend 提交已经推送，直接 `git ls-remote` 也能看到该 SHA。
+
+原因：
+
+- workflow 把 `myapp_ref` 写入 `apps.staging.json.branch`。
+- Bench 将该值作为 `git clone --branch` 参数；Git 的 `--branch` 只接受 branch/tag，不接受普通 commit SHA，即使是完整 40 位 SHA 也会失败。
+
+处理：
+
+1. 确认目标 Backend commit 已推送，并确认远端 `develop` 或发布 tag 当前精确指向该提交。
+2. 保持同一父仓库提交和唯一 `image_tag`，用该 branch/tag 重新触发构建。
+3. 从成功构建的 OCI label、构建日志或镜像内元数据核对实际 Backend revision。
+
+不要把短 SHA 换成完整 SHA 后继续重试。若未来需要真正的不可变 commit 输入，必须改造 workflow：先 fetch commit，再显式 checkout，并让构建清单使用本地已固定源码，而不是继续复用 `branch` 字段。
 
 ---
 
