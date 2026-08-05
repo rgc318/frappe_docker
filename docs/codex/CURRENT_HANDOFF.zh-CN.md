@@ -1,46 +1,44 @@
 # 当前交接状态
 
-更新时间：2026-08-04 CST
+更新时间：2026-08-05 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。历史过程以 Git 历史、GitHub Actions Run 和长期设计文档为准，不再持续追加到本文件。
 
 ## 当前目标与结果
 
-- 本轮目标：统一商品图片与用户头像的裁剪、缩放、旋转、压缩、格式化和重新编辑能力，并让后端对所有客户端执行同一图片规范化与真实内容校验。
-- 当前结果：Backend `b3a0d38`、Web `0e715f9`、Mobile `06e135f` 和 Parent `dc94022a` 已分别提交并推送；统一图片编辑能力已部署 staging。Web 商品图和头像已统一进入 profile 驱动编辑器；Mobile 商品图策略已对齐；Backend 会真实解码、限制像素、纠正 EXIF、按 profile 裁剪并输出 WebP。
-- 涉及仓库：父仓库、`apps/myapp`、`frontend/myapp-web`、`frontend/myapp-mobile`。AI Orchestrator 源码未修改，但 staging 镜像随统一 tag 重建并完成健康检查；production 未部署本次增量。
+- 本轮目标：在已部署的统一图片编辑器上增加商品图自由裁剪和常用比例预设，同时保持头像固定方形及后端最终比例、尺寸和安全边界。
+- 当前结果：Web 与 Mobile 商品图已支持自由、1:1、4:3、3:2、16:9 裁剪，非方形预设支持横向/纵向切换；Backend 商品 profile 升级为 `item-flexible-v2`，保留客户端最终裁剪比例、限制宽高比为 `0.4–2.5`，最长边规范化为 1600px WebP。改动已完成本地验证并分别提交、推送 Backend `31bd6ff`、Web `b572e79`、Mobile `ebb242e`；Parent release 和 staging 部署正在进行，production 未变更。
+- 涉及仓库：父仓库文档、`apps/myapp`、`frontend/myapp-web`、`frontend/myapp-mobile`。AI Orchestrator 未修改，production 未变更。
 
 本次是在已部署的图片上传、暂存、正式保存、统一占位和跨业务展示能力之上增加第三阶段媒体治理。CSV/XLSX/PDF 等非图片文件不进入裁剪器，继续使用各自的导入、预览和校验流程。
 
 ## 当前仓库状态
 
-| 仓库                           | 分支 / HEAD                    | 工作树状态                                                          | 本轮责任                                      |
-| ------------------------------ | ------------------------------ | ------------------------------------------------------------------- | --------------------------------------------- |
-| Parent `frappe_docker`         | `develop` / release `dc94022a` | 发布提交已推送；交接收口见当前 HEAD；仅既有 `.codex` 未跟踪，不提交 | 统一设计索引、Backend gitlink 与跨仓库发布    |
-| Backend `apps/myapp`           | `develop` / `b3a0d38`          | 干净，已推送                                                        | 图片规范化、商品图/头像服务、契约和测试       |
-| AI `services/myapp-ai`         | `develop` / `ca5448c`          | 干净                                                                | 本轮运行时代码未变；仅沿用既有编排契约        |
-| Web `frontend/myapp-web`       | `main` / `0e715f9`             | 干净，已推送                                                        | 统一编辑器、商品图/头像接入、媒体元数据和测试 |
-| Mobile `frontend/myapp-mobile` | `develop` / `06e135f`          | 本次提交已推送；仍有既有 5 个用户修改                               | 对齐 1:1 裁剪、质量、媒体响应和文档           |
+| 仓库                           | 分支 / HEAD            | 工作树状态                                                                           | 本轮责任                                        |
+| ------------------------------ | ---------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| Parent `frappe_docker`         | `develop` / `84b21695` | 媒体设计、交接文档和 Backend gitlink 待提交；既有 `.codex` 不提交                    | 跨仓库设计与交接                                |
+| Backend `apps/myapp`           | `develop` / `31bd6ff`  | 已提交并推送，工作树干净                                                             | 自适应比例规范化、元数据和安全边界              |
+| AI `services/myapp-ai`         | `develop` / `ca5448c`  | 干净                                                                                 | 本轮运行时代码未变；仅沿用既有编排契约          |
+| Web `frontend/myapp-web`       | `main` / `b572e79`     | 已提交并推送，工作树干净                                                             | 自由/预设比例编辑与动态输出                     |
+| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`  | 本轮 3 个媒体文件已提交并推送；仍保留既有 5 个用户修改                               | 自由/预设比例选择、原生/Web fallback 和媒体映射 |
 
 Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮图片增量，不得覆盖或提交。本次只修改 `components/item-image-field.tsx`、`services/media.ts`、`DEVELOPMENT.md`。
 
-## 本次媒体治理增量
+## 本次自由裁剪增量
 
-- 新增统一设计文档 `docs/05-development/05-media-upload-and-image-editing.zh-CN.md`，记录 Ant Design、Cloudinary、MDN 和 OWASP 调研依据、profile、生命周期和后续扩展。
-- Web 新增 `ImageEditorUpload` 与 `image-processing`：支持 1:1 裁剪、拖动、缩放、左右旋转、重新裁剪已有图片、Canvas WebP 输出和自适应质量。
-- 商品图统一使用 `item-square-v1`：1600 × 1600 WebP，起始质量 82，来源最短边至少 300px，来源最大 20MB/4000 万像素，输出最大 5MB。
+- Web `ImageEditorUpload` 增加比例选择、自由比例滑杆和横纵切换；Canvas 根据最终裁剪比例输出动态宽高，默认仍为 1:1。
+- 商品图升级为 `item-flexible-v2`：自由比例范围 `0.4–2.5`，预设为 1:1、4:3、3:2、16:9，最长边 1600px WebP，起始质量 82，输出最大 5MB。
 - 头像统一使用 `avatar-square-v1`：512 × 512 WebP，起始质量 85，来源最短边至少 128px，输出最大 2MB。
-- Backend 新增 `myapp.utils.image_processing`：真实解码、解压炸弹防护、EXIF 方向纠正、居中兜底裁剪、LANCZOS 缩放、元数据移除、WebP 自适应质量和输出上限。
-- 商品图片与头像响应增加 `content_type`、`file_size`、`width`、`height`、`profile`、`quality`、`source_width`、`source_height`、`source_format`。
-- Mobile 原生和 Web fallback 对齐 1:1 商品图裁剪，客户端质量从 0.78 调整为 0.82；最终正式格式仍由 Backend 统一为 WebP。
+- Backend 对商品图保留裁剪后宽高比并返回真实 `width`、`height`、`aspect_ratio`；头像继续居中裁为固定方形。
+- Mobile 原生相册/相机和 Expo Web fallback 增加相同比例选择；自由模式使用平台裁剪器，最终范围由 Backend 关闭式校验。
 
 ## 本次验证
 
-- Backend：容器内 `202 tests` 通过，覆盖图片处理、媒体服务、头像、Gateway、安全契约和商品写事务。
-- Web：`npm run tsc`、`npm run biome:lint`、全量 `41 suites / 283 tests`、`npm run build` 均通过；Jest 仍有仓库既有 open handle 提示但退出码为 0。
-- Mobile：`npm run lint` 通过。
+- Backend：容器内 `204 tests` 通过，覆盖图片处理、媒体服务、头像、Gateway、安全契约和商品写事务。
+- Web：`npm run tsc`、`npm run biome:lint`、全量 `41 suites / 284 tests`、`npm run build` 均通过；Jest 仍有仓库既有 open handle 提示但退出码为 0。
+- Mobile：`npm run lint` 通过；全仓 `tsc --noEmit` 仍有大量既有错误，但过滤确认本轮 `components/item-image-field.tsx` 和 `services/media.ts` 无新增 TypeScript 错误。
 - Backend 容器无 `env/bin/ruff`，因此本次无法运行独立 Ruff 命令；相关 Python 代码已由容器单元测试导入执行。
-- staging 镜像构建、部署、迁移和公开健康检查通过；尚未执行真实浏览器拖拽/裁剪人工验收或登录态真实 HTTP 图片上传 smoke。
+- 本轮尚未执行真实浏览器/真机自由裁剪人工验收、登录态 HTTP 图片上传 smoke；代码仓库已提交推送，staging 构建部署正在进行。
 
 ## 已部署基线能力
 
@@ -150,7 +148,7 @@ Container state: running / healthy
 1. 需要在真实浏览器人工验证横图/竖图拖动、缩放、左右旋转、透明 PNG、已有图片重新裁剪和取消编辑；当前自动测试覆盖策略、入口和上传调用，但 JSDOM 不验证 Canvas 视觉结果。
 2. 需要使用登录态 HTTP smoke 确认 Gateway 最终保存为 WebP、尺寸与 profile 元数据正确，并清理测试 Item/File；本次未创建真实业务数据。
 3. Mobile 原生裁剪器依赖 dev client/APK；发布后建议至少在 Android 或 iOS 真机验证相册与拍照各一次，Web fallback 也验证一次。
-4. Backend、Web、Mobile 和 Parent 已按仓库边界提交推送；后续提交不得夹带 Mobile 既有 5 个用户修改或 `.codex`。
+4. Backend、Web 和 Mobile 已按仓库边界提交推送；Parent release 正在收口。后续提交不得夹带 Mobile 既有 5 个用户修改或 `.codex`。
 5. 当前只保存规范化正式图片，不长期保留原图；未来若需要无损反复编辑、印刷原稿或 DAM，应增加独立 original asset 和版本/保留策略。
 
 ## 接手建议
