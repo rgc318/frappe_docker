@@ -6,9 +6,9 @@
 
 ## 当前目标与结果
 
-- 本轮目标：把 Web 统一图片编辑器升级为主流的“图片与裁剪框均可操作”模式，让用户可以移动裁剪框并拖动四边或四角调整范围，同时保留自由/预设比例、缩放、旋转和后端安全边界。
-- 当前结果：Web `ImageEditorUpload` 已接入 Cropper.js，商品图自由模式支持裁剪框整体移动及四边/四角自由缩放，1:1、4:3、3:2、16:9 和头像模式锁定比例但仍可移动、缩放裁剪框；框外拖动继续移动图片。实现已完成验证，并以 `c005124 feat: add adjustable image crop frame` 提交、推送和部署 staging；Web CI、Coverage、镜像构建、部署健康探测及 Parent Lint 均成功，production 未变更。
-- 涉及仓库：`frontend/myapp-web` 代码和文档、父仓库媒体设计与交接文档。Backend、AI Orchestrator 和 Mobile 本轮未修改；Mobile 原生裁剪器已经具备可移动、可缩放裁剪框，production 未变更。
+- 本轮目标：为 Web 增加平板、内置及外置摄像头拍照上传，并补齐与 Mobile 同语义的商品扫码搜索、主条码录入和销售 / 采购共享选品入口。
+- 当前结果：Web 已以 `6b23ac5 feat: add web camera capture and barcode scanning` 提交、推送并部署 staging。`ImageEditorUpload` 新增拍照、预览、重拍和摄像头切换，拍摄文件继续进入统一裁剪 / WebP / Backend profile；新增 ZXing 扫码弹窗，支持摄像头选择、单次识别、手动输入降级和流释放，并已接入商品列表、商品创建 / 编辑、商品详情条码管理及共享 `ProductSelect`。
+- 涉及仓库：`frontend/myapp-web` 代码与文档、父仓库媒体设计和交接文档。Backend、AI Orchestrator 和 Mobile 本轮未修改；扫码仍查询本地商品库，不接外部条码 Provider，不自动创建商品。
 
 本次是在已部署的图片上传、暂存、正式保存、统一占位和跨业务展示能力之上增加第三阶段媒体治理。CSV/XLSX/PDF 等非图片文件不进入裁剪器，继续使用各自的导入、预览和校验流程。
 
@@ -16,42 +16,42 @@
 
 | 仓库                           | 分支 / 发布版本             | 工作树状态                                                       | 本轮责任                               |
 | ------------------------------ | --------------------------- | ---------------------------------------------------------------- | -------------------------------------- |
-| Parent `frappe_docker`         | `develop` / docs `26568e61` | 媒体设计已推送，交接文档正在做部署结果收口；既有 `.codex` 不提交 | 可调裁剪框设计与交接                   |
+| Parent `frappe_docker`         | `develop`                   | 媒体设计与交接文档待本轮提交；既有 `.codex` 不提交               | 摄像头拍照设计与交接                   |
 | Backend `apps/myapp`           | `develop` / `31bd6ff`       | 已提交并推送，工作树干净                                         | 自适应比例规范化、元数据和安全边界     |
 | AI `services/myapp-ai`         | `develop` / `ca5448c`       | 干净                                                             | 本轮运行时代码未变；仅沿用既有编排契约 |
-| Web `frontend/myapp-web`       | `main` / `c005124`          | 已提交并推送，工作树干净                                         | 图片与可调裁剪框双操作                 |
+| Web `frontend/myapp-web`       | `main` / `6b23ac5`          | 已提交、推送并部署 staging，工作树干净                           | Web 拍照上传与商品扫码                  |
 | Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`       | 本轮未修改；仍保留既有 5 个用户修改                              | 原生裁剪框能力保持不变                 |
 
-Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮图片增量，不得覆盖或提交。本次只修改 `components/item-image-field.tsx`、`services/media.ts`、`DEVELOPMENT.md`。
+Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮增量，不得覆盖或提交；本轮没有修改 Mobile。
 
-## 本次可调裁剪框增量
+## 本次 Web 摄像头与扫码增量
 
-- Web 统一编辑器改用 Cropper.js 管理裁剪画布、图片平移、裁剪框移动、八方向缩放、缩放和 90°旋转。
-- 自由模式允许独立拖动四边或四角，并继续执行 `0.4–2.5` 宽高比关闭式校验；超出范围时禁用确认并显示原因。
-- 1:1、4:3、3:2、16:9 预设和头像 1:1 锁定宽高比，但裁剪框仍可移动和缩放；非方形预设继续支持横竖切换。
-- Cropper 只替换客户端交互层，输出仍通过统一 Canvas/WebP 质量和字节限制处理，Backend profile 与 API 契约不变。
-- Mobile 原生端已有 `showCropFrame`、`freeStyleCropEnabled` 和可调边框能力，本轮无需修改；Expo Web fallback 后续可继续评估是否复用同类自定义编辑器。
+- `CameraCaptureModal` 使用 MediaDevices API，默认优先后置摄像头，授权后支持选择平板、内置或外置 USB 摄像头，并提供拍摄、预览、重拍和确认。
+- 拍摄结果生成 JPEG `File` 后进入既有 `ImageEditorUpload`，继续执行来源校验、自由 / 预设比例裁剪、WebP 输出和 Backend profile，不新增绕过媒体治理的上传路径。
+- `BarcodeScannerModal` 使用 ZXing 识别常见一维码和二维码，支持摄像头选择、单次提交锁、手动输入降级和流释放。
+- 商品列表扫码后查询本地商品库；命中停用商品时切换筛选，未命中时仅提示用户确认新建并预填条码，不自动创建、不接外部条码 Provider。
+- 商品创建 / 编辑、商品详情新增条码和主条码、销售 / 采购共享 `ProductSelect` 均已接入扫码入口；交易选品默认保留结果供用户确认，避免重复识别直接产生重复明细。
+- Web 摄像头遵循浏览器安全上下文规则，只在 HTTPS 或 localhost 可用；文件选择和手动条码输入始终保留为降级路径。
 
 ## 本次验证
 
-- Web：`npm run tsc`、`npm run biome:lint`、全量 `41 suites / 285 tests`、`npm run build` 均通过。
-- 新增回归覆盖 Cropper 的 `cropBoxMovable`、`cropBoxResizable`、`dragMode=move`、自由模式解锁比例和 `0.4–2.5` 裁剪比例边界。
-- 生产构建已确认 Cropper.js 样式和运行时代码进入正式 bundle。
-- 尚未执行真实浏览器鼠标/触控人工验收；代码已提交推送，staging 构建、部署和基础健康探测均成功。
+- Web：`npm run tsc`、`npm run biome:lint`、全量 Jest `43 suites / 288 tests` 和 `npm run build` 已通过。
+- 新增回归覆盖摄像头拍照生成 JPEG File、视频流停止、扫码手动输入降级和连续识别只提交一次。
+- Web push CI、Coverage、镜像构建和 staging 部署均成功；独立探测 `/healthz`、`/user/login` 和 `/api/method/ping` 均返回 HTTP 200。
+- 真实浏览器摄像头授权、外置摄像头切换和真实条码识别尚待人工验收；production 未部署。
 
 ## 本次 staging 发布
 
 | 范围            | Workflow Run                                                                    | 结果 |
 | --------------- | ------------------------------------------------------------------------------- | ---- |
-| Web push CI     | [30982412627](https://github.com/rgc318/myapp-web/actions/runs/30982412627)     | 成功 |
-| Web coverage CI | [30982412551](https://github.com/rgc318/myapp-web/actions/runs/30982412551)     | 成功 |
-| Web build       | [30982641759](https://github.com/rgc318/myapp-web/actions/runs/30982641759)     | 成功 |
-| Web deploy      | [30983090950](https://github.com/rgc318/myapp-web/actions/runs/30983090950)     | 成功 |
-| Parent Lint     | [30982618157](https://github.com/rgc318/frappe_docker/actions/runs/30982618157) | 成功 |
+| Web push CI     | [30987941487](https://github.com/rgc318/myapp-web/actions/runs/30987941487) | 成功 |
+| Web coverage CI | [30987941539](https://github.com/rgc318/myapp-web/actions/runs/30987941539) | 成功 |
+| Web build       | [30989815958](https://github.com/rgc318/myapp-web/actions/runs/30989815958) | 成功 |
+| Web deploy      | [30990422600](https://github.com/rgc318/myapp-web/actions/runs/30990422600) | 成功 |
 
 部署事实：
 
-- staging Web 使用 `ghcr.io/rgc318/myapp-web:staging-20260805-c005124`，镜像 digest 为 `sha256:3f82016dc0c8934372d4e8f2e3cf6848df7b93f54a14c07ef3af48c2ef8c31b0`。
+- staging Web 使用 `ghcr.io/rgc318/myapp-web:staging-20260805-6b23ac5`，镜像 digest 为 `sha256:0c6752a5d0970e7cf3aed86e445dc89cb3551e0385c0cee662247f20620b9859`。
 - Web 部署 workflow 的健康循环已通过 `/healthz`、`/user/login` HTTP 200 和 `/api/method/ping` 检查；容器启动后成功保留新版本，没有触发旧镜像回滚。
 - Backend、AI Orchestrator、Mobile 和数据库未变更；production 未部署。
 

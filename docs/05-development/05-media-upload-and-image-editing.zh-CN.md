@@ -9,6 +9,7 @@
 - Web 商品创建、商品编辑、商品详情和 AI 商品草稿中的商品图片。
 - Web AI 当前商品详情中的即时上传、替换、删除和重新裁剪。
 - Web 个人设置中的用户头像。
+- Web 平板、内置摄像头和外置 USB 摄像头拍照，并继续进入统一图片编辑链路。
 - Mobile 商品创建和商品详情中的相册选择、拍照、裁剪和替换。
 - Backend 商品图片与用户头像上传接口的统一安全校验和规范化。
 
@@ -80,9 +81,14 @@ Item.image / User.user_image
 Web：
 
 - `src/components/ImageEditorUpload.tsx`
-  - 统一文件选择、读取当前图片和编辑弹窗，并通过 Cropper.js 提供图片拖动、裁剪框移动、四边/四角缩放、自由/预设比例、横纵切换、缩放、旋转和输出。
+  - 统一文件选择、摄像头拍照、读取当前图片和编辑弹窗，并通过 Cropper.js 提供图片拖动、裁剪框移动、四边/四角缩放、自由/预设比例、横纵切换、缩放、旋转和输出。
+  - 拍照产生的 JPEG `File` 必须先执行来源校验，再进入与文件选择完全相同的裁剪、WebP 和上传流程。
   - 自由模式不锁定裁剪框比例，预设比例和头像模式锁定比例但仍允许移动及缩放裁剪框；裁剪框不得离开有效图片区域。
   - 支持“重新裁剪”已有图片；读取失败时要求重新选择本地原图。
+- `src/components/CameraCaptureModal.tsx`
+  - 使用标准 MediaDevices API 请求摄像头，默认优先后置摄像头，并在授权后枚举和切换所有 `videoinput`，因此可覆盖平板、内置摄像头和外置 USB 摄像头。
+  - 支持拍摄、预览、重拍和确认；关闭、切换、重拍及组件卸载均停止 MediaStream tracks，避免摄像头指示灯和设备占用残留。
+  - 摄像头只在 HTTPS 或 localhost 可用；无权限、无设备、设备占用或浏览器不支持时提示用户改用文件选择。
 - `src/utils/image-processing.ts`
   - 定义 profile、来源校验、位移约束、Canvas 导出、WebP 质量和文件名格式化。
 - `src/components/ItemImageUpload.tsx`
