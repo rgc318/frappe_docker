@@ -7,20 +7,20 @@
 ## 当前目标与结果
 
 - 本轮目标：在已部署的统一图片编辑器上增加商品图自由裁剪和常用比例预设，同时保持头像固定方形及后端最终比例、尺寸和安全边界。
-- 当前结果：Web 与 Mobile 商品图已支持自由、1:1、4:3、3:2、16:9 裁剪，非方形预设支持横向/纵向切换；Backend 商品 profile 升级为 `item-flexible-v2`，保留客户端最终裁剪比例、限制宽高比为 `0.4–2.5`，最长边规范化为 1600px WebP。改动已完成本地验证并分别提交、推送 Backend `31bd6ff`、Web `b572e79`、Mobile `ebb242e`；Parent release 和 staging 部署正在进行，production 未变更。
+- 当前结果：Web 与 Mobile 商品图已支持自由、1:1、4:3、3:2、16:9 裁剪，非方形预设支持横向/纵向切换；Backend 商品 profile 升级为 `item-flexible-v2`，保留客户端最终裁剪比例、限制宽高比为 `0.4–2.5`，最长边规范化为 1600px WebP。改动已完成验证、提交、推送并部署 staging，Backend/AI、Web 和 Mobile Preview 均发布成功；production 未变更。
 - 涉及仓库：父仓库文档、`apps/myapp`、`frontend/myapp-web`、`frontend/myapp-mobile`。AI Orchestrator 未修改，production 未变更。
 
 本次是在已部署的图片上传、暂存、正式保存、统一占位和跨业务展示能力之上增加第三阶段媒体治理。CSV/XLSX/PDF 等非图片文件不进入裁剪器，继续使用各自的导入、预览和校验流程。
 
 ## 当前仓库状态
 
-| 仓库                           | 分支 / HEAD            | 工作树状态                                                                           | 本轮责任                                        |
-| ------------------------------ | ---------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| Parent `frappe_docker`         | `develop` / `84b21695` | 媒体设计、交接文档和 Backend gitlink 待提交；既有 `.codex` 不提交                    | 跨仓库设计与交接                                |
-| Backend `apps/myapp`           | `develop` / `31bd6ff`  | 已提交并推送，工作树干净                                                             | 自适应比例规范化、元数据和安全边界              |
-| AI `services/myapp-ai`         | `develop` / `ca5448c`  | 干净                                                                                 | 本轮运行时代码未变；仅沿用既有编排契约          |
-| Web `frontend/myapp-web`       | `main` / `b572e79`     | 已提交并推送，工作树干净                                                             | 自由/预设比例编辑与动态输出                     |
-| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`  | 本轮 3 个媒体文件已提交并推送；仍保留既有 5 个用户修改                               | 自由/预设比例选择、原生/Web fallback 和媒体映射 |
+| 仓库                           | 分支 / HEAD            | 工作树状态                                                       | 本轮责任                                        |
+| ------------------------------ | ---------------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
+| Parent `frappe_docker`         | `develop` / `b42ced93` | 发布提交已推送，交接文档正在做部署结果收口；既有 `.codex` 不提交 | 跨仓库设计与交接                                |
+| Backend `apps/myapp`           | `develop` / `31bd6ff`  | 已提交并推送，工作树干净                                         | 自适应比例规范化、元数据和安全边界              |
+| AI `services/myapp-ai`         | `develop` / `ca5448c`  | 干净                                                             | 本轮运行时代码未变；仅沿用既有编排契约          |
+| Web `frontend/myapp-web`       | `main` / `b572e79`     | 已提交并推送，工作树干净                                         | 自由/预设比例编辑与动态输出                     |
+| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`  | 本轮 3 个媒体文件已提交并推送；仍保留既有 5 个用户修改           | 自由/预设比例选择、原生/Web fallback 和媒体映射 |
 
 Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮图片增量，不得覆盖或提交。本次只修改 `components/item-image-field.tsx`、`services/media.ts`、`DEVELOPMENT.md`。
 
@@ -38,7 +38,7 @@ Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts
 - Web：`npm run tsc`、`npm run biome:lint`、全量 `41 suites / 284 tests`、`npm run build` 均通过；Jest 仍有仓库既有 open handle 提示但退出码为 0。
 - Mobile：`npm run lint` 通过；全仓 `tsc --noEmit` 仍有大量既有错误，但过滤确认本轮 `components/item-image-field.tsx` 和 `services/media.ts` 无新增 TypeScript 错误。
 - Backend 容器无 `env/bin/ruff`，因此本次无法运行独立 Ruff 命令；相关 Python 代码已由容器单元测试导入执行。
-- 本轮尚未执行真实浏览器/真机自由裁剪人工验收、登录态 HTTP 图片上传 smoke；代码仓库已提交推送，staging 构建部署正在进行。
+- 本轮尚未执行真实浏览器/真机自由裁剪人工验收、登录态 HTTP 图片上传 smoke；代码仓库已提交推送，staging 构建、部署和基础健康检查均成功。
 
 ## 已部署基线能力
 
@@ -112,50 +112,51 @@ Container state: running / healthy
 
 ## 已部署提交与版本
 
-- Backend：`b3a0d38 feat: standardize uploaded images`，已推送 `origin/develop`。
-- Web：`0e715f9 feat: add unified image editor`，已推送 `origin/main`。
-- Mobile：`06e135f feat: align product image editing policy`，已推送 `origin/develop`，Web Preview 自动部署成功。
+- Backend：`31bd6ff feat: support flexible image crop ratios`，已推送 `origin/develop`。
+- Web：`b572e79 feat: support flexible image crop ratios`，已推送 `origin/main`。
+- Mobile：`ebb242e feat: support flexible image crop ratios`，已推送 `origin/develop`，Web Preview 自动部署成功。
 - AI Orchestrator：`ca5448c docs: document AI model fallback behavior`，源码未修改；staging 镜像随 Parent build 使用该 gitlink 重建。
-- Parent release：`dc94022a feat: release unified image editing`，固定 Backend `b3a0d38` / AI `ca5448c` gitlink，并已推送 `origin/develop`。
-- Backend / AI staging 使用 `staging-20260804-dc94022a`；Web staging 使用 `staging-20260804-0e715f9`；Mobile Preview 对应 `06e135f`，同时更新 `develop-latest`。
+- Parent release：`b42ced93 feat: release flexible image cropping`，固定 Backend `31bd6ff` / AI `ca5448c` gitlink，并已推送 `origin/develop`。
+- Backend / AI staging 使用 `staging-20260805-b42ced93`；Web staging 使用 `staging-20260805-b572e79`；Mobile Preview 对应 `ebb242e`。
 - `.codex` 仍为既有未跟踪目录，不提交。
 
 ## staging 构建与部署
 
 | 范围                       | Workflow Run                                                                    | 结果 |
 | -------------------------- | ------------------------------------------------------------------------------- | ---- |
-| Backend + AI build         | [30912254451](https://github.com/rgc318/frappe_docker/actions/runs/30912254451) | 成功 |
-| Backend + AI deploy/health | [30912664896](https://github.com/rgc318/frappe_docker/actions/runs/30912664896) | 成功 |
-| Web push CI                | [30909141610](https://github.com/rgc318/myapp-web/actions/runs/30909141610)     | 成功 |
-| Web coverage CI            | [30909141583](https://github.com/rgc318/myapp-web/actions/runs/30909141583)     | 成功 |
-| Web build                  | [30912244783](https://github.com/rgc318/myapp-web/actions/runs/30912244783)     | 成功 |
-| Web deploy                 | [30912837387](https://github.com/rgc318/myapp-web/actions/runs/30912837387)     | 成功 |
-| Mobile Web Preview         | [30909347617](https://github.com/rgc318/myapp-mobile/actions/runs/30909347617)  | 成功 |
+| Backend + AI build         | [30970198635](https://github.com/rgc318/frappe_docker/actions/runs/30970198635) | 成功 |
+| Backend + AI deploy/health | [30970428806](https://github.com/rgc318/frappe_docker/actions/runs/30970428806) | 成功 |
+| Web push CI                | [30970072813](https://github.com/rgc318/myapp-web/actions/runs/30970072813)     | 成功 |
+| Web coverage CI            | [30970072839](https://github.com/rgc318/myapp-web/actions/runs/30970072839)     | 成功 |
+| Web build                  | [30970200271](https://github.com/rgc318/myapp-web/actions/runs/30970200271)     | 成功 |
+| Web deploy                 | [30970430177](https://github.com/rgc318/myapp-web/actions/runs/30970430177)     | 成功 |
+| Mobile checks              | [30970072081](https://github.com/rgc318/myapp-mobile/actions/runs/30970072081)  | 成功 |
+| Mobile Web Preview         | [30970072076](https://github.com/rgc318/myapp-mobile/actions/runs/30970072076)  | 成功 |
 
 部署事实：
 
-- Parent release `dc94022a` 的 gitlink 精确固定 Backend `b3a0d38` 和 AI `ca5448c`；远端 Backend/Web/Mobile 分支头分别精确指向 `b3a0d38`、`0e715f9` 和 `06e135f`。
-- Backend、Frontend、Queue、Scheduler、Websocket 和 AI Orchestrator 使用 `staging-20260804-dc94022a`；独立 Web 使用 `staging-20260804-0e715f9`；Mobile Preview 已从 `06e135f` 成功发布。
+- Parent release `b42ced93` 的 gitlink 精确固定 Backend `31bd6ff` 和 AI `ca5448c`；远端 Backend/Web/Mobile 分支头分别精确指向 `31bd6ff`、`b572e79` 和 `ebb242e`。
+- Backend、Frontend、Queue、Scheduler、Websocket 和 AI Orchestrator 使用 `staging-20260805-b42ced93`；独立 Web 使用 `staging-20260805-b572e79`；Mobile Preview 已从 `ebb242e` 成功发布。
 - `bench --site staging.example.com migrate` 成功执行。
 - AI `/healthz` 返回 `status=ok`；LiteLLM、Runtime Governance 和 Vector Search 已配置；Backend 到 Orchestrator 内部认证通过。
 - Runtime Policy 已发布：`1 policies, 7 tool-ready models`。
 - `check-staging.sh` 显示数据库、Redis、Backend、Queue、Scheduler、Websocket 和 AI 服务运行正常；首页与 Ping API 均返回 `200`，AI Orchestrator 状态为 `healthy`。
 - staging 未配置本轮登录态关键 HTTP 回归输入，因此部署 workflow 保持 `run_http_regression=false`；本轮仍需后续人工执行真实图片上传与裁剪验收。
-- Backend push CI Run [30908869896](https://github.com/rgc318/myapp/actions/runs/30908869896) 的全量 `722 tests` 仍命中既有 `test_ai_repository` 单测 `KeyError: product`；本轮图片相关容器测试 `202 tests` 已通过，该既有失败与媒体改动无关。
+- Backend push CI Run [30970071791](https://github.com/rgc318/myapp/actions/runs/30970071791) 的全量 `724 tests` 仍命中既有 `test_ai_repository` 单测 `KeyError: product`；本轮图片相关容器测试 `204 tests` 已通过，该既有失败与媒体改动无关。
 
 ## 当前风险与下一步
 
 1. 需要在真实浏览器人工验证横图/竖图拖动、缩放、左右旋转、透明 PNG、已有图片重新裁剪和取消编辑；当前自动测试覆盖策略、入口和上传调用，但 JSDOM 不验证 Canvas 视觉结果。
 2. 需要使用登录态 HTTP smoke 确认 Gateway 最终保存为 WebP、尺寸与 profile 元数据正确，并清理测试 Item/File；本次未创建真实业务数据。
 3. Mobile 原生裁剪器依赖 dev client/APK；发布后建议至少在 Android 或 iOS 真机验证相册与拍照各一次，Web fallback 也验证一次。
-4. Backend、Web 和 Mobile 已按仓库边界提交推送；Parent release 正在收口。后续提交不得夹带 Mobile 既有 5 个用户修改或 `.codex`。
+4. Backend、Web、Mobile 和 Parent release 已按仓库边界提交推送；交接文档收口后仍不得夹带 Mobile 既有 5 个用户修改或 `.codex`。
 5. 当前只保存规范化正式图片，不长期保留原图；未来若需要无损反复编辑、印刷原稿或 DAM，应增加独立 original asset 和版本/保留策略。
 
 ## 接手建议
 
 1. 先查看各仓库状态并严格保留 Mobile 既有 5 个用户修改与 Parent `.codex`。
-2. 使用受限 staging 测试账号完成一轮真实图片生命周期：横图上传 → 确认 1600 × 1600 WebP/profile → 重新裁剪 → 替换 → 删除 → 确认 File 无残留。
-3. 浏览器人工确认商品创建、商品编辑、AI 当前商品详情和个人头像均进入同一编辑器；Mobile 验证相册和相机的正方形裁剪。
+2. 使用受限 staging 测试账号完成一轮真实图片生命周期：横图上传 → 确认最长边 1600px、比例正确及 WebP/profile 元数据 → 重新裁剪 → 替换 → 删除 → 确认 File 无残留。
+3. 浏览器人工确认商品创建、商品编辑、AI 当前商品详情和个人头像均进入统一编辑器；Mobile 验证相册和相机的自由/预设比例，头像继续验证固定 1:1。
 4. 单独处理 Backend 全量 CI 的既有 `test_ai_repository` `KeyError: product`，不要和媒体功能混在同一提交。
 5. production 尚未部署；只有用户明确要求并完成业务验收后再安排 production 发布。
 
