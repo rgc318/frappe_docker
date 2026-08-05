@@ -7,20 +7,20 @@
 ## 当前目标与结果
 
 - 本轮目标：把 Web 统一图片编辑器升级为主流的“图片与裁剪框均可操作”模式，让用户可以移动裁剪框并拖动四边或四角调整范围，同时保留自由/预设比例、缩放、旋转和后端安全边界。
-- 当前结果：Web `ImageEditorUpload` 已接入 Cropper.js，商品图自由模式支持裁剪框整体移动及四边/四角自由缩放，1:1、4:3、3:2、16:9 和头像模式锁定比例但仍可移动、缩放裁剪框；框外拖动继续移动图片。实现已完成验证，并以 `c005124 feat: add adjustable image crop frame` 提交、推送 `origin/main`；staging 构建部署正在进行，当前运行版本仍是 `b572e79`。
+- 当前结果：Web `ImageEditorUpload` 已接入 Cropper.js，商品图自由模式支持裁剪框整体移动及四边/四角自由缩放，1:1、4:3、3:2、16:9 和头像模式锁定比例但仍可移动、缩放裁剪框；框外拖动继续移动图片。实现已完成验证，并以 `c005124 feat: add adjustable image crop frame` 提交、推送和部署 staging；Web CI、Coverage、镜像构建、部署健康探测及 Parent Lint 均成功，production 未变更。
 - 涉及仓库：`frontend/myapp-web` 代码和文档、父仓库媒体设计与交接文档。Backend、AI Orchestrator 和 Mobile 本轮未修改；Mobile 原生裁剪器已经具备可移动、可缩放裁剪框，production 未变更。
 
 本次是在已部署的图片上传、暂存、正式保存、统一占位和跨业务展示能力之上增加第三阶段媒体治理。CSV/XLSX/PDF 等非图片文件不进入裁剪器，继续使用各自的导入、预览和校验流程。
 
 ## 当前仓库状态
 
-| 仓库                           | 分支 / 发布版本        | 工作树状态                                           | 本轮责任                               |
-| ------------------------------ | ---------------------- | ---------------------------------------------------- | -------------------------------------- |
-| Parent `frappe_docker`         | `develop` / `f8bd36c9` | 媒体设计和交接文档有未提交改动；既有 `.codex` 不提交 | 可调裁剪框设计与交接                   |
-| Backend `apps/myapp`           | `develop` / `31bd6ff`  | 已提交并推送，工作树干净                             | 自适应比例规范化、元数据和安全边界     |
-| AI `services/myapp-ai`         | `develop` / `ca5448c`  | 干净                                                 | 本轮运行时代码未变；仅沿用既有编排契约 |
-| Web `frontend/myapp-web`       | `main` / `c005124`     | 已提交并推送，工作树干净                             | 图片与可调裁剪框双操作                 |
-| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`  | 本轮未修改；仍保留既有 5 个用户修改                  | 原生裁剪框能力保持不变                 |
+| 仓库                           | 分支 / 发布版本             | 工作树状态                                                       | 本轮责任                               |
+| ------------------------------ | --------------------------- | ---------------------------------------------------------------- | -------------------------------------- |
+| Parent `frappe_docker`         | `develop` / docs `26568e61` | 媒体设计已推送，交接文档正在做部署结果收口；既有 `.codex` 不提交 | 可调裁剪框设计与交接                   |
+| Backend `apps/myapp`           | `develop` / `31bd6ff`       | 已提交并推送，工作树干净                                         | 自适应比例规范化、元数据和安全边界     |
+| AI `services/myapp-ai`         | `develop` / `ca5448c`       | 干净                                                             | 本轮运行时代码未变；仅沿用既有编排契约 |
+| Web `frontend/myapp-web`       | `main` / `c005124`          | 已提交并推送，工作树干净                                         | 图片与可调裁剪框双操作                 |
+| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`       | 本轮未修改；仍保留既有 5 个用户修改                              | 原生裁剪框能力保持不变                 |
 
 Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮图片增量，不得覆盖或提交。本次只修改 `components/item-image-field.tsx`、`services/media.ts`、`DEVELOPMENT.md`。
 
@@ -37,7 +37,23 @@ Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts
 - Web：`npm run tsc`、`npm run biome:lint`、全量 `41 suites / 285 tests`、`npm run build` 均通过。
 - 新增回归覆盖 Cropper 的 `cropBoxMovable`、`cropBoxResizable`、`dragMode=move`、自由模式解锁比例和 `0.4–2.5` 裁剪比例边界。
 - 生产构建已确认 Cropper.js 样式和运行时代码进入正式 bundle。
-- 尚未执行真实浏览器鼠标/触控人工验收；代码已提交推送，staging 构建部署正在进行。
+- 尚未执行真实浏览器鼠标/触控人工验收；代码已提交推送，staging 构建、部署和基础健康探测均成功。
+
+## 本次 staging 发布
+
+| 范围            | Workflow Run                                                                    | 结果 |
+| --------------- | ------------------------------------------------------------------------------- | ---- |
+| Web push CI     | [30982412627](https://github.com/rgc318/myapp-web/actions/runs/30982412627)     | 成功 |
+| Web coverage CI | [30982412551](https://github.com/rgc318/myapp-web/actions/runs/30982412551)     | 成功 |
+| Web build       | [30982641759](https://github.com/rgc318/myapp-web/actions/runs/30982641759)     | 成功 |
+| Web deploy      | [30983090950](https://github.com/rgc318/myapp-web/actions/runs/30983090950)     | 成功 |
+| Parent Lint     | [30982618157](https://github.com/rgc318/frappe_docker/actions/runs/30982618157) | 成功 |
+
+部署事实：
+
+- staging Web 使用 `ghcr.io/rgc318/myapp-web:staging-20260805-c005124`，镜像 digest 为 `sha256:3f82016dc0c8934372d4e8f2e3cf6848df7b93f54a14c07ef3af48c2ef8c31b0`。
+- Web 部署 workflow 的健康循环已通过 `/healthz`、`/user/login` HTTP 200 和 `/api/method/ping` 检查；容器启动后成功保留新版本，没有触发旧镜像回滚。
+- Backend、AI Orchestrator、Mobile 和数据库未变更；production 未部署。
 
 ## 已部署自由裁剪基线
 
