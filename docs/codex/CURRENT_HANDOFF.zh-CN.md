@@ -12,6 +12,25 @@
 
 本次是在已部署的图片上传、暂存、正式保存、统一占位和跨业务展示能力之上增加第三阶段媒体治理。CSV/XLSX/PDF 等非图片文件不进入裁剪器，继续使用各自的导入、预览和校验流程。
 
+## 本轮工作总结
+
+1. 统一图片编辑能力完成企业级收口
+   - Web 商品图和头像统一经过媒体 profile、来源校验、Cropper.js 可调裁剪框、自由 / 预设比例、横纵切换、缩放、旋转和 WebP 输出。
+   - 商品图使用 `item-flexible-v2`，支持自由、1:1、4:3、3:2、16:9；头像继续固定 `avatar-square-v1`。
+   - 文件选择、已有图片重新裁剪和摄像头拍照最终都进入同一 `ImageEditorUpload`，页面不得绕过 profile 自行压缩或上传。
+2. Web 摄像头拍照能力落地
+   - 新增 `CameraCaptureModal`，支持平板、内置摄像头、外置 USB 摄像头选择，以及拍摄、预览、重拍和确认。
+   - 关闭弹窗、切换设备、重拍或组件卸载时停止全部 MediaStream tracks，避免摄像头指示灯和设备占用残留。
+   - 浏览器摄像头不是项目自定义限制，而是标准安全上下文要求：HTTPS 或 localhost 可用，普通局域网 HTTP IP 不可用。
+3. Web 商品扫码链路落地
+   - 新增基于 ZXing 的共享扫码弹窗和按钮，支持常见一维码 / 二维码、摄像头选择、单次识别锁和手动输入降级。
+   - 商品列表、商品创建 / 编辑、商品详情条码管理和销售 / 采购共享 `ProductSelect` 均已接入。
+   - 扫码只查询本地商品库并返回字符串，不接外部 Provider、不自动创建商品、不在扫描器内构造业务对象。
+4. 本地网络与发布链路核验
+   - Web dev server 当前推荐端口为 `8001`；Windows 侧 `localhost:8001` / `127.0.0.1:8001` 已验证返回 200，但 `192.168.31.63:8001` 受 Windows / WSL LAN 边界影响而超时。
+   - 既有 Windows 桥接仍为 `18081 -> 18080`（ERPNext）和 `18082 -> 8081`（Mobile / Expo）；本轮没有新增 `18083 -> 8001`，因为该 HTTP 桥接也无法满足平板摄像头的 HTTPS 要求。
+   - Web、Parent 文档均已推送，staging 已切换到 `staging-20260805-6b23ac5`；Backend、AI、Mobile、数据库和 production 均未变更。
+
 ## 当前仓库状态
 
 | 仓库                           | 分支 / 发布版本       | 工作树状态                                                   | 本轮责任                               |
@@ -42,17 +61,19 @@ Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts
 
 ## 本次 staging 发布
 
-| 范围            | Workflow Run                                                                | 结果 |
-| --------------- | --------------------------------------------------------------------------- | ---- |
-| Web push CI     | [30987941487](https://github.com/rgc318/myapp-web/actions/runs/30987941487) | 成功 |
-| Web coverage CI | [30987941539](https://github.com/rgc318/myapp-web/actions/runs/30987941539) | 成功 |
-| Web build       | [30989815958](https://github.com/rgc318/myapp-web/actions/runs/30989815958) | 成功 |
-| Web deploy      | [30990422600](https://github.com/rgc318/myapp-web/actions/runs/30990422600) | 成功 |
+| 范围            | Workflow Run                                                                    | 结果 |
+| --------------- | ------------------------------------------------------------------------------- | ---- |
+| Web push CI     | [30987941487](https://github.com/rgc318/myapp-web/actions/runs/30987941487)     | 成功 |
+| Web coverage CI | [30987941539](https://github.com/rgc318/myapp-web/actions/runs/30987941539)     | 成功 |
+| Web build       | [30989815958](https://github.com/rgc318/myapp-web/actions/runs/30989815958)     | 成功 |
+| Web deploy      | [30990422600](https://github.com/rgc318/myapp-web/actions/runs/30990422600)     | 成功 |
+| Parent Lint     | [30993028090](https://github.com/rgc318/frappe_docker/actions/runs/30993028090) | 成功 |
 
 部署事实：
 
 - staging Web 使用 `ghcr.io/rgc318/myapp-web:staging-20260805-6b23ac5`，镜像 digest 为 `sha256:0c6752a5d0970e7cf3aed86e445dc89cb3551e0385c0cee662247f20620b9859`。
 - Web 部署 workflow 的健康循环已通过 `/healthz`、`/user/login` HTTP 200 和 `/api/method/ping` 检查；容器启动后成功保留新版本，没有触发旧镜像回滚。
+- 第一次镜像构建使用短 SHA `6b23ac5` 时，`actions/checkout` 将其当作 branch / tag pattern 导致失败；改用完整 SHA `6b23ac56226bff2b67e5614b8382cfc5f8c24bb2` 后成功。后续手动触发 `Build staging image` 应直接传完整 SHA 或分支名。
 - Backend、AI Orchestrator、Mobile 和数据库未变更；production 未部署。
 
 ## 已部署自由裁剪基线
@@ -177,19 +198,20 @@ Container state: running / healthy
 
 ## 当前风险与下一步
 
-1. 需要在真实浏览器人工验证横图/竖图拖动、缩放、左右旋转、透明 PNG、已有图片重新裁剪和取消编辑；当前自动测试覆盖策略、入口和上传调用，但 JSDOM 不验证 Canvas 视觉结果。
-2. 需要使用登录态 HTTP smoke 确认 Gateway 最终保存为 WebP、尺寸与 profile 元数据正确，并清理测试 Item/File；本次未创建真实业务数据。
-3. Mobile 原生裁剪器依赖 dev client/APK；发布后建议至少在 Android 或 iOS 真机验证相册与拍照各一次，Web fallback 也验证一次。
-4. Backend、Web、Mobile 和 Parent release 已按仓库边界提交推送；交接文档收口后仍不得夹带 Mobile 既有 5 个用户修改或 `.codex`。
-5. 当前只保存规范化正式图片，不长期保留原图；未来若需要无损反复编辑、印刷原稿或 DAM，应增加独立 original asset 和版本/保留策略。
+1. 需要在 staging HTTPS 地址使用真实平板、电脑内置摄像头和至少一个外置 USB 摄像头验证授权、设备切换、拍照、重拍、裁剪、上传和关闭后的 track 释放。
+2. 需要准备 EAN-13、EAN-8、UPC、Code 128 和 QR 等实际样本，分别验证商品列表搜索、主条码填入、详情新增条码以及销售 / 采购选品；特别检查连续识别不会重复加单。
+3. 浏览器自动测试验证的是 API 调用和生命周期，不验证真实焦距、低光、反光包装、摄像头方向和不同浏览器的识别成功率；实际硬件验收仍是发布完成条件之一。
+4. 本地 `http://192.168.31.63:<port>` 即使完成端口转发，也不属于浏览器安全上下文。若必须在局域网平板测试 Web 摄像头，应配置终端信任的 HTTPS 证书、同域反向代理或 HTTPS Tunnel，不应通过删除前端 HTTPS 检查规避。
+5. Parent 当前 `.git` 在本会话沙箱中只读；远端 `develop` 已更新，本地两份文档与远端字节一致但仍显示修改。新会话应先重新挂载 / fetch，而不是重复提交或还原文档。
+6. Mobile 仍保留 5 个用户修改，后续任务不得夹带；production 尚未部署，只有用户明确要求并完成业务验收后再安排。
 
 ## 接手建议
 
-1. 先查看各仓库状态并严格保留 Mobile 既有 5 个用户修改与 Parent `.codex`。
-2. 使用受限 staging 测试账号完成一轮真实图片生命周期：横图上传 → 确认最长边 1600px、比例正确及 WebP/profile 元数据 → 重新裁剪 → 替换 → 删除 → 确认 File 无残留。
-3. 浏览器人工确认商品创建、商品编辑、AI 当前商品详情和个人头像均进入统一编辑器；Mobile 验证相册和相机的自由/预设比例，头像继续验证固定 1:1。
-4. 单独处理 Backend 全量 CI 的既有 `test_ai_repository` `KeyError: product`，不要和媒体功能混在同一提交。
-5. production 尚未部署；只有用户明确要求并完成业务验收后再安排 production 发布。
+1. 先确认远端版本：Web `main=6b23ac5`，Parent `develop` 至少包含 `783dc03d`；检查本地 Parent `.git` 是否恢复可写，并严格保留 `.codex` 与 Mobile 既有 5 个修改。
+2. 在 staging HTTPS 环境按“拍照 → 重拍 → 自由裁剪 → 预设裁剪 → 上传 → 重新裁剪 → 替换 / 删除”完成一次真实商品图片生命周期，并确认最终 WebP、尺寸、profile 元数据和 File 清理。
+3. 在商品列表、商品新增 / 编辑、商品详情条码区、销售选品和采购选品逐一验证真实条码；无权限或无摄像头时确认手动输入仍可用。
+4. 若需本地平板调试，优先设计 HTTPS 入口；现有 `18081/18082` 文档位于 `frontend/myapp-mobile/DEVELOPMENT.md`，不要复用 `8081` 导致 Expo 与 Windows portproxy 冲突。
+5. production 尚未部署；获得业务验收和用户明确授权后，再用当前 staging 镜像或对应 Web 提交安排 production 发布。
 
 ## 上一轮目标（2026-08-03，已完成）
 
