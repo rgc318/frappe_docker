@@ -6,25 +6,40 @@
 
 ## 当前目标与结果
 
-- 本轮目标：在已部署的统一图片编辑器上增加商品图自由裁剪和常用比例预设，同时保持头像固定方形及后端最终比例、尺寸和安全边界。
-- 当前结果：Web 与 Mobile 商品图已支持自由、1:1、4:3、3:2、16:9 裁剪，非方形预设支持横向/纵向切换；Backend 商品 profile 升级为 `item-flexible-v2`，保留客户端最终裁剪比例、限制宽高比为 `0.4–2.5`，最长边规范化为 1600px WebP。改动已完成验证、提交、推送并部署 staging，Backend/AI、Web 和 Mobile Preview 均发布成功；production 未变更。
-- 涉及仓库：父仓库文档、`apps/myapp`、`frontend/myapp-web`、`frontend/myapp-mobile`。AI Orchestrator 未修改，production 未变更。
+- 本轮目标：把 Web 统一图片编辑器升级为主流的“图片与裁剪框均可操作”模式，让用户可以移动裁剪框并拖动四边或四角调整范围，同时保留自由/预设比例、缩放、旋转和后端安全边界。
+- 当前结果：Web `ImageEditorUpload` 已接入 Cropper.js，商品图自由模式支持裁剪框整体移动及四边/四角自由缩放，1:1、4:3、3:2、16:9 和头像模式锁定比例但仍可移动、缩放裁剪框；框外拖动继续移动图片。实现已完成验证，并以 `c005124 feat: add adjustable image crop frame` 提交、推送 `origin/main`；staging 构建部署正在进行，当前运行版本仍是 `b572e79`。
+- 涉及仓库：`frontend/myapp-web` 代码和文档、父仓库媒体设计与交接文档。Backend、AI Orchestrator 和 Mobile 本轮未修改；Mobile 原生裁剪器已经具备可移动、可缩放裁剪框，production 未变更。
 
 本次是在已部署的图片上传、暂存、正式保存、统一占位和跨业务展示能力之上增加第三阶段媒体治理。CSV/XLSX/PDF 等非图片文件不进入裁剪器，继续使用各自的导入、预览和校验流程。
 
 ## 当前仓库状态
 
-| 仓库                           | 分支 / 发布版本                | 工作树状态                                             | 本轮责任                                        |
-| ------------------------------ | ------------------------------ | ------------------------------------------------------ | ----------------------------------------------- |
-| Parent `frappe_docker`         | `develop` / release `b42ced93` | 发布和部署交接均已推送；既有 `.codex` 不提交           | 跨仓库设计与交接                                |
-| Backend `apps/myapp`           | `develop` / `31bd6ff`          | 已提交并推送，工作树干净                               | 自适应比例规范化、元数据和安全边界              |
-| AI `services/myapp-ai`         | `develop` / `ca5448c`          | 干净                                                   | 本轮运行时代码未变；仅沿用既有编排契约          |
-| Web `frontend/myapp-web`       | `main` / `b572e79`             | 已提交并推送，工作树干净                               | 自由/预设比例编辑与动态输出                     |
-| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`          | 本轮 3 个媒体文件已提交并推送；仍保留既有 5 个用户修改 | 自由/预设比例选择、原生/Web fallback 和媒体映射 |
+| 仓库                           | 分支 / 发布版本        | 工作树状态                                           | 本轮责任                               |
+| ------------------------------ | ---------------------- | ---------------------------------------------------- | -------------------------------------- |
+| Parent `frappe_docker`         | `develop` / `f8bd36c9` | 媒体设计和交接文档有未提交改动；既有 `.codex` 不提交 | 可调裁剪框设计与交接                   |
+| Backend `apps/myapp`           | `develop` / `31bd6ff`  | 已提交并推送，工作树干净                             | 自适应比例规范化、元数据和安全边界     |
+| AI `services/myapp-ai`         | `develop` / `ca5448c`  | 干净                                                 | 本轮运行时代码未变；仅沿用既有编排契约 |
+| Web `frontend/myapp-web`       | `main` / `c005124`     | 已提交并推送，工作树干净                             | 图片与可调裁剪框双操作                 |
+| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`  | 本轮未修改；仍保留既有 5 个用户修改                  | 原生裁剪框能力保持不变                 |
 
 Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮图片增量，不得覆盖或提交。本次只修改 `components/item-image-field.tsx`、`services/media.ts`、`DEVELOPMENT.md`。
 
-## 本次自由裁剪增量
+## 本次可调裁剪框增量
+
+- Web 统一编辑器改用 Cropper.js 管理裁剪画布、图片平移、裁剪框移动、八方向缩放、缩放和 90°旋转。
+- 自由模式允许独立拖动四边或四角，并继续执行 `0.4–2.5` 宽高比关闭式校验；超出范围时禁用确认并显示原因。
+- 1:1、4:3、3:2、16:9 预设和头像 1:1 锁定宽高比，但裁剪框仍可移动和缩放；非方形预设继续支持横竖切换。
+- Cropper 只替换客户端交互层，输出仍通过统一 Canvas/WebP 质量和字节限制处理，Backend profile 与 API 契约不变。
+- Mobile 原生端已有 `showCropFrame`、`freeStyleCropEnabled` 和可调边框能力，本轮无需修改；Expo Web fallback 后续可继续评估是否复用同类自定义编辑器。
+
+## 本次验证
+
+- Web：`npm run tsc`、`npm run biome:lint`、全量 `41 suites / 285 tests`、`npm run build` 均通过。
+- 新增回归覆盖 Cropper 的 `cropBoxMovable`、`cropBoxResizable`、`dragMode=move`、自由模式解锁比例和 `0.4–2.5` 裁剪比例边界。
+- 生产构建已确认 Cropper.js 样式和运行时代码进入正式 bundle。
+- 尚未执行真实浏览器鼠标/触控人工验收；代码已提交推送，staging 构建部署正在进行。
+
+## 已部署自由裁剪基线
 
 - Web `ImageEditorUpload` 增加比例选择、自由比例滑杆和横纵切换；Canvas 根据最终裁剪比例输出动态宽高，默认仍为 1:1。
 - 商品图升级为 `item-flexible-v2`：自由比例范围 `0.4–2.5`，预设为 1:1、4:3、3:2、16:9，最长边 1600px WebP，起始质量 82，输出最大 5MB。
@@ -32,7 +47,7 @@ Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts
 - Backend 对商品图保留裁剪后宽高比并返回真实 `width`、`height`、`aspect_ratio`；头像继续居中裁为固定方形。
 - Mobile 原生相册/相机和 Expo Web fallback 增加相同比例选择；自由模式使用平台裁剪器，最终范围由 Backend 关闭式校验。
 
-## 本次验证
+## 已部署基线验证
 
 - Backend：容器内 `204 tests` 通过，覆盖图片处理、媒体服务、头像、Gateway、安全契约和商品写事务。
 - Web：`npm run tsc`、`npm run biome:lint`、全量 `41 suites / 284 tests`、`npm run build` 均通过；Jest 仍有仓库既有 open handle 提示但退出码为 0。
