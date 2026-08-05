@@ -14,13 +14,13 @@
 
 ## 当前仓库状态
 
-| 仓库                           | 分支 / 发布版本             | 工作树状态                                                       | 本轮责任                               |
-| ------------------------------ | --------------------------- | ---------------------------------------------------------------- | -------------------------------------- |
-| Parent `frappe_docker`         | `develop`                   | 媒体设计与交接文档待本轮提交；既有 `.codex` 不提交               | 摄像头拍照设计与交接                   |
-| Backend `apps/myapp`           | `develop` / `31bd6ff`       | 已提交并推送，工作树干净                                         | 自适应比例规范化、元数据和安全边界     |
-| AI `services/myapp-ai`         | `develop` / `ca5448c`       | 干净                                                             | 本轮运行时代码未变；仅沿用既有编排契约 |
-| Web `frontend/myapp-web`       | `main` / `6b23ac5`          | 已提交、推送并部署 staging，工作树干净                           | Web 拍照上传与商品扫码                  |
-| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`       | 本轮未修改；仍保留既有 5 个用户修改                              | 原生裁剪框能力保持不变                 |
+| 仓库                           | 分支 / 发布版本       | 工作树状态                                                   | 本轮责任                               |
+| ------------------------------ | --------------------- | ------------------------------------------------------------ | -------------------------------------- |
+| Parent `frappe_docker`         | `develop`             | 远端文档已提交；本地 `.git` 只读导致两份同内容文档仍显示修改 | 摄像头拍照设计与交接                   |
+| Backend `apps/myapp`           | `develop` / `31bd6ff` | 已提交并推送，工作树干净                                     | 自适应比例规范化、元数据和安全边界     |
+| AI `services/myapp-ai`         | `develop` / `ca5448c` | 干净                                                         | 本轮运行时代码未变；仅沿用既有编排契约 |
+| Web `frontend/myapp-web`       | `main` / `6b23ac5`    | 已提交、推送并部署 staging，工作树干净                       | Web 拍照上传与商品扫码                 |
+| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e` | 本轮未修改；仍保留既有 5 个用户修改                          | 原生裁剪框能力保持不变                 |
 
 Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮增量，不得覆盖或提交；本轮没有修改 Mobile。
 
@@ -42,8 +42,8 @@ Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts
 
 ## 本次 staging 发布
 
-| 范围            | Workflow Run                                                                    | 结果 |
-| --------------- | ------------------------------------------------------------------------------- | ---- |
+| 范围            | Workflow Run                                                                | 结果 |
+| --------------- | --------------------------------------------------------------------------- | ---- |
 | Web push CI     | [30987941487](https://github.com/rgc318/myapp-web/actions/runs/30987941487) | 成功 |
 | Web coverage CI | [30987941539](https://github.com/rgc318/myapp-web/actions/runs/30987941539) | 成功 |
 | Web build       | [30989815958](https://github.com/rgc318/myapp-web/actions/runs/30989815958) | 成功 |
