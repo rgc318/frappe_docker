@@ -14,13 +14,13 @@
 
 ## 当前仓库状态
 
-| 仓库                           | 分支 / HEAD            | 工作树状态                                                       | 本轮责任                                        |
-| ------------------------------ | ---------------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
-| Parent `frappe_docker`         | `develop` / `b42ced93` | 发布提交已推送，交接文档正在做部署结果收口；既有 `.codex` 不提交 | 跨仓库设计与交接                                |
-| Backend `apps/myapp`           | `develop` / `31bd6ff`  | 已提交并推送，工作树干净                                         | 自适应比例规范化、元数据和安全边界              |
-| AI `services/myapp-ai`         | `develop` / `ca5448c`  | 干净                                                             | 本轮运行时代码未变；仅沿用既有编排契约          |
-| Web `frontend/myapp-web`       | `main` / `b572e79`     | 已提交并推送，工作树干净                                         | 自由/预设比例编辑与动态输出                     |
-| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`  | 本轮 3 个媒体文件已提交并推送；仍保留既有 5 个用户修改           | 自由/预设比例选择、原生/Web fallback 和媒体映射 |
+| 仓库                           | 分支 / 发布版本                | 工作树状态                                             | 本轮责任                                        |
+| ------------------------------ | ------------------------------ | ------------------------------------------------------ | ----------------------------------------------- |
+| Parent `frappe_docker`         | `develop` / release `b42ced93` | 发布和部署交接均已推送；既有 `.codex` 不提交           | 跨仓库设计与交接                                |
+| Backend `apps/myapp`           | `develop` / `31bd6ff`          | 已提交并推送，工作树干净                               | 自适应比例规范化、元数据和安全边界              |
+| AI `services/myapp-ai`         | `develop` / `ca5448c`          | 干净                                                   | 本轮运行时代码未变；仅沿用既有编排契约          |
+| Web `frontend/myapp-web`       | `main` / `b572e79`             | 已提交并推送，工作树干净                               | 自由/预设比例编辑与动态输出                     |
+| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`          | 本轮 3 个媒体文件已提交并推送；仍保留既有 5 个用户修改 | 自由/预设比例选择、原生/Web fallback 和媒体映射 |
 
 Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮图片增量，不得覆盖或提交。本次只修改 `components/item-image-field.tsx`、`services/media.ts`、`DEVELOPMENT.md`。
 
