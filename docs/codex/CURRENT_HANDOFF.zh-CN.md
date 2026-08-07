@@ -138,13 +138,13 @@ git -C frontend/myapp-web diff --check
 
 ## 仓库状态与未提交范围
 
-| 仓库                           | 分支 / 发布版本       | 工作树状态                                                   | 本轮责任                               |
-| ------------------------------ | --------------------- | ------------------------------------------------------------ | -------------------------------------- |
-| Parent `frappe_docker`         | `develop` / 当前提交   | 本轮提交 Backend gitlink 与 handoff；媒体文档既有修改；`.codex` 未跟踪 | 本轮集成提交                             |
-| Backend `apps/myapp`           | `develop` / `3468b5d`  | 工作树干净；权限文档、代码和测试均已提交                        | 本轮主要改动仓库                         |
-| AI `services/myapp-ai`         | `develop` / `ca5448c`  | 干净                                                           | 本轮未修改                               |
-| Web `frontend/myapp-web`       | `main` / `fb597b2`     | 工作树干净；权限文档、UI、service 和测试均已提交                | 本轮 Web 改动仓库                        |
-| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`  | 保留既有 5 个用户修改，本轮未触碰                              | 不得夹带提交                             |
+| 仓库                           | 分支 / 发布版本       | 工作树状态                                                             | 本轮责任          |
+| ------------------------------ | --------------------- | ---------------------------------------------------------------------- | ----------------- |
+| Parent `frappe_docker`         | `develop` / 当前提交  | 本轮提交 Backend gitlink 与 handoff；媒体文档既有修改；`.codex` 未跟踪 | 本轮集成提交      |
+| Backend `apps/myapp`           | `develop` / `3468b5d` | 工作树干净；权限文档、代码和测试均已提交                               | 本轮主要改动仓库  |
+| AI `services/myapp-ai`         | `develop` / `ca5448c` | 干净                                                                   | 本轮未修改        |
+| Web `frontend/myapp-web`       | `main` / `fb597b2`    | 工作树干净；权限文档、UI、service 和测试均已提交                       | 本轮 Web 改动仓库 |
+| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e` | 保留既有 5 个用户修改，本轮未触碰                                      | 不得夹带提交      |
 
 Backend 提交：
 
