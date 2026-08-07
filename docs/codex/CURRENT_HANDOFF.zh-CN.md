@@ -9,7 +9,7 @@
 - 本轮目标：完善 Backend 自定义 API 的企业级数据隔离，并为 Web 用户管理补齐数据权限配置防误配能力。
 - 业务范围：客户、供应商、商品、UOM、仓库、销售 / 采购订单、发货 / 收货、销售 / 采购发票、库存、收付款、经营报表、用户偏好和商品图片。
 - 涉及仓库：Backend `apps/myapp`、Web `frontend/myapp-web` 和 Parent 交接文档。Mobile、AI Orchestrator、部署编排和 production 本轮未修改。
-- 当前结果：P0 自定义业务接口权限收口、P1 权限配置治理和 P2 权限兼容性 / 用户体验回归均已完成并通过本地门禁；Backend、Web 补充文档已分别本地提交，代码、测试仍未提交，所有本轮改动均未推送或部署。
+- 当前结果：P0 自定义业务接口权限收口、P1 权限配置治理和 P2 权限兼容性 / 用户体验回归均已完成并通过本地门禁；Backend、Web 的补充文档、代码和测试均已按仓库边界本地提交，尚未推送或部署。
 - 关键结论：代码层已经阻止自定义 API 绕过 Frappe 角色权限、文档权限和 User Permission，但本地数据库当前仍为 `User Permission = 0`。因此相同业务角色的用户目前仍可能看到相同的跨公司数据；要实现实际的按公司 / 仓库隔离，仍需业务方提供正式授权矩阵后配置 User Permission。
 - 数据状态：本轮没有迁移或修改正式业务数据。真实权限验证全部在单一数据库事务内执行并强制回滚，测试前后 `User Permission` 数量均为 `0`。
 
@@ -68,6 +68,7 @@
 - Web `npm run tsc`、`npm run biome:lint`、`npm run build` 全部通过。
 - Ruff `0.14.10` 检查通过。
 - Parent、Backend、Web 的 `git diff --check` 通过。
+- 代码提交后再次验证 Backend 权限关键回归 `183 tests`、Web 权限聚焦回归 `76 tests` 和 Web `npm run tsc`，全部通过。
 
 主要复现入口：
 
@@ -139,28 +140,23 @@ git -C frontend/myapp-web diff --check
 
 | 仓库                           | 分支 / 发布版本       | 工作树状态                                                   | 本轮责任                               |
 | ------------------------------ | --------------------- | ------------------------------------------------------------ | -------------------------------------- |
-| Parent `frappe_docker`         | `develop` / `aae6fb61` | `apps/myapp` gitlink 已变化且工作树 dirty；媒体文档既有修改；`.codex` 未跟踪 | 本轮只提交 handoff，不提交 gitlink       |
-| Backend `apps/myapp`           | `develop` / `9eca5f5`  | 权限文档已提交；数据隔离代码和测试未提交                        | 本轮主要改动仓库                         |
+| Parent `frappe_docker`         | `develop` / 当前提交   | 本轮提交 Backend gitlink 与 handoff；媒体文档既有修改；`.codex` 未跟踪 | 本轮集成提交                             |
+| Backend `apps/myapp`           | `develop` / `3468b5d`  | 工作树干净；权限文档、代码和测试均已提交                        | 本轮主要改动仓库                         |
 | AI `services/myapp-ai`         | `develop` / `ca5448c`  | 干净                                                           | 本轮未修改                               |
-| Web `frontend/myapp-web`       | `main` / `b8bf472`     | 权限文档已提交；权限治理 UI、service 和测试未提交               | 本轮 Web 改动仓库                        |
+| Web `frontend/myapp-web`       | `main` / `fb597b2`     | 工作树干净；权限文档、UI、service 和测试均已提交                | 本轮 Web 改动仓库                        |
 | Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`  | 保留既有 5 个用户修改，本轮未触碰                              | 不得夹带提交                             |
 
-Backend 未提交范围：
+Backend 提交：
 
-- 新增：`myapp/services/data_permission_service.py`、`myapp/tests/unit/test_data_permission_service.py`。
-- 服务：`customer_service.py`、`document_list_service.py`、`inventory_service.py`、`media_service.py`、`order_service.py`、`purchase_service.py`、`report_service.py`、`settlement_service.py`、`uom_service.py`、`user_management_service.py`、`user_preferences_service.py`、`warehouse_service.py`、`wholesale_service.py`。
-- 测试：`test_ai_repository.py`、`test_customer_service.py`、`test_document_list_service.py`、`test_inventory_service.py`、`test_media_service.py`、`test_purchase_service.py`、`test_report_service.py`、`test_uom_service.py`、`test_user_management_service.py`、`test_warehouse_service.py`、`test_wholesale_service.py`。
+- `9eca5f5 docs: document permission boundaries`
+- `3468b5d feat: enforce business data permissions`
 
-Backend 权限补充文档已独立提交为 `9eca5f5`，尚未推送；Parent 本轮不更新 Backend gitlink，避免把尚未提交的代码状态误当作完整 Backend 交付。
+Web 提交：
 
-Web 未提交范围：
+- `b8bf472 docs: document permission-aware UX`
+- `fb597b2 feat: align UI with permission boundaries`
 
-- 页面：`src/pages/Administration/Users/Detail.tsx`、`src/pages/Dashboard.tsx`、`src/pages/Reports/index.tsx`、销售 / 采购订单新建页、主数据动态入口。
-- 权限路由：`src/access.ts`、`config/routes.ts`、`src/__tests__/access.test.ts`。
-- 新增权限范围工具与测试：`src/pages/Administration/Users/permission-scope.ts`、`permission-scope.test.ts`。
-- Service 与测试：`src/services/myapp/users.ts`、`src/services/myapp/reports.ts`、用户与领域 service 测试。
-
-Web 权限补充文档已独立提交为 `b8bf472`，尚未推送。
+上述提交均仅存在于本地，尚未推送；Parent 本轮将 Backend gitlink 固定到 `3468b5d`。
 
 Parent 当前还显示上一轮既有修改 `docs/05-development/05-media-upload-and-image-editing.zh-CN.md`；它不属于本轮数据隔离增量，提交时必须单独核对，不能默认夹带。`.codex` 是本地未跟踪状态，禁止提交。
 
@@ -173,21 +169,21 @@ Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts
 3. `User Permission = 0` 时，代码门禁保证角色和文档权限不被绕过，但不会自动把相同业务角色的用户按公司 / 仓库拆分；这不是代码缺陷，而是授权数据尚未配置。
 4. 真实事务已覆盖 Company / Warehouse 全局授权；`applicable_for` 定向授权和 `hide_descendants` 仍建议在 staging 使用实际组织树人工验收。
 5. 本轮只收口已审计的核心业务入口。后续新增服务若使用 `frappe.get_all()`、`frappe.db.sql()` 或 `frappe.db.get_value()` 返回业务数据，必须复用 `data_permission_service` 并补低权限回归。
-6. Backend / Web 补充文档已本地提交，但权限代码和测试仍未提交；全部提交均未推送或部署，staging 和 production 当前都不包含本轮数据隔离增量。
+6. Backend / Web 权限文档、代码和测试均已本地提交，但尚未推送或部署；staging 和 production 当前都不包含本轮数据隔离增量。
 
 ## 下一步建议
 
 1. 业务方提供正式授权矩阵，并确认是否需要 Customer / Supplier 维度以及 Company / Warehouse 下级节点继承。
-2. 用户明确要求提交代码时，先在 `apps/myapp` 提交并推送 Backend 代码与测试，再在 `frontend/myapp-web` 独立提交并推送 Web 代码与测试，最后在 Parent 更新并提交 `apps/myapp` gitlink；不要夹带 `.codex`、Mobile 既有修改或未核对的媒体设计文档。
+2. 用户明确要求推送时，先推送 Backend `develop`，再推送 Web `main`，最后推送包含 Backend gitlink 的 Parent `develop`；不要夹带 `.codex`、Mobile 既有修改或未核对的媒体设计文档。
 3. 部署 staging 后使用四类真实账号执行 HTTP 验收：无业务角色、单公司业务用户、多公司业务用户、`System Manager`；核对同一入口的 `403/200` 与返回范围。
 4. 在 staging 使用真实组织结构验收定向 `applicable_for`、`hide_descendants`、默认值越界提示、首条权限收窄和最后一条权限删除扩权。
 5. 完成业务验收后再安排 production，不要在授权矩阵未确认前批量写入正式 User Permission。
 
 ## 当前提交基线
 
-- Parent：`aae6fb61 docs: record web camera and barcode release`
-- Backend：`9eca5f5 docs: document permission boundaries`
-- Web：`b8bf472 docs: document permission-aware UX`
+- Parent：本次 Backend gitlink / handoff 集成提交（以当前 HEAD 为准）
+- Backend：`3468b5d feat: enforce business data permissions`
+- Web：`fb597b2 feat: align UI with permission boundaries`
 - AI Orchestrator：`ca5448c docs: document AI model fallback behavior`
 - Mobile：`ebb242e feat: support flexible image crop ratios`
 
