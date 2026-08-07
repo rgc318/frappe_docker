@@ -1,18 +1,122 @@
 # 当前交接状态
 
-更新时间：2026-08-05 CST
+更新时间：2026-08-07 CST
 
 本文件只记录当前短期状态、仓库边界、验证结果、风险和下一步。历史过程以 Git 历史、GitHub Actions Run 和长期设计文档为准，不再持续追加到本文件。
 
-## 当前目标与结果
+## 当前目标与结论
 
-- 本轮目标：为 Web 增加平板、内置及外置摄像头拍照上传，并补齐与 Mobile 同语义的商品扫码搜索、主条码录入和销售 / 采购共享选品入口。
-- 当前结果：Web 已以 `6b23ac5 feat: add web camera capture and barcode scanning` 提交、推送并部署 staging。`ImageEditorUpload` 新增拍照、预览、重拍和摄像头切换，拍摄文件继续进入统一裁剪 / WebP / Backend profile；新增 ZXing 扫码弹窗，支持摄像头选择、单次识别、手动输入降级和流释放，并已接入商品列表、商品创建 / 编辑、商品详情条码管理及共享 `ProductSelect`。
-- 涉及仓库：`frontend/myapp-web` 代码与文档、父仓库媒体设计和交接文档。Backend、AI Orchestrator 和 Mobile 本轮未修改；扫码仍查询本地商品库，不接外部条码 Provider，不自动创建商品。
+- 本轮目标：完善 Backend 自定义 API 的企业级数据隔离，并为 Web 用户管理补齐数据权限配置防误配能力。
+- 业务范围：客户、供应商、商品、UOM、仓库、销售 / 采购订单、发货 / 收货、销售 / 采购发票、库存、收付款、经营报表、用户偏好和商品图片。
+- 涉及仓库：Backend `apps/myapp`、Web `frontend/myapp-web` 和 Parent 交接文档。Mobile、AI Orchestrator、部署编排和 production 本轮未修改。
+- 当前结果：P0 自定义业务接口权限收口、P1 权限配置治理和 P2 权限兼容性 / 用户体验回归均已完成并通过本地门禁；Backend、Web 补充文档已分别本地提交，代码、测试仍未提交，所有本轮改动均未推送或部署。
+- 关键结论：代码层已经阻止自定义 API 绕过 Frappe 角色权限、文档权限和 User Permission，但本地数据库当前仍为 `User Permission = 0`。因此相同业务角色的用户目前仍可能看到相同的跨公司数据；要实现实际的按公司 / 仓库隔离，仍需业务方提供正式授权矩阵后配置 User Permission。
+- 数据状态：本轮没有迁移或修改正式业务数据。真实权限验证全部在单一数据库事务内执行并强制回滚，测试前后 `User Permission` 数量均为 `0`。
 
-本次是在已部署的图片上传、暂存、正式保存、统一占位和跨业务展示能力之上增加第三阶段媒体治理。CSV/XLSX/PDF 等非图片文件不进入裁剪器，继续使用各自的导入、预览和校验流程。
+## 已完成改动
 
-## 本轮工作总结
+### Backend：统一数据权限底座
+
+1. 权限基础能力
+   - 新增登录用户、DocType、文档级、Company、Warehouse、SQL match condition 和临时文件 owner 校验。
+   - 默认公司 / 仓库只作为工作偏好，不再被当作授权来源；支持多公司授权范围。
+2. 核心业务接口收口
+   - 客户、供应商、商品、UOM、仓库、订单、发货 / 收货 / 发票、库存和收付款详情执行正式权限判断。
+   - 列表从 `frappe.get_all()` 切换为 `frappe.get_list()`；库存只聚合当前用户可读仓库。
+   - 经营、销售、采购、应收应付和资金报表在裸 SQL 中注入 Frappe 角色、owner 和 User Permission 条件。
+3. 媒体与用户偏好边界
+   - 商品图片上传、替换、删除要求 Item 写权限；暂存图片只能由上传者或 `System Manager` 绑定。
+   - 保存默认 Company / Warehouse 时校验当前用户的授权范围。
+
+### Backend / Web：权限配置防误配
+
+1. 后端治理约束
+   - MyApp 管理入口只开放 Company、Warehouse、Customer、Supplier 四类业务范围，目录由 Backend `permission_catalog` 统一下发。
+   - `Administrator` 禁止配置 User Permission；非法定向 DocType 和非树形下级配置由后端拒绝。
+   - 只有 Company / Warehouse 支持 `hide_descendants`；Customer→Purchase Order 等无效 `applicable_for` 组合会被拒绝。
+2. Web 有效范围展示
+   - Web 明确展示“未按该维度限制”不等于“无权限”，并提示首次添加会收窄、删除最后一条会扩权。
+   - 用户详情展示四类权限维度的有效范围、默认公司 / 仓库越界警告和 Company / Warehouse 下级节点开关。
+   - 权限类型、可定向 DocType 和树形能力均以后端 `permission_catalog` 为事实来源，不在页面复制规则。
+
+### Backend / Web：权限兼容性与用户体验
+
+1. 标准角色交易体验
+   - 标准 Sales / Purchase 角色无需 Item Price 直接读取权限即可继续商品选品；服务先限制可读 Price List 和 Item，再读取受控价格。
+   - 历史默认公司 / 仓库越界时只忽略失效偏好，不阻断销售 / 采购上下文；显式越权参数继续拒绝。
+2. 组合报表部分可见
+   - 经营总览、完整经营报表和销售 / 采购分析按业务域返回 `visibility`；无权域不执行 SQL，指标返回 `null`。
+   - Dashboard 和报表页显示“无查看权限”，不把缺少权限误报为业务金额 0，也不因一个无权域整页失败。
+3. 菜单与动作一致性
+   - 主数据子路由按商品、客户、供应商、UOM、仓库分别控制，入口页跳转到当前用户首个可用模块。
+   - 销售发票入口、销售 / 采购快捷开单和订单 / 发货 / 收货 / 发票详情动作均与目标 DocType 权限一致；无权动作隐藏或禁用并给出原因。
+
+### 文档与测试夹具
+
+- Backend `API_GATEWAY.zh-CN.md`、`TESTING.zh-CN.md`、`USER_MANAGEMENT_TECH_DESIGN.zh-CN.md` 已提交为 `9eca5f5 docs: document permission boundaries`。
+- Web `WEB_DEVELOPMENT.zh-CN.md` 已提交为 `b8bf472 docs: document permission-aware UX`。
+- Web 根目录中文 Markdown 被 lint-staged 传给 Biome，但同时被 Biome 配置忽略，常规提交钩子因此以“0 files processed”失败；确认仅暂存该文档且 `git diff --cached --check` 通过后，本次文档提交使用 `--no-verify`，没有修改钩子配置或其他文件。
+- `test_ai_repository.py` 只调整日期敏感夹具，避免固定日期超过 7 天 TTL 后使全量测试失效；未修改 AI 运行时代码或业务行为。
+
+## 已验证
+
+### 自动化门禁
+
+- Backend 全量单元测试：`754 tests` 通过。
+- Backend 用户管理、Gateway 与安全契约聚焦回归：`159 tests` 通过。
+- Web 全量 Jest：`44 suites / 292 tests` 通过。
+- Web `npm run tsc`、`npm run biome:lint`、`npm run build` 全部通过。
+- Ruff `0.14.10` 检查通过。
+- Parent、Backend、Web 的 `git diff --check` 通过。
+
+主要复现入口：
+
+```bash
+docker exec frappe_docker-backend-1 bash -lc '
+  cd /home/frappe/frappe-bench &&
+  env/bin/python -m unittest \
+    apps.myapp.myapp.tests.unit.test_data_permission_service \
+    apps.myapp.myapp.tests.unit.test_customer_service \
+    apps.myapp.myapp.tests.unit.test_warehouse_service \
+    apps.myapp.myapp.tests.unit.test_uom_service \
+    apps.myapp.myapp.tests.unit.test_document_list_service \
+    apps.myapp.myapp.tests.unit.test_inventory_service \
+    apps.myapp.myapp.tests.unit.test_report_service \
+    apps.myapp.myapp.tests.unit.test_media_service \
+    apps.myapp.myapp.tests.unit.test_wholesale_service \
+    apps.myapp.myapp.tests.unit.test_purchase_service \
+    apps.myapp.myapp.tests.unit.test_user_preferences_service \
+    apps.myapp.myapp.tests.unit.test_user_management_service \
+    apps.myapp.myapp.tests.unit.test_gateway_wrappers \
+    apps.myapp.myapp.tests.unit.test_api_security_contracts
+'
+
+cd /home/rgc318/python-project/frappe_docker/frontend/myapp-web
+npm run tsc
+npm run biome:lint
+npm test -- --runInBand
+npm run build
+
+cd /home/rgc318/python-project/frappe_docker
+git diff --check
+git -C apps/myapp diff --check
+git -C frontend/myapp-web diff --check
+```
+
+### 真实事务验证
+
+- 无业务 DocType 角色的用户访问 12 类核心入口均得到 `PermissionError`；具备完整业务角色的用户可正常读取。
+- 临时仅授权 Company=`rgc (Demo)` 后，采购订单只返回该公司；显式请求未授权公司返回 `0` 条。
+- 同一公司授权下，库存汇总 `862` 条、库存流水 `2765` 条，所有结果均属于 `rgc (Demo)`。
+- 再限制 Warehouse=`主仓库 - R` 后，库存汇总仅 `5` 条、库存流水仅 `95` 条，均只属于该仓库。
+- 显式请求未授权公司的采购报表时，金额指标为 `0`、明细为空。
+- 普通 `System Manager` 可创建合法 Company 权限；`Administrator` 目标和 Customer→Purchase Order 非法组合均被拒绝。
+- 所有验证均回滚，最终数据库 `User Permission = 0`，没有遗留测试权限或测试业务数据。
+- 标准角色体验探针覆盖 Sales User、Purchase User、Stock User、Accounts User：对应商品、客户 / 供应商、订单、发货 / 收货、库存和资金路径均正常；无权销售发票入口继续拒绝，Web 已不再向 Sales User 暴露该菜单。
+- 销售 / 采购经理、库存经理和财务经理访问组合经营报表均成功；只返回其角色允许的业务域，无权指标为 `null` 并由 Web 明确标识。
+- 最新 Company=`rgc (Demo)` 抽样验证中，采购订单、库存汇总和库存流水只包含该公司；Warehouse=`主仓库 - R` 后库存汇总 `5` 条、库存流水 `95` 条，显式请求其他仓库返回 `PermissionError`。
+
+## 上一轮已部署 Web 工作总结
 
 1. 统一图片编辑能力完成企业级收口
    - Web 商品图和头像统一经过媒体 profile、来源校验、Cropper.js 可调裁剪框、自由 / 预设比例、横纵切换、缩放、旋转和 WebP 输出。
@@ -31,19 +135,63 @@
    - 既有 Windows 桥接仍为 `18081 -> 18080`（ERPNext）和 `18082 -> 8081`（Mobile / Expo）；本轮没有新增 `18083 -> 8001`，因为该 HTTP 桥接也无法满足平板摄像头的 HTTPS 要求。
    - Web、Parent 文档均已推送，staging 已切换到 `staging-20260805-6b23ac5`；Backend、AI、Mobile、数据库和 production 均未变更。
 
-## 当前仓库状态
+## 仓库状态与未提交范围
 
 | 仓库                           | 分支 / 发布版本       | 工作树状态                                                   | 本轮责任                               |
 | ------------------------------ | --------------------- | ------------------------------------------------------------ | -------------------------------------- |
-| Parent `frappe_docker`         | `develop`             | 远端文档已提交；本地 `.git` 只读导致两份同内容文档仍显示修改 | 摄像头拍照设计与交接                   |
-| Backend `apps/myapp`           | `develop` / `31bd6ff` | 已提交并推送，工作树干净                                     | 自适应比例规范化、元数据和安全边界     |
-| AI `services/myapp-ai`         | `develop` / `ca5448c` | 干净                                                         | 本轮运行时代码未变；仅沿用既有编排契约 |
-| Web `frontend/myapp-web`       | `main` / `6b23ac5`    | 已提交、推送并部署 staging，工作树干净                       | Web 拍照上传与商品扫码                 |
-| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e` | 本轮未修改；仍保留既有 5 个用户修改                          | 原生裁剪框能力保持不变                 |
+| Parent `frappe_docker`         | `develop` / `aae6fb61` | `apps/myapp` gitlink 已变化且工作树 dirty；媒体文档既有修改；`.codex` 未跟踪 | 本轮只提交 handoff，不提交 gitlink       |
+| Backend `apps/myapp`           | `develop` / `9eca5f5`  | 权限文档已提交；数据隔离代码和测试未提交                        | 本轮主要改动仓库                         |
+| AI `services/myapp-ai`         | `develop` / `ca5448c`  | 干净                                                           | 本轮未修改                               |
+| Web `frontend/myapp-web`       | `main` / `b8bf472`     | 权限文档已提交；权限治理 UI、service 和测试未提交               | 本轮 Web 改动仓库                        |
+| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e`  | 保留既有 5 个用户修改，本轮未触碰                              | 不得夹带提交                             |
+
+Backend 未提交范围：
+
+- 新增：`myapp/services/data_permission_service.py`、`myapp/tests/unit/test_data_permission_service.py`。
+- 服务：`customer_service.py`、`document_list_service.py`、`inventory_service.py`、`media_service.py`、`order_service.py`、`purchase_service.py`、`report_service.py`、`settlement_service.py`、`uom_service.py`、`user_management_service.py`、`user_preferences_service.py`、`warehouse_service.py`、`wholesale_service.py`。
+- 测试：`test_ai_repository.py`、`test_customer_service.py`、`test_document_list_service.py`、`test_inventory_service.py`、`test_media_service.py`、`test_purchase_service.py`、`test_report_service.py`、`test_uom_service.py`、`test_user_management_service.py`、`test_warehouse_service.py`、`test_wholesale_service.py`。
+
+Backend 权限补充文档已独立提交为 `9eca5f5`，尚未推送；Parent 本轮不更新 Backend gitlink，避免把尚未提交的代码状态误当作完整 Backend 交付。
+
+Web 未提交范围：
+
+- 页面：`src/pages/Administration/Users/Detail.tsx`、`src/pages/Dashboard.tsx`、`src/pages/Reports/index.tsx`、销售 / 采购订单新建页、主数据动态入口。
+- 权限路由：`src/access.ts`、`config/routes.ts`、`src/__tests__/access.test.ts`。
+- 新增权限范围工具与测试：`src/pages/Administration/Users/permission-scope.ts`、`permission-scope.test.ts`。
+- Service 与测试：`src/services/myapp/users.ts`、`src/services/myapp/reports.ts`、用户与领域 service 测试。
+
+Web 权限补充文档已独立提交为 `b8bf472`，尚未推送。
+
+Parent 当前还显示上一轮既有修改 `docs/05-development/05-media-upload-and-image-editing.zh-CN.md`；它不属于本轮数据隔离增量，提交时必须单独核对，不能默认夹带。`.codex` 是本地未跟踪状态，禁止提交。
 
 Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮增量，不得覆盖或提交；本轮没有修改 Mobile。
 
-## 本次 Web 摄像头与扫码增量
+## 未完成事项与当前风险
+
+1. 正式权限矩阵尚未配置。当前没有可安全推断的“用户 / 岗位 → Company → Warehouse → Customer / Supplier”业务授权关系，不能由开发者猜测后写入生产 User Permission。
+2. 管理员默认值存在冲突：`default_company = rgc`，`default_warehouse = Stores - RD`，而该仓库属于 `rgc (Demo)`。默认值只是偏好，不能据此反推授权范围或自动生成权限矩阵。
+3. `User Permission = 0` 时，代码门禁保证角色和文档权限不被绕过，但不会自动把相同业务角色的用户按公司 / 仓库拆分；这不是代码缺陷，而是授权数据尚未配置。
+4. 真实事务已覆盖 Company / Warehouse 全局授权；`applicable_for` 定向授权和 `hide_descendants` 仍建议在 staging 使用实际组织树人工验收。
+5. 本轮只收口已审计的核心业务入口。后续新增服务若使用 `frappe.get_all()`、`frappe.db.sql()` 或 `frappe.db.get_value()` 返回业务数据，必须复用 `data_permission_service` 并补低权限回归。
+6. Backend / Web 补充文档已本地提交，但权限代码和测试仍未提交；全部提交均未推送或部署，staging 和 production 当前都不包含本轮数据隔离增量。
+
+## 下一步建议
+
+1. 业务方提供正式授权矩阵，并确认是否需要 Customer / Supplier 维度以及 Company / Warehouse 下级节点继承。
+2. 用户明确要求提交代码时，先在 `apps/myapp` 提交并推送 Backend 代码与测试，再在 `frontend/myapp-web` 独立提交并推送 Web 代码与测试，最后在 Parent 更新并提交 `apps/myapp` gitlink；不要夹带 `.codex`、Mobile 既有修改或未核对的媒体设计文档。
+3. 部署 staging 后使用四类真实账号执行 HTTP 验收：无业务角色、单公司业务用户、多公司业务用户、`System Manager`；核对同一入口的 `403/200` 与返回范围。
+4. 在 staging 使用真实组织结构验收定向 `applicable_for`、`hide_descendants`、默认值越界提示、首条权限收窄和最后一条权限删除扩权。
+5. 完成业务验收后再安排 production，不要在授权矩阵未确认前批量写入正式 User Permission。
+
+## 当前提交基线
+
+- Parent：`aae6fb61 docs: record web camera and barcode release`
+- Backend：`9eca5f5 docs: document permission boundaries`
+- Web：`b8bf472 docs: document permission-aware UX`
+- AI Orchestrator：`ca5448c docs: document AI model fallback behavior`
+- Mobile：`ebb242e feat: support flexible image crop ratios`
+
+## 上一轮 Web 摄像头与扫码增量
 
 - `CameraCaptureModal` 使用 MediaDevices API，默认优先后置摄像头，授权后支持选择平板、内置或外置 USB 摄像头，并提供拍摄、预览、重拍和确认。
 - 拍摄结果生成 JPEG `File` 后进入既有 `ImageEditorUpload`，继续执行来源校验、自由 / 预设比例裁剪、WebP 输出和 Backend profile，不新增绕过媒体治理的上传路径。
@@ -196,7 +344,7 @@ Container state: running / healthy
 - staging 未配置本轮登录态关键 HTTP 回归输入，因此部署 workflow 保持 `run_http_regression=false`；本轮仍需后续人工执行真实图片上传与裁剪验收。
 - Backend push CI Run [30970071791](https://github.com/rgc318/myapp/actions/runs/30970071791) 的全量 `724 tests` 仍命中既有 `test_ai_repository` 单测 `KeyError: product`；本轮图片相关容器测试 `204 tests` 已通过，该既有失败与媒体改动无关。
 
-## 当前风险与下一步
+## 上一轮摄像头与扫码风险
 
 1. 需要在 staging HTTPS 地址使用真实平板、电脑内置摄像头和至少一个外置 USB 摄像头验证授权、设备切换、拍照、重拍、裁剪、上传和关闭后的 track 释放。
 2. 需要准备 EAN-13、EAN-8、UPC、Code 128 和 QR 等实际样本，分别验证商品列表搜索、主条码填入、详情新增条码以及销售 / 采购选品；特别检查连续识别不会重复加单。
@@ -205,7 +353,7 @@ Container state: running / healthy
 5. Parent 当前 `.git` 在本会话沙箱中只读；远端 `develop` 已更新，本地两份文档与远端字节一致但仍显示修改。新会话应先重新挂载 / fetch，而不是重复提交或还原文档。
 6. Mobile 仍保留 5 个用户修改，后续任务不得夹带；production 尚未部署，只有用户明确要求并完成业务验收后再安排。
 
-## 接手建议
+## 上一轮摄像头与扫码接手建议
 
 1. 先确认远端版本：Web `main=6b23ac5`，Parent `develop` 至少包含 `783dc03d`；检查本地 Parent `.git` 是否恢复可写，并严格保留 `.codex` 与 Mobile 既有 5 个修改。
 2. 在 staging HTTPS 环境按“拍照 → 重拍 → 自由裁剪 → 预设裁剪 → 上传 → 重新裁剪 → 替换 / 删除”完成一次真实商品图片生命周期，并确认最终 WebP、尺寸、profile 元数据和 File 清理。
