@@ -9,7 +9,7 @@
 - 本轮目标：完善 Backend 自定义 API 的企业级数据隔离，并为 Web 用户管理补齐数据权限配置防误配能力。
 - 业务范围：客户、供应商、商品、UOM、仓库、销售 / 采购订单、发货 / 收货、销售 / 采购发票、库存、收付款、经营报表、用户偏好和商品图片。
 - 涉及仓库：Backend `apps/myapp`、Web `frontend/myapp-web` 和 Parent 交接文档。Mobile、AI Orchestrator、部署编排和 production 本轮未修改。
-- 当前结果：P0 自定义业务接口权限收口、P1 权限配置治理和 P2 权限兼容性 / 用户体验回归均已完成并通过本地门禁；Backend、Web 的补充文档、代码和测试均已按仓库边界本地提交，尚未推送或部署。
+- 当前结果：P0 自定义业务接口权限收口、P1 权限配置治理和 P2 权限兼容性 / 用户体验回归均已完成；Backend、Web 和 Parent 提交已推送，Backend/AI 与 Web 不可变镜像已部署 staging 并通过健康检查。production 未部署。
 - 关键结论：代码层已经阻止自定义 API 绕过 Frappe 角色权限、文档权限和 User Permission，但本地数据库当前仍为 `User Permission = 0`。因此相同业务角色的用户目前仍可能看到相同的跨公司数据；要实现实际的按公司 / 仓库隔离，仍需业务方提供正式授权矩阵后配置 User Permission。
 - 数据状态：本轮没有迁移或修改正式业务数据。真实权限验证全部在单一数据库事务内执行并强制回滚，测试前后 `User Permission` 数量均为 `0`。
 
@@ -117,6 +117,39 @@ git -C frontend/myapp-web diff --check
 - 销售 / 采购经理、库存经理和财务经理访问组合经营报表均成功；只返回其角色允许的业务域，无权指标为 `null` 并由 Web 明确标识。
 - 最新 Company=`rgc (Demo)` 抽样验证中，采购订单、库存汇总和库存流水只包含该公司；Warehouse=`主仓库 - R` 后库存汇总 `5` 条、库存流水 `95` 条，显式请求其他仓库返回 `PermissionError`。
 
+### 2026-08-07 staging 发布验证
+
+发布版本：
+
+- Parent 部署 revision：`a6cef381 docs: format permission handoff`，Backend gitlink 固定到 `3468b5d`。
+- Backend/AI tag：`staging-20260807-a6cef381`。
+- Web tag：`staging-20260807-fb597b2`。
+- Backend 镜像 digest：`sha256:27ee2dbaf64c71793be502e1da34596cf0b0f57b1e79e87acfbb6a3dde19c014`。
+- AI 镜像 digest：`sha256:6e291ebd7b8000a467a992b14cce56a73e3617fc083cac839a2135dc8dab70e9`，OCI revision=`ca5448c74a2cd4efa73f3fe64d4327fb1054674b`。
+- Web 镜像 digest：`sha256:e45e0e8f75ee632f6837a2d014fba3fd5015eed1e21a51888336846ff1b89f1d`，OCI revision=`fb597b26c97ddf9a0192c489e12452832536d79d`。
+
+Workflow：
+
+| 范围                  | Run                                                                             | 结果 |
+| --------------------- | ------------------------------------------------------------------------------- | ---- |
+| Backend push CI       | [31180611415](https://github.com/rgc318/myapp/actions/runs/31180611415)         | 成功 |
+| Web push CI           | [31180622691](https://github.com/rgc318/myapp-web/actions/runs/31180622691)     | 成功 |
+| Web coverage          | [31180622506](https://github.com/rgc318/myapp-web/actions/runs/31180622506)     | 成功 |
+| Parent Lint           | [31181298760](https://github.com/rgc318/frappe_docker/actions/runs/31181298760) | 成功 |
+| Backend/AI image      | [31181568267](https://github.com/rgc318/frappe_docker/actions/runs/31181568267) | 成功 |
+| Web image             | [31181461915](https://github.com/rgc318/myapp-web/actions/runs/31181461915)     | 成功 |
+| Backend/AI deployment | [31181882750](https://github.com/rgc318/frappe_docker/actions/runs/31181882750) | 成功 |
+| Web deployment        | [31182138316](https://github.com/rgc318/myapp-web/actions/runs/31182138316)     | 成功 |
+
+服务器验收：
+
+- Backend、Frontend、Queue、Scheduler、Websocket、AI Orchestrator 和独立 Web 均使用目标唯一 tag；新容器 `RestartCount=0`，AI 与 Web 健康状态为 `healthy`。
+- `check-staging.sh` 通过：Homepage 200、Ping 200、Backend→AI 内部认证正常、Agent runtime policy 已发布且有 `7` 个 tool-ready models。
+- Frappe 标准 `/login` 200；独立 Web `/user/login` 200；Web 与 Backend `/api/method/ping` 均返回 `pong`。Backend 的 `/user/login` 不是 Frappe 标准登录路由，不作为 Backend 健康门禁。
+- 未登录经 Web Gateway 调用 `search_product_v2` 返回 HTTP 403 `PermissionError`，没有暴露商品数据。
+- 部署前磁盘为 `74G/98G`、可用 `20G`、使用率 `79%`；部署后为 `75G/98G`、可用 `19G`、使用率 `81%`。未执行镜像或卷清理，旧镜像仍可用于回滚。
+- staging 未配置登录态 HTTP regression 凭据，因此 workflow 保持 `run_http_regression=false`。正式角色、Company/Warehouse 与 User Permission 体验仍需使用 staging 真实账号人工验收。
+
 ## 上一轮已部署 Web 工作总结
 
 1. 统一图片编辑能力完成企业级收口
@@ -138,13 +171,13 @@ git -C frontend/myapp-web diff --check
 
 ## 仓库状态与未提交范围
 
-| 仓库                           | 分支 / 发布版本       | 工作树状态                                                             | 本轮责任          |
-| ------------------------------ | --------------------- | ---------------------------------------------------------------------- | ----------------- |
-| Parent `frappe_docker`         | `develop` / 当前提交  | 本轮提交 Backend gitlink 与 handoff；媒体文档既有修改；`.codex` 未跟踪 | 本轮集成提交      |
-| Backend `apps/myapp`           | `develop` / `3468b5d` | 工作树干净；权限文档、代码和测试均已提交                               | 本轮主要改动仓库  |
-| AI `services/myapp-ai`         | `develop` / `ca5448c` | 干净                                                                   | 本轮未修改        |
-| Web `frontend/myapp-web`       | `main` / `fb597b2`    | 工作树干净；权限文档、UI、service 和测试均已提交                       | 本轮 Web 改动仓库 |
-| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e` | 保留既有 5 个用户修改，本轮未触碰                                      | 不得夹带提交      |
+| 仓库                           | 分支 / 发布版本       | 工作树状态                                             | 本轮责任          |
+| ------------------------------ | --------------------- | ------------------------------------------------------ | ----------------- |
+| Parent `frappe_docker`         | `develop` / 当前提交  | 发布 handoff 待提交；`.codex` 未跟踪                   | 本轮集成与部署    |
+| Backend `apps/myapp`           | `develop` / `3468b5d` | 工作树干净；权限文档、代码和测试均已提交并推送         | 本轮主要改动仓库  |
+| AI `services/myapp-ai`         | `develop` / `ca5448c` | 干净                                                   | 本轮未修改        |
+| Web `frontend/myapp-web`       | `main` / `fb597b2`    | 工作树干净；权限文档、UI、service 和测试均已提交并推送 | 本轮 Web 改动仓库 |
+| Mobile `frontend/myapp-mobile` | `develop` / `ebb242e` | 保留既有 5 个用户修改，本轮未触碰                      | 不得夹带提交      |
 
 Backend 提交：
 
@@ -156,9 +189,9 @@ Web 提交：
 - `b8bf472 docs: document permission-aware UX`
 - `fb597b2 feat: align UI with permission boundaries`
 
-上述提交均仅存在于本地，尚未推送；Parent 本轮将 Backend gitlink 固定到 `3468b5d`。
+上述提交均已推送；Parent 已把 Backend gitlink 固定到 `3468b5d`。
 
-Parent 当前还显示上一轮既有修改 `docs/05-development/05-media-upload-and-image-editing.zh-CN.md`；它不属于本轮数据隔离增量，提交时必须单独核对，不能默认夹带。`.codex` 是本地未跟踪状态，禁止提交。
+Parent 已同步远端媒体文档提交；当前只保留 `.codex` 本地未跟踪状态，禁止提交。
 
 Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts`、`services/gateway.ts`、`services/products.ts`、`services/sales.ts`。这些文件不属于本轮增量，不得覆盖或提交；本轮没有修改 Mobile。
 
@@ -169,19 +202,19 @@ Mobile 当前既有修改：`app/common/product-search.tsx`、`lib/sales-mode.ts
 3. `User Permission = 0` 时，代码门禁保证角色和文档权限不被绕过，但不会自动把相同业务角色的用户按公司 / 仓库拆分；这不是代码缺陷，而是授权数据尚未配置。
 4. 真实事务已覆盖 Company / Warehouse 全局授权；`applicable_for` 定向授权和 `hide_descendants` 仍建议在 staging 使用实际组织树人工验收。
 5. 本轮只收口已审计的核心业务入口。后续新增服务若使用 `frappe.get_all()`、`frappe.db.sql()` 或 `frappe.db.get_value()` 返回业务数据，必须复用 `data_permission_service` 并补低权限回归。
-6. Backend / Web 权限文档、代码和测试均已本地提交，但尚未推送或部署；staging 和 production 当前都不包含本轮数据隔离增量。
+6. staging 已包含本轮数据隔离增量，但 production 未部署。正式 User Permission 矩阵未确认前不得批量写入 production，也不得把 staging 技术验收等同于业务授权验收。
 
 ## 下一步建议
 
 1. 业务方提供正式授权矩阵，并确认是否需要 Customer / Supplier 维度以及 Company / Warehouse 下级节点继承。
-2. 用户明确要求推送时，先推送 Backend `develop`，再推送 Web `main`，最后推送包含 Backend gitlink 的 Parent `develop`；不要夹带 `.codex`、Mobile 既有修改或未核对的媒体设计文档。
-3. 部署 staging 后使用四类真实账号执行 HTTP 验收：无业务角色、单公司业务用户、多公司业务用户、`System Manager`；核对同一入口的 `403/200` 与返回范围。
+2. 使用四类真实 staging 账号执行登录态 HTTP/浏览器验收：无业务角色、单公司业务用户、多公司业务用户、`System Manager`；核对同一入口的 `403/200`、菜单、动作和返回范围。
+3. 补齐 staging HTTP regression 凭据后，运行部署 workflow 的登录态关键回归，避免长期只依赖 Guest 与健康探针。
 4. 在 staging 使用真实组织结构验收定向 `applicable_for`、`hide_descendants`、默认值越界提示、首条权限收窄和最后一条权限删除扩权。
 5. 完成业务验收后再安排 production，不要在授权矩阵未确认前批量写入正式 User Permission。
 
 ## 当前提交基线
 
-- Parent：本次 Backend gitlink / handoff 集成提交（以当前 HEAD 为准）
+- Parent 部署 revision：`a6cef381 docs: format permission handoff`；本发布记录以当前文档 HEAD 为准
 - Backend：`3468b5d feat: enforce business data permissions`
 - Web：`fb597b2 feat: align UI with permission boundaries`
 - AI Orchestrator：`ca5448c docs: document AI model fallback behavior`
