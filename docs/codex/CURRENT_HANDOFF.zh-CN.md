@@ -10,7 +10,7 @@
 - 涉及 Parent、Backend `apps/myapp`、AI Orchestrator `services/myapp-ai` 和 Web `frontend/myapp-web`；Mobile 未修改。
 - 当前结论：主链路已实现并通过 Backend、AI、Web 自动化门禁；本地 `localhost` 已完成备份和迁移，真实 Provider 视觉探测及三类关键图片草稿 smoke 已通过。
 - 真实 smoke 只生成并丢弃 AI Draft，没有创建或修改正式 Item、Sales Order 或 Purchase Order。
-- Backend、AI Orchestrator 和 Web 已分别提交并推送；Parent 正在固定子模块指针并准备 staging 候选。production 未操作。
+- Backend、AI Orchestrator、Web 和 Parent 已分别提交并推送；Backend/AI 与 Web staging 镜像已构建并部署成功。production 未操作。
 
 ## 已实现能力
 
@@ -116,28 +116,69 @@
 - AI `git -C services/myapp-ai diff --check`：通过。
 - Web `git -C frontend/myapp-web diff --check`：通过。
 
+## Staging 发布结果
+
+### 提交与镜像
+
+- Parent staging release：`d072d538 feat: release multimodal AI workflows`。
+- Backend：`0001e0c feat: add multimodal AI product and order workflows`。
+- AI Orchestrator：`0f15f02 feat: add governed multimodal AI requests`。
+- Web：`4626080 feat: add multimodal AI workbench flows`。
+- Backend/Worker/Frontend 镜像：`staging-20260815-d072d538`，digest `sha256:2cf9ccc013be39a6ee2f67249fb4d62c4c32686597260a55fb0b36ea944b1aed`。
+- AI 镜像：`staging-20260815-d072d538`，digest `sha256:35100f3f44acf752436325138351f77e7c065c2197cd6638ba35eaf8483316f8`，Runtime revision 固定为 `0f15f02`。
+- Web 镜像：`staging-20260815-4626080`，digest `sha256:a3a946c464cea0a803bdae906a148674b2b93320a53252047e9ad1896261195d`。
+
+### GitHub Actions
+
+| 范围                       | Run                                                                             | 结果 |
+| -------------------------- | ------------------------------------------------------------------------------- | ---- |
+| Backend push CI            | [31882343611](https://github.com/rgc318/myapp/actions/runs/31882343611)         | 成功 |
+| AI push CI                 | [31882350624](https://github.com/rgc318/myapp-ai/actions/runs/31882350624)      | 成功 |
+| AI CodeQL                  | [31882350656](https://github.com/rgc318/myapp-ai/actions/runs/31882350656)      | 成功 |
+| Web push CI                | [31882360694](https://github.com/rgc318/myapp-web/actions/runs/31882360694)     | 成功 |
+| Web coverage CI            | [31882360697](https://github.com/rgc318/myapp-web/actions/runs/31882360697)     | 成功 |
+| Backend + AI build         | [31882464128](https://github.com/rgc318/frappe_docker/actions/runs/31882464128) | 成功 |
+| Backend + AI deploy/health | [31882650200](https://github.com/rgc318/frappe_docker/actions/runs/31882650200) | 成功 |
+| Web build                  | [31882466394](https://github.com/rgc318/myapp-web/actions/runs/31882466394)     | 成功 |
+| Web deploy                 | [31882816673](https://github.com/rgc318/myapp-web/actions/runs/31882816673)     | 成功 |
+
+Parent release 首次 Lint Run `31882414571` 只发现本交接文件的 Prettier 格式漂移；代码、镜像构建和部署均未失败。当前交接更新已按同一 Prettier 版本格式化，后续 handoff-only 提交用于恢复分支门禁。
+
+### 部署后事实
+
+- Workflow 在 `staging.example.com` 成功执行 `bench migrate`。
+- Backend、Frontend、Queue、Scheduler、Websocket 均运行 `staging-20260815-d072d538`。
+- AI Orchestrator 运行同标签并为 `healthy`；AI `/health` 返回 `status=ok`，LiteLLM、Runtime Governance 和 Vector Search 已配置。
+- Backend 到 AI Orchestrator 内部认证通过。
+- Agent Runtime Policy：`1 policies, 7 tool-ready models`。
+- staging 首页和 Ping API 均返回 HTTP 200。
+- Web 部署对 `/healthz`、`/user/login` 和 `/api/method/ping` 的组合检查通过。
+- 仓库未配置登录态 HTTP 回归凭据，因此 `run_http_regression=false`；没有把该项冒充为已执行。
+- production 未部署。
+
 ## 仓库状态与未提交范围
 
-| 仓库 | 分支 / 基线 | 当前状态 |
-| --- | --- | --- |
-| Parent | `develop` / `79e8309b` | 正在提交多模态设计、AI 工作台设计、交接和 Backend/AI 子模块指针；`.codex` 为既有未跟踪状态，不得提交 |
-| Backend | `develop` / `0001e0c` | `feat: add multimodal AI product and order workflows`，已推送 `origin/develop` |
-| AI Orchestrator | `develop` / `0f15f02` | `feat: add governed multimodal AI requests`，已推送 `origin/develop` |
-| Web | `main` / `4626080` | `feat: add multimodal AI workbench flows`，已推送 `origin/main` |
-| Mobile | 未核对 | 本轮未修改，保留用户既有状态 |
+| 仓库            | 提交 / 发布基线                        | 当前状态                                                        |
+| --------------- | -------------------------------------- | --------------------------------------------------------------- |
+| Parent          | `develop` / staging release `d072d538` | 已推送并部署；本交接作为后续 docs-only 提交更新，不改变运行镜像 |
+| Backend         | `develop` / `0001e0c`                  | 已推送，CI 成功，已进入 staging 镜像                            |
+| AI Orchestrator | `develop` / `0f15f02`                  | 已推送，CI/CodeQL 成功，已进入 staging 镜像                     |
+| Web             | `main` / `4626080`                     | 已推送，CI/coverage 成功，已部署 staging                        |
+| Mobile          | 未核对                                 | 本轮未修改，保留用户既有状态                                    |
 
 Parent 的 `AGENTS.md` 当前显示为修改状态，属于用户提供的项目指令更新，本轮不得覆盖或擅自提交。
 
 ## 剩余边界与风险
 
-1. 尚未用真实浏览器、平板或摄像头验证 20MB 上传、4 图交互、私有预览 URL、刷新恢复和网络中断后的带图重试。
-2. 尚未创建或修改正式业务对象；本地 smoke 刻意停在草稿并 discard。发布前仍应使用可回滚测试数据验证已提交订单、下游单据阻断和权限组合。
-3. 本轮未运行 Compose integration 或 Web production build；发布候选形成后仍需按实际发布范围补门禁。
+1. 尚未在 staging 使用真实浏览器、平板或摄像头验证 20MB 上传、4 图交互、私有预览 URL、刷新恢复和网络中断后的带图重试。
+2. 尚未在 staging 创建或修改正式业务对象；本地 smoke 刻意停在草稿并 discard。仍应使用可回滚测试数据验证已提交订单、下游单据阻断和权限组合。
+3. staging 仓库未配置登录态 HTTP 回归凭据，本次只完成公开 HTTP、服务认证、迁移和容器健康检查。
 4. Provider 健康是带时间的快照。当前 401/403 alias 不应进入自动或固定选择；Provider 配置恢复后需重新探测。
-5. 本地 Backend devcontainer 重启后不会自动启动 `bench serve`，健康复核时需先确认进程和 HTTP Ping。
+5. 本次标准 Deploy Workflow 没有单独执行发布前备份。迁移已成功；后续涉及 Schema 的 staging/production 发布应先显式运行备份流程。
+6. 本地 Backend devcontainer 重启后不会自动启动 `bench serve`，健康复核时需先确认进程和 HTTP Ping。
 
 ## 下一步
 
-1. 提交并推送 Parent 候选，固定 Backend `0001e0c` 与 AI `0f15f02`。
-2. 使用唯一镜像标签构建和部署 staging；部署流程自动备份/迁移后完成健康检查。
-3. 使用可回滚数据补充浏览器上传、商品新增/完善、销售/采购创建/修改和并发冲突验收。
+1. 使用可回滚数据完成 staging 浏览器上传、商品新增/完善、销售/采购创建/修改和并发冲突验收。
+2. 如需自动登录态回归，为 Parent 仓库配置受控的 staging HTTP 凭据后重新运行健康门禁。
+3. production 仅在业务验收完成且用户再次明确授权后部署。
