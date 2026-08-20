@@ -75,7 +75,7 @@ AGENT_RUNTIME_ENABLED="${AGENT_RUNTIME_ENABLED:-1}"
 if [[ "${AGENT_RUNTIME_ENABLED,,}" =~ ^(1|true|yes)$ ]]; then
   POLICY_SITE_HOST="$(get_env MYAPP_AI_FRAPPE_SITE_HOST)"
   compose exec -T -e MYAPP_AI_POLICY_SITE_HOST="${POLICY_SITE_HOST}" backend bash -lc \
-    './env/bin/python -c '\''import json, os, urllib.request; token=os.environ["MYAPP_AI_SERVICE_TOKEN"]; site=os.environ.get("MYAPP_AI_POLICY_SITE_HOST", ""); request=urllib.request.Request("http://backend:8000/api/method/myapp.api.gateway.get_ai_runtime_policy_snapshot_v1", headers={"Host": site, "X-MyApp-AI-Service-Token": token}); body=json.load(urllib.request.urlopen(request, timeout=10)); payload=body.get("message", body); policies=payload.get("policies") or []; models=payload.get("models") or {}; tool_ready=sum(1 for metadata in models.values() if metadata.get("status") in {"active", "validated"} and metadata.get("supports_tools") is True); print(f"Agent runtime policy: published ({len(policies)} policies, {tool_ready} tool-ready models)" if policies else "Agent runtime policy: compatibility fallback (no published policy)")'\'''
+    './env/bin/python -' < "${ROOT_DIR}/deploy/staging/check-ai-runtime-policy.py"
 fi
 
 if [[ -z "${BASE_URL}" ]]; then

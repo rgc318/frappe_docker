@@ -87,7 +87,7 @@ MYAPP_AI_TAG=staging-latest
 PULL_POLICY=always
 ```
 
-The build workflow publishes the ERPNext and AI Orchestrator images with the same release tag. Deploy and rollback update both `CUSTOM_TAG` and `MYAPP_AI_TAG`; `check-staging.sh` verifies the Orchestrator health response and authenticated Backend-to-Orchestrator communication.
+The build workflow publishes the ERPNext and AI Orchestrator images with the same release tag. Deploy and rollback update both `CUSTOM_TAG` and `MYAPP_AI_TAG`; `check-staging.sh` verifies the Orchestrator health response, authenticated Backend-to-Orchestrator communication, and an effective positive-rollout staging Runtime Policy with tool-ready and vision-ready models.
 
 Before starting staging, configure these AI values in the ignored `deploy/staging/staging.env`:
 
