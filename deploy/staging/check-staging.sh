@@ -75,7 +75,7 @@ AGENT_RUNTIME_ENABLED="${AGENT_RUNTIME_ENABLED:-1}"
 if [[ "${AGENT_RUNTIME_ENABLED,,}" =~ ^(1|true|yes)$ ]]; then
   POLICY_SITE_HOST="$(get_env MYAPP_AI_FRAPPE_SITE_HOST)"
   compose exec -T -e MYAPP_AI_POLICY_SITE_HOST="${POLICY_SITE_HOST}" backend bash -lc \
-    './env/bin/python -' < "${ROOT_DIR}/deploy/staging/check-ai-runtime-policy.py"
+    './env/bin/python -' <"${ROOT_DIR}/deploy/staging/check-ai-runtime-policy.py"
 fi
 
 if [[ -z "${BASE_URL}" ]]; then
