@@ -4,6 +4,18 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。完整阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-08-31 单位与库存 P4 包装单位目录去歧义已完成并本地提交
+
+- Backend 已提交 `9b9712d fix(inventory): disambiguate packaging units`；Web 已提交 `e778f3c fix(inventory): clarify packaging unit choices`。
+- 根因确认：标准目录同时把 `Box / Case / Carton` 标记为日常业务可选，且三者数据库 symbol 都是“箱”；后端展示又优先读取中文 symbol，导致稳定编码不同但下拉标签重复。真实商品 `可口可乐-5000ML` 的换算表始终只有错误库存基准单位和 `Box=24`，并不存在四套“箱”换算。
+- 目录治理结果：`Box` 继续作为副食、批发场景唯一默认“箱”单位；`Case / Carton` 不删除、不改写历史引用，但默认 `myapp_business_selectable=0`，分别显示为“箱装/纸箱”。管理员仍可在单位管理页显式重新设为业务可选。
+- 标准 UOM 同步只在新建标准单位时应用业务可选默认值，不再覆盖管理员对已有单位的业务可选治理选择。新增一次性 patch 负责把既有 `Case / Carton` 默认关闭并修正 symbol，新安装场景也由原字段 patch 按当前目录默认值初始化。
+- Web 展示兼容旧响应中的 `Case/Carton + symbol=箱`，仍强制区分为“箱装/纸箱”。AI 库存草稿继续只使用唯一匹配商品返回的 `available_uoms`；商品刚在表单中更换但尚未保存重新校验时，单位下拉保持禁用并提示保存后加载，不回退全局 UOM。
+- 本地 `bench --site localhost migrate` 成功。迁移前 `Box / Case / Carton` 均为“箱”且业务可选；迁移后为 `Box=箱/1`、`Case=箱装/0`、`Carton=纸箱/0`。以 `Administrator` 真实调用 `list_uoms_v2(search_key="箱", enabled=1, business_selectable=1)` 只返回 `Box（箱）`；历史展示映射仍返回 `Case=箱装`、`Carton=纸箱`。
+- 真实商品数据未改写：`可口可乐-5000ML` 仍为 `Wavelength In Megametres=1` 与 `Box=24`。本阶段只治理 UOM 主数据目录和显示，不执行 P3 商品替代迁移。
+- 最终验证：Backend 全量 847 tests PASS，Python compile、Ruff、Backend diff check PASS；Web TypeScript、Biome、50 suites / 321 tests、Web diff check PASS。Jest 仍保留既有 open-handle 提示但退出码为 0。
+- 本阶段未推送、未部署 staging 或 production。父仓库本次提交同步 Backend 子模块指针与本交接记录；Web 仍为独立仓库提交。
+
 ## 2026-08-31 单位与库存 P3 受控错误商品迁移已完成并本地提交
 
 - Backend 已提交 `1419849 feat(inventory): add controlled product UOM migration`；Web 已提交 `1aef312 feat(inventory): add product UOM migration workflow`。
