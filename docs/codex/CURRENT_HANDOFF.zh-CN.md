@@ -1,8 +1,20 @@
 # 当前交接状态
 
-更新时间：2026-08-31 CST
+更新时间：2026-09-01 CST
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。完整阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
+
+## 2026-09-01 AI 商品候选续接与库存编辑流程已完成并本地提交
+
+- Backend 已提交 `3af5961 fix(ai): streamline product and inventory draft actions`；Web 已提交 `8e4cec1 fix(ai): continue product inventory workflows`。
+- 商品查询卡片的“编辑商品资料”和“调整库存”现直接调用确定性草稿接口并打开共享编辑器，不再把商品名填回输入框，也不调用模型或创建 AI Run。确定性动作仍保存来源会话中的用户动作、系统回执、草稿版本和幂等信息；草稿 `source_run` 使用唯一 `AI-ACTION-*` 业务动作标识满足现有数据库约束，但不存在对应模型 Run 或模型用量。
+- 未唯一匹配商品的库存草稿直接显示候选按钮。用户下一条文字如“可口可乐”能唯一命中当前草稿候选时，Web 调用 `select_ai_draft_product_candidate_v1` 更新同一个草稿，保留增减方式、数量、单位、仓库、原因和日期；“百事可乐”等仍匹配多个候选时不猜测、不重新搜索，而是打开原草稿要求明确选择。
+- 商品完善弹窗新增公司总库存、分仓库存、库存基准单位和“调整此商品库存”入口。库存仍通过独立库存调整草稿处理，不与商品主数据混写；已有商品的库存基准单位在普通完善流程中继续锁定。
+- 库存草稿和商品上下文都会检查 `UOM.myapp_business_selectable`。异常、科学或未纳入日常业务目录的库存基准单位返回 `requires_uom_migration` 并阻断库存执行；Web 改为“处理单位异常”，直接进入 `/master-data/products/{item_code}?uom_migration=1` 的受控单位错误迁移流程。
+- 真实 HTTP 用例 `GatewayHttpTestCase.test_ai_product_actions_prepare_drafts_without_model_generation` PASS，确认 Web 参数组合、Frappe Gateway 路由、`ai_api` adapter 和 Service 全链路可用，响应没有 `run_id`。为完成本地 HTTP 验证，只在现有 Backend 容器内启动 `bench serve --port 8000 --noreload --nothreading`；未重启容器、数据库、队列或卷。
+- 真实数据库回滚式演练以 `Administrator` 验证：正常商品可准备商品完善与库存调整草稿并返回已配置单位；真实异常商品 `可口可乐-5000ML / Wavelength In Megametres` 被单位治理阻断；没有创建模型 Run；最终 rollback 后新增会话和草稿均为 0。
+- 最终验证：Backend unit 全量 854 tests PASS，新增 HTTP smoke PASS，Python compile、Ruff、Backend diff check PASS；Web TypeScript、Biome、51 suites / 326 tests、Web diff check PASS。Jest 仍保留既有 JSDOM `getComputedStyle` 与 open-handle 噪音，但退出码为 0。
+- 本阶段未推送、未部署 staging 或 production。下一步仅需按用户安排进行真实浏览器人工验收，或在明确要求后推送并部署测试环境；本地代码阶段已完成。
 
 ## 2026-08-31 单位与库存 P4 包装单位目录去歧义已完成并本地提交
 
