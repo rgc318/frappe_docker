@@ -2,11 +2,42 @@
 
 更新时间：2026-09-01 CST
 
-本文件只记录当前短期状态、运行基线、风险和接手步骤。完整阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
+本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
+
+## 2026-09-01 当前统一状态与接手结论
+
+### 当前功能基线
+
+| 仓库 | 分支 | 当前提交 | 工作树 |
+| --- | --- | --- | --- |
+| Parent | `develop` | `baeb2d82 fix(ai): enforce runtime state consistency`；交接文档提交可能位于其后 | 保留用户已有文档修改和未跟踪本地资料 |
+| Backend `apps/myapp` | `develop` | `46f5d48 fix(ai): converge durable run state` | clean |
+| AI Orchestrator `services/myapp-ai` | `develop` | `25e55e7 fix: refresh stale model health policy cache` | clean |
+| Web `frontend/myapp-web` | `main` | `b4112fe fix(ai): restore durable run state` | clean |
+| Mobile | 未核对 | 本阶段未修改 | 不得顺带清理或提交 |
+
+Parent 当前不应提交或覆盖：`AGENTS.md`、`STAGING_DEPLOYMENT.zh-CN.md`、`docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`、`docs/codex/HANDOFF_TEMPLATE.zh-CN.md`、`docs/codex/KNOWN_ISSUES.zh-CN.md` 中用户已有修改，以及未跟踪 `.codex`、`docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`。本轮已在 `KNOWN_ISSUES` 工作树中补充 502 条目并修正旧状态，但该文件包含用户原有未提交内容，提交时不得整文件混入；若继续完善交接或已知问题，应只提交能与用户状态安全分离的文档改动。
+
+### 当前完成度
+
+- AI Run 状态恢复、轮询收敛、僵尸 Run/过期审批回收和五服务 AI Gateway 配置一致性检查：本地代码与验证已完成并提交。
+- AI 模型健康瞬时失败治理、商品候选续接、商品完善与库存调整入口、单位与库存 P0～P4：均已完成本地代码阶段并分别提交。
+- 当前尚未推送本轮 2026-09-01 本地提交，尚未部署新的 staging 候选；production 未操作。
+- 仍需在 staging 验收运行中刷新、切换会话后返回、审批后网络中断、终态后 Sender 恢复、商品候选续接、库存调整，以及配置不一致失败关闭。
+- 真实异常商品 `可口可乐-5000ML` 仍未执行替代迁移；必须由用户确认新商品编码、库存基准单位、完整换算和四条历史价格的迁移决定，不能自动猜测。
+
+## 2026-09-01 本地 Web 502 已恢复，自动预防尚未实现
+
+- 用户本地通过 `http://localhost:8001` 测试时，登录与 AI 工作台接口稳定返回 502。诊断时 Backend `8000` 为 200、AI Orchestrator `4010` 为 200/healthy，只有 Frappe Frontend `8080 → Backend` 为 502。
+- 根因是本轮为刷新 AI Gateway 环境，只 recreate 了 `backend / queue-short / queue-long / queue-ai-vector / scheduler`。Backend 容器地址从 `172.19.0.5` 变化为 `172.19.0.9`，已运行约 34 小时的 Frontend Nginx 仍把 upstream 固定到旧地址 `172.19.0.5:8000`，日志明确为 `connect() failed (111: Connection refused)`。
+- 已执行 `docker compose restart frontend`，Nginx 重新解析 `backend` 为 `172.19.0.9`。恢复后 Backend `8000`、Frontend `8080`、Web 开发代理 `8001` 和 AI `4010` 全部 HTTP 200；没有修改代码、数据库、卷或 Secret。
+- 该 502 不是 AI 模型、Provider、Backend 业务逻辑、Prompt 版本或数据库错误；不要通过重建 AI 镜像、修改模型策略或回滚本阶段代码处理。
+- 自动预防尚未实现：凡是只 recreate Backend 而不重启 Frontend 的本地操作，都可能再次触发。至少应覆盖 `rotate-ai-service-token.sh`、本地精确 recreate 和可能只重建 Backend 的启动流程；安全方案是在 Backend 就绪后 reload/restart Frontend 并验证 `8001 → 8080 → backend` Ping，或改造 Nginx 使用 Docker DNS 动态解析。完成自动化前，手工恢复命令为 `docker compose restart frontend`。
+- staging 使用同一 Frontend/Backend 拓扑，部署验收必须在容器切换后检查真实 Frontend Gateway Ping，不能只检查 Backend 直连和 AI `/health`。
 
 ## 2026-09-01 AI Run 状态一致性与运行配置收敛已完成并本地提交
 
-- Backend 已提交 `46f5d48 fix(ai): converge durable run state`；Web 已提交 `b4112fe fix(ai): restore durable run state`。AI Orchestrator 本阶段未修改。
+- Backend 已提交 `46f5d48 fix(ai): converge durable run state`；Web 已提交 `b4112fe fix(ai): restore durable run state`；Parent 已提交 `baeb2d82 fix(ai): enforce runtime state consistency`。AI Orchestrator 本阶段未修改。
 - `get_ai_conversation_v1` 现返回当前用户最新持久 `latest_run`，包括可空 `message_id`。即使助手消息尚未生成，Web 也能恢复 `running / waiting_approval / completed / failed / expired / cancelled`；若旧回答已存在但不在当前消息分页中，不会把它重复追加到会话末尾。
 - Web 重开或刷新会话不再把所有非失败 Run 误标为已完成。`running / waiting_approval` 每 3 秒读取一次持久快照，终态后替换临时占位并恢复 Sender；活动 Run 期间禁止重复发送、上传和移除待发送附件。轮询失败保留最后已知状态，不伪造完成结果。
 - Scheduler 新增每 10 分钟 watchdog。默认 900 秒没有持久更新的 `running` Run 收敛为 `failed / AI_RUN_STALE_TIMEOUT`；超过审批有效期且仍停在 `waiting_approval` 的 `pending / approved / rejected` 决定统一收敛为 `expired / AI_AGENT_APPROVAL_EXPIRED`，覆盖“决定已保存但恢复请求中断”的半完成状态。处理时吊销能力令牌、设置取消标记，并为失败 Run 补齐助手错误占位。
