@@ -4,6 +4,18 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。完整阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-01 本地 AI 模型健康误阻断修复已完成并本地提交
+
+- 根因不是模型配置版本或商品/库存代码：03:16 定时探测中 `gpt-5.5`、`gpt-5.6-luna` 单次收到 `PROVIDER_HTTP_429`，Backend 旧逻辑立即持久化为 `unavailable`；模型恢复后 Orchestrator 仍可能在 30 秒缓存内读取旧健康快照，固定模型请求因此在首 Token 前被 `AI_MODEL_HEALTH_UNAVAILABLE` 阻断。
+- Backend 健康状态改为三态：成功立即 `available`；401/403、alias 缺失等确定性错误立即 `unavailable`；429、超时、5xx 和连接异常首次为 `degraded`，连续瞬态失败才 `unavailable`。首次降级保留既有工具/视觉能力，模型同步也不会覆盖三态健康事实。
+- 健康写入与审计先提交数据库，再调用受 Service Token 保护的 Orchestrator 缓存失效端点；通知失败不回滚健康结果，并通过 `runtime_cache_invalidated=false` 暴露。
+- Orchestrator `RuntimePolicyResolver.invalidate()` 只使缓存过期，保留最后已验证快照作为依赖故障兜底。固定模型缓存为不可用、或自动模型链全部缓存为不可用时，普通 Chat、SSE 和结构化草稿会强制刷新一次快照，刷新后仍不可用才由 Runtime Guard 阻断。
+- Web 模型选择器把 `degraded` 显示为“临时波动”且保持可选；`unavailable` 继续显示“不可用”并禁用。模型管理页和健康检查结果同步展示可用、临时波动、不可用三类数量。
+- 当前验证：Backend 30 tests PASS，容器 Python compile PASS；AI 33 tests + 6 subtests PASS，Ruff PASS；Web 定向 43 tests PASS，TypeScript、Biome PASS；三仓库 `git diff --check` PASS。Jest 仍输出既有 open-handle 提示但退出码为 0。
+- 已提交：Backend `f919642 fix(ai): tolerate transient model health failures`；AI Orchestrator `25e55e7 fix: refresh stale model health policy cache`；Web `24ac7ff fix(ai): distinguish transient model health`。尚未推送、未部署 staging/production。
+- 本地已只重建/重启 `ai-orchestrator`，新容器为 healthy。Backend 容器通过内部 Service Token 调用缓存失效端点返回 `invalidated=true`；随后固定 `gpt-5.6-luna` 的真实最小 Chat 请求返回 HTTP 200 和实际 `model_alias=gpt-5.6-luna`，未再出现 `AI_MODEL_HEALTH_UNAVAILABLE`。本次没有部署测试服务器。
+- 下一步由用户决定何时推送和部署 staging；production 未操作。
+
 ## 2026-09-01 AI 商品候选续接与库存编辑流程已完成并本地提交
 
 - Backend 已提交 `3af5961 fix(ai): streamline product and inventory draft actions`；Web 已提交 `8e4cec1 fix(ai): continue product inventory workflows`。
