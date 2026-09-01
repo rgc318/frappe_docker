@@ -4,6 +4,32 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-01 商品单位纠正双策略与历史引用修复：本地完成并提交，尚未推送
+
+- 原“单位替代迁移”已升级为双策略：没有历史 Stock Ledger Entry、库存/占用/未完订单均为零且没有既有替代关系时，后端推荐 `in_place`，保留原商品编码受控纠正；存在历史库存流水时即使余额为零也不允许原地改库存单位，推荐 `replacement` 创建继任商品并停用源商品。
+- 新增原始审计表 `tabMyApp Product Correction` 和 patch `myapp.patches.create_product_correction_table`，记录纠正类型、源/目标商品、原因、前后快照、幂等请求、执行人和执行时间。localhost 已用 `frappe.modules.patch_handler.run_single` 单独执行并写入 Patch Log；当前审计表为 0 行，没有回填或改写真实商品。
+- 新增 `resolve_active_product_v1`：优先沿正式纠正记录解析最多 10 层继任链并检测循环；对上线前遗留数据，仅在“源商品停用 + 唯一单向 Item Alternative + 目标启用”时使用安全 fallback，不在多个替代商品之间猜测。
+- AI 历史消息的“完善商品/调整库存”现在先解析当前有效商品。Web 在历史编码已被替代时展示源编码和当前有效编码并要求确认；Backend 也会用有效编码重新创建草稿，最终商品停用且无继任时阻断。
+- 商品详情普通编辑已修复价格副作用：0 元价格不再预填，四个汇总价格字段仅在本次确实触碰时提交；每次打开/成功保存会重置 touched 状态，避免后续只改描述或图片仍重复写价格。商品切换后和新增条码成功后，条码单位重置为当前商品库存单位，避免残留旧异常单位。
+- 原地纠正会更新原 Item 的单位换算、模式默认单位、条码单位和用户明确映射的价格；`skip` 只把旧价格有效期截止到执行前一日，不删除历史价格。无价格映射时不要求 Item Price 写权限；只有新增价格时要求创建权限。
+- 真实验证：`resolve_active_product_v1(可口可乐-5000ML)` 通过 Backend Service 和登录态 HTTP 均返回 `可口可乐-5000ML-2`，`resolution_source=legacy_item_alternative`、`requires_confirmation=true`。没有执行新的商品纠正、价格调整、条码迁移或库存操作。
+- Backend：纠正服务、单位纠正、Gateway 和 AI Service 共 314 tests PASS；新增 HTTP 回归 1 test PASS；localhost patch PASS。
+- Web：TypeScript PASS；Biome 259 files PASS；全量 Jest 51 suites / 333 tests PASS。Jest 仍有既有 open handle 提示，但退出码为 0。
+- Backend commit：`8969453 feat: govern product uom corrections`；Web commit：`37f2ea4 feat: support governed product uom corrections`。真实可口可乐数据最终整理仍需用户确认：库存基准单位选 `Bottle` 还是 `Nos`、`Box` 实际装量、Retail 3 元对应单位、Standard Buying 70 元对应单位；未经确认不得删除、合并或重写两个商品及其价格。
+
+## 2026-09-01 商品单位替代迁移现代化：阶段完成，已并入双策略提交
+
+- Web 已修复中文商品编码写入 `Idempotency-Key` 时浏览器在发请求前直接拒绝的问题；商品编辑、库存调整和单位迁移不再使用原始中文编码作为请求头值。
+- 单位迁移提交不再假设源商品一定存在条码或价格；空集合显式按 `[]` 提交，校验失败会提示并滚动到首个错误字段，不再出现按钮无请求、无报错的静默失败。
+- 新商品编码由后端按现有编码规则生成建议值，Web 默认带出但允许修改或清空；清空后执行时由后端重新生成，用户无需每次人工发明抽象编码。条码继续保持可选。
+- 同一迁移向导现可逐条处理旧价格：保留原金额、手工填写新金额、跳过；也可直接新增独立价格。价格金额支持 6 位小数，单位必须来自新商品换算表。
+- 执行前新增最终变更预览，集中展示新旧商品、库存/批发/零售单位、完整换算、条码去向、跳过价格数和最终价格计划；只有二次确认后才调用执行接口。
+- Web 与 Backend 均会拒绝同一 `价格表 + 币种 + 单位` 的重复价格计划。Backend 还会预检价格表存在性和 Item Price 创建权限，再停用源商品或创建新商品；事务、源版本复核和幂等保护继续保留。
+- 真实只读评估 `可口可乐-5000ML` 已返回：建议编码 `可口可乐-5000ML-2`、4 条旧价格、0 条条码、无 blocker、`can_execute = true`。本轮没有执行迁移，没有修改该商品、库存、价格或历史数据。
+- Web 验证：`npm run tsc` PASS；`npm run biome:lint` 259 files PASS；单位迁移、领域 Service、API client、AI action 目标测试 4 suites / 103 tests PASS；`git diff --check` PASS。Jest 仍有既有 open handle 提示，但退出码为 0。
+- Backend 验证：`test_product_uom_migration_service + test_gateway_wrappers` 152/152 PASS；`git diff --check` PASS。
+- 本阶段改动已与后续双策略、历史引用和审计修复合并提交到 Backend `8969453` 与 Web `37f2ea4`。
+
 ## 2026-09-01 当前统一状态与接手结论
 
 ### 当前功能基线
@@ -11,9 +37,9 @@
 | 仓库 | 分支 | 当前提交 | 工作树 |
 | --- | --- | --- | --- |
 | Parent | `develop` | `baeb2d82 fix(ai): enforce runtime state consistency`；交接文档提交可能位于其后 | 保留用户已有文档修改和未跟踪本地资料 |
-| Backend `apps/myapp` | `develop` | `46f5d48 fix(ai): converge durable run state` | clean |
+| Backend `apps/myapp` | `develop` | `8969453 feat: govern product uom corrections` | clean |
 | AI Orchestrator `services/myapp-ai` | `develop` | `25e55e7 fix: refresh stale model health policy cache` | clean |
-| Web `frontend/myapp-web` | `main` | `b4112fe fix(ai): restore durable run state` | clean |
+| Web `frontend/myapp-web` | `main` | `37f2ea4 feat: support governed product uom corrections` | clean |
 | Mobile | 未核对 | 本阶段未修改 | 不得顺带清理或提交 |
 
 Parent 当前不应提交或覆盖：`AGENTS.md`、`STAGING_DEPLOYMENT.zh-CN.md`、`docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`、`docs/codex/HANDOFF_TEMPLATE.zh-CN.md`、`docs/codex/KNOWN_ISSUES.zh-CN.md` 中用户已有修改，以及未跟踪 `.codex`、`docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`。本轮已在 `KNOWN_ISSUES` 工作树中补充 502 条目并修正旧状态，但该文件包含用户原有未提交内容，提交时不得整文件混入；若继续完善交接或已知问题，应只提交能与用户状态安全分离的文档改动。
