@@ -39,6 +39,18 @@ compose pull
 echo "Restarting staging stack..."
 compose up -d
 
+AI_GATEWAY_CONTAINER_IDS=()
+for service in backend queue-short queue-long queue-ai-vector scheduler; do
+  container_id="$(compose ps -q "${service}")"
+  if [[ -z "${container_id}" ]]; then
+    echo "AI gateway runtime configuration check failed: ${service} is not running." >&2
+    exit 1
+  fi
+  AI_GATEWAY_CONTAINER_IDS+=("${container_id}")
+done
+"${ROOT_DIR}/verify-ai-gateway-runtime-env.sh" \
+  "${ENV_FILE}" "${AI_GATEWAY_CONTAINER_IDS[@]}"
+
 if [[ -n "${SITE_NAME}" ]]; then
   echo "Reconciling site database grants for: ${SITE_NAME}"
   SITE_NAME="${SITE_NAME}" ENV_FILE="${ENV_FILE}" STAGING_MODE="${STAGING_MODE}" \

@@ -78,3 +78,15 @@ fi
 "${ROOT_DIR}/validate-secret-env-files.sh" "${SECRET_ENV_FILES[@]}"
 
 docker compose "${COMPOSE_ARGS[@]}" up -d --build --wait --wait-timeout 300
+
+AI_GATEWAY_CONTAINER_IDS=()
+for service in backend queue-short queue-long queue-ai-vector scheduler; do
+  container_id="$(docker compose "${COMPOSE_ARGS[@]}" ps -q "${service}")"
+  if [[ -z "${container_id}" ]]; then
+    echo "AI gateway runtime configuration check failed: ${service} is not running." >&2
+    exit 1
+  fi
+  AI_GATEWAY_CONTAINER_IDS+=("${container_id}")
+done
+"${ROOT_DIR}/verify-ai-gateway-runtime-env.sh" \
+  "${ROOT_DIR}/.env.ai.gateway.local" "${AI_GATEWAY_CONTAINER_IDS[@]}"

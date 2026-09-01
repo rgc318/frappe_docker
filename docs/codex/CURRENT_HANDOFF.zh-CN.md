@@ -4,6 +4,19 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。完整阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-01 AI Run 状态一致性与运行配置收敛已完成并本地提交
+
+- Backend 已提交 `46f5d48 fix(ai): converge durable run state`；Web 已提交 `b4112fe fix(ai): restore durable run state`。AI Orchestrator 本阶段未修改。
+- `get_ai_conversation_v1` 现返回当前用户最新持久 `latest_run`，包括可空 `message_id`。即使助手消息尚未生成，Web 也能恢复 `running / waiting_approval / completed / failed / expired / cancelled`；若旧回答已存在但不在当前消息分页中，不会把它重复追加到会话末尾。
+- Web 重开或刷新会话不再把所有非失败 Run 误标为已完成。`running / waiting_approval` 每 3 秒读取一次持久快照，终态后替换临时占位并恢复 Sender；活动 Run 期间禁止重复发送、上传和移除待发送附件。轮询失败保留最后已知状态，不伪造完成结果。
+- Scheduler 新增每 10 分钟 watchdog。默认 900 秒没有持久更新的 `running` Run 收敛为 `failed / AI_RUN_STALE_TIMEOUT`；超过审批有效期且仍停在 `waiting_approval` 的 `pending / approved / rejected` 决定统一收敛为 `expired / AI_AGENT_APPROVAL_EXPIRED`，覆盖“决定已保存但恢复请求中断”的半完成状态。处理时吊销能力令牌、设置取消标记，并为失败 Run 补齐助手错误占位。
+- 父仓库新增 `verify-ai-gateway-runtime-env.sh`，比较期望 Gateway-safe env、五个运行容器的实际 `Config.Env` 以及容器间一致性，只输出不一致变量名，不输出 Token 或 Secret。检查已接入本地 dev/prod 启动、Service Token 轮换和 staging start/deploy；新增 `MYAPP_AI_AGENT_RUNTIME_ENABLED` 与 `MYAPP_AI_RUN_STALE_TIMEOUT_SECONDS` 的同步和 Compose 配置。
+- 本地首先准确检出 Backend、Scheduler 尚未加载新增参数，以及 Backend 的 `MYAPP_AI_VECTOR_EXCLUDED_ITEM_PREFIXES` 仍是旧值；执行 `sync-ai-gateway-env.sh` 并只 recreate `backend / queue-short / queue-long / queue-ai-vector / scheduler` 后，五容器一致性检查 PASS。没有删除 orphan、数据库、卷或本地 Secret 文件。
+- 本地 `bench --site localhost migrate` 成功；`myapp.tasks.cleanup_stale_ai_runs` 已注册为 `*/10 * * * *`。Backend Ping 返回 `pong`；真实数据库回滚式调用 watchdog 与 `get_conversation` 新查询均成功，没有保留测试写入。
+- 最终验证：Backend 全量 857 tests PASS、定向 45 tests PASS、容器 Python compile PASS；Web TypeScript、Biome、51 suites / 328 tests PASS，AI 定向 58 tests PASS；Shell `bash -n`、三仓库 `git diff --check` PASS。Jest 仍输出项目既有 open-handle 提示，但退出码为 0。
+- 本阶段不增加关键词寒暄、机械回复或前端伪完成；模型/Provider 自身首 Token 慢继续由后续模型选择和治理策略处理。本阶段未推送、未部署 staging/production。
+- 下一步只有在用户明确要求后才推送并部署 staging。staging 人工验收应覆盖：运行中刷新、切换会话后返回、审批后网络中断、终态后 Sender 恢复，以及故意制造一组容器旧环境时部署脚本能失败关闭。
+
 ## 2026-09-01 本地 AI 模型健康误阻断修复已完成并本地提交
 
 - 根因不是模型配置版本或商品/库存代码：03:16 定时探测中 `gpt-5.5`、`gpt-5.6-luna` 单次收到 `PROVIDER_HTTP_429`，Backend 旧逻辑立即持久化为 `unavailable`；模型恢复后 Orchestrator 仍可能在 30 秒缓存内读取旧健康快照，固定模型请求因此在首 Token 前被 `AI_MODEL_HEALTH_UNAVAILABLE` 阻断。

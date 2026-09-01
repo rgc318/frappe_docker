@@ -96,6 +96,18 @@ if [[ "${healthy}" != "1" ]]; then
   exit 1
 fi
 
+AI_GATEWAY_CONTAINER_IDS=()
+for service in backend queue-short queue-long queue-ai-vector scheduler; do
+  container_id="$(compose ps -q "${service}")"
+  if [[ -z "${container_id}" ]]; then
+    echo "AI gateway runtime configuration check failed: ${service} is not running." >&2
+    exit 1
+  fi
+  AI_GATEWAY_CONTAINER_IDS+=("${container_id}")
+done
+"${ROOT_DIR}/verify-ai-gateway-runtime-env.sh" \
+  "${ROOT_DIR}/.env.ai.gateway.local" "${AI_GATEWAY_CONTAINER_IDS[@]}"
+
 old_status="$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
   -H "Authorization: Bearer ${old_token}" \
   http://127.0.0.1:4010/internal/v1/vector/products/status)"
