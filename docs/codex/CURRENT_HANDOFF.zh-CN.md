@@ -4,6 +4,17 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-03 商品维护审计时间线 P2：已提交，未推送/部署
+
+- 已提交：Backend `b7df29c feat: add product change audit timeline`；Web `8a72903 feat: show product change audit timeline`。父仓本轮固定 Backend gitlink；Web 继续作为独立仓库维护。
+
+- Backend 新增 `list_product_change_history_v1`，在目标商品读取权限与可见 Price List 范围内聚合商品创建/Version、价格创建/Version、条码与单位子表差异以及 `MyApp Product Correction` 审计。
+- 统一事件结构区分 `product / price / barcode / uom / valuation` 和 `created / updated / terminated / corrected`，返回操作时间、操作人、来源记录和字段级前后值；历史长文本受限且过滤凭据型键。
+- Web 商品维护工作区“变更历史”已从占位说明替换为正式时间线表格，显示事件分类、摘要、字段差异与操作人；数据只来自 Backend，不根据当前商品值推测历史。
+- 价格创建事件会从后续 Version 逆向恢复创建时金额，不把当前价格冒充历史初始值；只有 `valid_upto` 在事件发生日或之前生效时才标记为“终止价格”，未来有效期调整仍属于普通更新。
+- 验证：Backend `test_wholesale_service + test_gateway_wrappers + test_product_correction_service` 194 tests PASS；目标真实 HTTP `test_product_change_history_returns_created_and_updated_events` PASS，公开入口返回创建与描述更新的结构化事件；Web 全量 Jest 52 suites / 347 tests PASS；`npm run tsc` PASS；`npm run biome:lint` 262 files PASS；Parent、Backend、Web `diff --check` PASS。
+- 真实商品只读验证：`可口可乐-5000ML-2` 返回 10 条可见事件，包括价格创建/更新、单位配置更新和商品创建；未写入或修改该商品、价格、库存和纠正记录。HTTP 回归创建了隔离测试商品与标准 HTTP 测试夹具。
+
 ## 2026-09-02 商品全屏维护工作区 P1：已提交，未推送/部署
 
 - 已提交：Backend `2446dfd feat: govern product maintenance workflows`；Web `be97f57 feat: add governed product maintenance workspace`。父仓本轮固定 Backend gitlink；Web 仓库仍保持独立，不由父仓跟踪。
