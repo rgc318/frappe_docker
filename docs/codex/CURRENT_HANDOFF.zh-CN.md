@@ -1,8 +1,58 @@
 # 当前交接状态
 
-更新时间：2026-09-01 CST
+更新时间：2026-09-03 CST
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
+
+## 2026-09-02 商品全屏维护工作区 P1：已提交，未推送/部署
+
+- 已提交：Backend `2446dfd feat: govern product maintenance workflows`；Web `be97f57 feat: add governed product maintenance workspace`。父仓本轮固定 Backend gitlink；Web 仓库仍保持独立，不由父仓跟踪。
+- 新增 `/master-data/products/:itemCode/edit` 全屏商品维护工作区，并确保路由位于动态详情路由之前。商品列表“编辑”、商品详情“编辑商品”和 AI 商品 Drawer“维护商品”统一进入该工作区；新增商品仍保留独立创建弹窗，现有商品编辑代码已从创建弹窗和详情页移除。
+- 工作区按基本资料、单位与包装、销售价格、采购价格、条码、库存与估值、变更历史分区。普通资料保存不创建新商品；只有库存基准单位语义或物理商品身份发生高风险变化时才进入单位风险纠正与继任商品流程。
+- 销售/采购页签直接维护完整 Item Price 矩阵，支持权限控制下的新增、金额/有效期修改和终止；四个价格摘要不再混入普通资料表单。条码区独立支持新增、设主条码和删除，且每条条码必须选择商品已配置单位。
+- 库存基准单位在普通维护中锁定，单位页签提供醒目的“单位风险纠正”入口；库存估值成本与采购价继续保持语义分离。变更历史页签当前明确展示正式来源和后续聚合计划，不伪造尚未具备的审计时间线。
+- 工作区具备未保存提示、浏览器关闭保护、返回详情/切换页签放弃修改确认、顶部与 sticky 底部保存入口和保存结果反馈。条码表单已拆为仅在条码页签挂载的独立组件，避免未连接 Form 和嵌套原生 form 告警。
+- 新增 `Workspace.test.tsx`，覆盖商品加载与页签、普通资料原地保存、库存基准单位锁定与纠正入口、无 Item Price 权限只读、未保存离开确认；AI Drawer 测试补充“维护商品”工作区链接。
+- 验证：定向 Jest 2 suites / 5 tests PASS；前端全量 Jest 52 suites / 345 tests PASS；`npm run tsc` PASS；`npm run biome:lint` 262 files PASS；Parent、Backend、Web `diff --check` PASS。既有 Jest open handle 提示仍存在但退出码为 0。
+
+## 2026-09-02 商品维护与完整价目表 P0：已提交，未推送/部署
+
+- 单位错误纠正不再从空白目标表单开始：当前库存基准单位、完整换算、批发/零售默认单位、价格目标单位和条码目标单位均已预加载；页面新增当前配置对照。价格和条码处理动作仍保持空值并要求逐条人工确认，避免自动复制或迁移高风险主数据。
+- 价格动作按策略拆清语义：原地纠正为“保持金额并确认单位 / 修改单位或金额 / 终止这条旧价格”；继任商品为“迁移并保持原金额 / 迁移并重新定价 / 不迁移（保留在源商品）”。预览也分别显示“本次终止旧价格”或“不迁移的源价格”，不再使用含糊的“跳过”。
+- Backend 新增完整价格矩阵与维护接口：`list_product_prices_v1`、`upsert_product_price_v1`、`terminate_product_price_v1`。完整记录包含 Price List 类型、币种、UOM、金额、有效期、版本和权限；新增/更新/终止使用正式 Item Price、幂等、归属校验和乐观锁。现有价格的 Price List、币种、UOM 定位键禁止直接改写，错误键必须新增正确记录后终止旧记录；终止只设置 `valid_upto`，不物理删除。
+- 商品详情改为销售/采购完整价格矩阵，可明确新增、修改和终止；无 Item Price 权限时维护按钮禁用。P0 曾扩大普通编辑弹窗并将四个常用价格标记为快捷入口；该过渡方案已被上方 P1 全屏维护工作区取代。
+- AI 商品快捷 Drawer 现在同时实时读取并展示完整单位换算、全部可见价目、全部条码和仓库库存；回答时快照继续与当前实时数据分开。
+- 真实只读验证：`可口可乐-5000ML-2` 通过新服务返回 6 条 Item Price，其中 Standard Buying 仍为独立的 `70/Box` 与 `70/Nos`；本轮没有新增、终止或修改任何真实价格。
+- 验证：Backend `test_wholesale_service + test_gateway_wrappers` 186 tests PASS；Web `npm run tsc` PASS、`npm run biome:lint` 260 files PASS、全量 Jest 51 suites / 341 tests PASS；Backend/Web/Parent `diff --check` PASS。既有 Jest open handle 提示仍存在但退出码为 0。
+
+## 2026-09-02 库存估值与采购参考价语义优化：已提交，未推送/部署
+
+- AI 库存调整增加库存时的取值顺序升级为：用户明确输入、商品已有有效库存估值、Standard Buying 标准采购参考价建议。只有三者均无有效正数时才阻止执行；减少库存仍不要求新成本。
+- Standard Buying fallback 会写入 `valuation_rate_source=standard_buying_reference` 和 `valuation_rate_reference`。同库存单位直接建议；按箱、包等其他已配置商品单位计价时按 UOM conversion factor 折算为每库存单位成本并展示换算依据；缺少换算关系时不自动采用。后端校验警告及 Web 表单均明确提示“仅为本次库存估值建议”，并说明库存调整执行 Stock Reconciliation，不创建采购单、采购发票或供应商应付。用户改值后来源记为 `user`，后端会验证来源与权威价格是否一致，客户端不能伪造来源。
+- 真实商品 `可口可乐-5000ML-2` 当前 `Item.valuation_rate=0`，同时存在 `Standard Buying 70/Nos` 与 `Standard Buying 70/Box`，而 `1 Box=24 Nos`；两条折算为 `70/Nos` 与 `2.916667/Nos`，属于主数据价格单位冲突，不能安全自动选取。Backend 现会返回 conflict 明细，Web 保持库存成本为空并展示两条折算结果。最终应由用户确认 70 元对应“箱”还是“件”，再清理错误 Item Price。
+- 复用旧库存活动草稿时，Backend 会重新解析没有来源的历史零估值并刷新为最新建议或价格冲突提示，不再原样打开旧空值；带 `valuation_rate_source=user` 的明确用户输入不会被覆盖。
+- localhost 上该商品的两个活动库存草稿 `AI-DRAFT-be9250...`、`AI-DRAFT-2aa53...` 已通过同一服务逻辑从版本 1 刷新为版本 2，均保留成本为空并写入 `price_conflict=true` 与 1 条价格单位冲突警告；没有执行库存调整或修改正式商品价格。
+- AI 商品草稿中的“成本价（默认采购价）”已改为“标准采购参考价”，“标准售价（默认单价）”已改为“标准销售参考价”；说明文案明确 Standard Selling 只是销售兜底参考，批发价和零售价为独立销售价格表，Standard Buying 不是库存实时估值。
+- 验证：Backend `test_ai_repository + test_ai_service + test_gateway_wrappers` 354 tests PASS；Web `npm run tsc` PASS、`npm run biome:lint` 259 files PASS、全量 Jest 51 suites / 340 tests PASS；父仓、Backend、Web `diff --check` 均 PASS。
+
+## 2026-09-02 AI 卡片动作去重与聊天语义隔离：已提交，未推送/部署
+
+- 商品卡片“编辑商品资料”“调整库存”已从单一布尔防重升级为按“会话 + 公司 + 动作 + 商品”维度的 Web single-flight；同一动作请求期间所有对应按钮 loading/disabled，并复用同一个 Promise 和 ASCII `Idempotency-Key`。请求完成前切换会话时不会污染当前消息或强制打开草稿弹窗。
+- Backend 新增业务幂等：按“用户 + 会话 + 公司 + 动作 + 当前有效商品”生成活动草稿键，在会话行锁和唯一索引保护下，同一活动草稿首次返回 `outcome=created`，不同 request id 的后续请求返回同一草稿和 `outcome=reused`。执行、交接、放弃后清空活动键，允许下一轮创建。
+- 直接 UI 动作和库存候选选择不再伪造 user/assistant 聊天，统一返回 `messages=[]`；`message_kind=chat|activity` 已贯通 Repository、API 映射和 Web，模型上下文只读取 `chat`。历史 activity 在 Web 使用 AI/系统侧“历史业务操作”标识展示，不再伪装成用户发送。
+- Patch `myapp.patches.govern_ai_draft_action_deduplication` 已在 localhost 通过 `bench migrate` 成功执行并写入 Patch Log，也已额外直接重跑一次验证可重入。真实数据中 16 条历史伪聊天已标记为 `activity`，53 条真实聊天保持 `chat`；8 个历史按钮草稿中 2 个重复且 `version_no=1` 的草稿标记为 `superseded`，没有删除记录；唯一索引存在，重复非空活动键为 0。
+- 真实 HTTP 回归：同一商品动作使用两个不同 `Idempotency-Key`，第一次 `created`、第二次 `reused`，草稿 ID 相同；新建测试会话最终 `message_count=0` 且消息表记录为 0。迁移曾暴露 MariaDB 参数化 LIKE 百分号和 Frappe DDL 事务边界问题，均已修复后重新迁移成功。
+- Backend 验证：`test_ai_repository + test_ai_service + test_gateway_wrappers` 348 tests PASS；目标真实 HTTP 1 test PASS；patch 重跑 PASS；Python compile 与 `git diff --check` PASS。
+- Web 验证：`npm run tsc` PASS；`npm run biome:lint` 259 files PASS；全量 Jest 51 suites / 338 tests PASS；既有 Jest open handle 提示仍存在但退出码为 0。
+- 本节 Backend 与 Web 改动已分别包含在 `2446dfd` 和 `be97f57`，尚未推送或部署。
+
+## 2026-09-01 AI 库存调整成本前置校验与换算布局修复：已提交，未推送/部署
+
+- 库存调整草稿在目标库存高于当前库存时，现在会在草稿阶段校验库存单位成本。商品已有有效估值时自动带出；无估值但存在 Standard Buying 时带出为带来源警告的参考建议；仍无有效值时必须填写按库存基准单位计价的 `valuation_rate > 0`。减少库存不要求新成本。
+- Web AI 草稿编辑器新增“库存单位成本”字段、字段级后端错误映射和执行前校验。填写并保存后草稿版本会增加，Web 执行幂等键随版本变化，不会继续复用旧版本已失败的 `request_id`。
+- 换算预览从双列 Grid 的单列子项改为跨整行展示，Grid 使用 `minmax(0, 1fr)` 防止内容撑宽，预览允许安全换行，调整原因也跨整行。
+- 本节改动已随 Backend `2446dfd` 与 Web `be97f57` 提交，尚未推送或部署。
+- 验证：Backend `test_ai_service` 154 tests PASS；Web 目标 Jest 2 suites / 27 tests PASS；`npm run tsc` PASS；`npm run biome:lint` PASS。Jest 既有 open handle 提示不影响退出码。
 
 ## 2026-09-01 商品单位纠正双策略与历史引用修复：本地完成并提交，尚未推送
 
