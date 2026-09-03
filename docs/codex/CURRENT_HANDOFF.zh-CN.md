@@ -4,6 +4,15 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-03 商品 CSV 导入治理 P6：已提交，未推送/部署
+
+- 已提交：Web `52a2efd feat: govern product csv imports`。本阶段复用 P3 Backend 的商品详情权限与乐观锁能力，没有 Backend 代码变化。
+- CSV 导入拆分为解析校验、更新行预检、逐行执行和可恢复结果四个阶段。更新行执行前读取目标商品、检查 `canWrite` 并保存当前 `modified`；执行时携带该版本，版本冲突后必须重新预检。
+- 成功行进入终态，后续点击自动跳过；失败行不终止其他行，也不回滚已经成功的记录。新增与更新行按请求载荷保留稳定幂等键，网络不确定失败可使用同一键重试；重新预检并改变更新版本时生成新的幂等键。
+- 导入预览区明确展示待预检、预检中、可执行、执行中、成功、可重试、失败和格式错误状态，并提供“重新预检更新行”。未知导入动作、非法数字和非法启停值不再被猜测或静默忽略。
+- 更新行预检采用最多 5 个并发请求，避免大文件完全串行；批量导入和既有批量启停/修改关闭逐条成功与错误通知，只保留汇总和逐行结果。
+- 验证：Web 全量 54 suites / 361 tests PASS，`npm run tsc` PASS，`npm run biome:lint` 266 files PASS，`git diff --check` PASS；提交后定向 2 suites / 79 tests PASS、TypeScript PASS。全量 Jest 仍偶发既有 open-handle 提示，但退出码为 0。
+
 ## 2026-09-03 商品批量维护结果治理 P5：已提交，未推送/部署
 
 - 已提交：Web `ddf7e01 feat: report governed bulk product changes`。本阶段复用 P3 Backend 的单商品写权限与版本冲突保护，没有 Backend 代码变化。
