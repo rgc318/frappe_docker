@@ -4,6 +4,17 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-03 AI 库存调整估值与价格候选 P10：已提交，未推送/部署
+
+- 已提交：Backend `2d7cd65 feat: improve AI inventory valuation review`；Web `f8b8754 feat: clarify AI inventory valuation workflow`。Backend API 契约和 Web 开发说明已同步；父仓本阶段只固定 Backend gitlink 并记录本交接，Web 仍为独立仓库。
+- 库存草稿现在优先读取所选仓库 `Bin.valuation_rate / stock_value` 作为实际估值基线，不再把商品详情摘要价误当仓库估值。页面把“本次计价单位价格”和“执行后库存估值单价”分开展示，并实时计算当前/执行后库存数量、当前/执行后库存价值与价值差额；估值变化且已有库存时明确提示 Stock Reconciliation 会一并重新估值已有库存。
+- Backend 返回全部当前有效的采购型 Item Price 候选，不限于 Standard Buying。每项携带稳定 Item Price ID、价格表、币种、原价格、计价单位、换算系数、折算后库存单位价格、有效期和可用状态。箱价与件价等不同包装价不再因折算结果不同被误判为冲突；当前估值为零时，仅在所选调整单位恰好有一个可用候选时自动采用，否则要求人工选择或输入。
+- 采用采购价时 Web 保存 `valuation_rate_source=buying_price_reference + valuation_rate_reference_id`。Backend 按 Item Price ID 重新校验商品、有效期、币种和单位换算，并忽略客户端伪造的 `valuation_rate`；人工输入通过 `valuation_input_rate + valuation_input_uom` 折算。旧 `standard_buying_reference` 和直接库存单位 `valuation_rate` 继续兼容读取。
+- 采购价格表只是估值候选；只有用户采用后折算形成正式 `valuation_rate` 才会影响库存价值，不会创建采购订单、采购发票或供应商应付。库存调整原因新增盘盈、盘亏、期初库存校准、历史数据纠正、单位/包装纠正、破损/报废/过期损耗快捷项，并保留其他原因手工填写。
+- 真实站点只读验证：商品 `可口可乐-5000ML-2`、仓库 `Stores - RD` 当前 5604 件，Bin 估值 6/件；调整 1 Box（24 件）默认沿用为 144/箱。候选 `9gvn3s5dm8` 为 70/Box→2.916667/件，`acvmbjn538` 为 2.5/Nos→2.5/件；选择前者并伪造客户端价格 999 时，Backend 仍核验为 70/Box 和 2.916667/件，并返回已有库存重新估值及价值差额 -17209。验证过程只读，没有执行草稿或写入业务数据。
+- 验证：Backend `py_compile + test_ai_service` 163 tests PASS，`test_ai_draft_state + test_gateway_wrappers` 158 tests PASS，Backend diff check PASS；Web `npm run tsc` PASS，`npm run biome:lint` 274 files PASS，定向 2 suites / 29 tests PASS，全量 Jest 58 suites / 375 tests PASS，Web diff check PASS。Jest 仍提示既有 open handle，定向回归另提示本地 Browserslist 数据较旧，但退出码均为 0。
+- 当前状态：Backend 与 Web 工作树干净；未推送、未部署。父仓既有 `AGENTS.md`、`STAGING_DEPLOYMENT.zh-CN.md`、开发规则/模板/已知问题和 `.codex` 等用户本地改动继续保留，不属于本阶段提交。
+
 ## 2026-09-03 商品价格表本地化显示 P9：已提交，未推送/部署
 
 - 已提交：Web `cd5049e feat: localize product price list names`、`4059d93 fix: apply price list localization consistently`。本阶段只有 Web 显示层变化，没有重命名 Price List、修改 Backend 或写入业务数据。
