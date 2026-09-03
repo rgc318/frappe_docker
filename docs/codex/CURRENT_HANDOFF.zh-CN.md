@@ -4,6 +4,14 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-03 商品资料质量语义 P8：已提交，未推送/部署
+
+- 已提交：Web `b516ecd feat: clarify product quality governance`。本阶段只调整 Web 质量评估与引导，没有 Backend 代码或数据变化。
+- 删除“100 分减分”的伪精确资料完整度，不再把条码、品牌、图片、描述、标准售价和标准采购价固定定义为商品建档必填；列表改为“良好 / 需关注 / 异常”，详情按数据错误、业务风险和可选完善建议分级展示数量与明细。
+- 数据错误覆盖库存基准单位缺失或系数不为 1、重复/无效单位换算、批发/零售默认单位引用无效、条码或有效价格引用未配置单位和负库存；业务风险覆盖停用仍有库存、历史条码或有效价格缺少单位，以及缺少商品分类；其余资料缺失仅作为不影响“良好”状态的可选建议。
+- 每项问题按语义精确进入基本资料、单位与包装、条码、销售价格、采购价格、库存调整或库存流水，不再统一跳回基本资料。Item Price 的修复按钮继续按独立价格权限控制，不与 Item 普通写权限混用。
+- 验证：`npm run tsc` PASS；`npm run biome:lint` 270 files PASS；全量 Jest 56 suites / 371 tests PASS；Web `git diff --check` PASS。Jest 仍提示既有 open handle，但进程退出码为 0。
+
 ## 2026-09-03 商品 CSV 导出治理 P7：已提交，未推送/部署
 
 - 已提交：Backend `dcaa4c6 feat: provide complete product export data`；Web `90fa747 feat: govern product csv exports`。父仓本轮固定 Backend gitlink；Web 仍为独立仓库。
