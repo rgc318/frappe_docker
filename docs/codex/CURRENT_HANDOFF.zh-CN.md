@@ -4,6 +4,14 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-03 商品批量维护结果治理 P5：已提交，未推送/部署
+
+- 已提交：Web `ddf7e01 feat: report governed bulk product changes`。本阶段复用 P3 Backend 的单商品写权限与版本冲突保护，没有 Backend 代码变化。
+- 商品列表选中行同时保存 `itemCode + modified`，批量启停和批量修改逐条携带对应商品版本；跨页保留选择，并在选中键与版本快照不完整时要求刷新后重选。
+- 批量语义明确为“逐条独立提交、允许部分成功”。单条失败不再中断后续商品，也不会回滚已经成功的记录；领域 service 返回 `succeeded[] / failed[]`。
+- 页面新增批量结果窗口，逐商品显示成功或失败原因，并明确成功数、失败数与不回滚语义。批量内部关闭逐条错误通知，避免大量 toast/notification 淹没最终结果。
+- 验证：Web 全量 53 suites / 352 tests PASS，`npm run tsc` PASS，`npm run biome:lint` 264 files PASS；提交后领域 service 70 tests PASS，`diff --check` PASS。
+
 ## 2026-09-03 商品详情写入口一致性 P4：已提交，未推送/部署
 
 - 已提交：Web `cc4bd37 fix: align product detail edit guards`。本阶段没有 Backend 代码变化。
