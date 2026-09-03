@@ -4,6 +4,15 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-03 商品价格表本地化显示 P9：已提交，未推送/部署
+
+- 已提交：Web `cd5049e feat: localize product price list names`、`4059d93 fix: apply price list localization consistently`。本阶段只有 Web 显示层变化，没有重命名 Price List、修改 Backend 或写入业务数据。
+- 新增共享价格表显示映射与 `PriceListName` 组件：简体中文界面将 `Standard Selling / Standard Buying / Wholesale / Retail` 显示为“标准销售 / 标准采购 / 批发 / 零售”，繁体中文使用对应繁体名称；英文、其他未配置语言和自定义价格表保持原始名称。
+- 已审查并覆盖所有当前面向用户的价格表只读展示：商品详情摘要与价格矩阵、商品维护工作区、价格编辑器、单位纠错/继任商品流程、AI 商品详情、客户/供应商详情和商品价格审计摘要。AI 商品草稿说明使用“中文（英文标识）”；选择器同样保留原始标识。
+- 修复半屏商品详情矩阵列被压缩后中文逐字竖排：价格表列设置明确宽度，整表按列总宽度横向滚动，`PriceListName` 统一使用不换行样式。英文稳定标识仍通过悬停可见。
+- 接口提交、Item Price 定位、权限、审计源、内部业务判断与 CSV 导入导出继续使用英文稳定标识；客户/供应商默认价格表编辑框也明确说明输入的是稳定标识。本地化文字不得写回业务字段。
+- 验证：`npm run tsc` PASS；`npm run biome:lint` 274 files PASS；定向 7 suites / 40 tests PASS；全量 Jest 58 suites / 375 tests PASS；提交后关键 5 suites / 15 tests PASS；Web `git diff --check` PASS。定向 Jest 仍可能提示既有 open handle，但退出码为 0。
+
 ## 2026-09-03 商品资料质量语义 P8：已提交，未推送/部署
 
 - 已提交：Web `b516ecd feat: clarify product quality governance`。本阶段只调整 Web 质量评估与引导，没有 Backend 代码或数据变化。
