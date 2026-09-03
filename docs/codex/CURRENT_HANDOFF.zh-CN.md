@@ -4,6 +4,15 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-03 商品 CSV 导出治理 P7：已提交，未推送/部署
+
+- 已提交：Backend `dcaa4c6 feat: provide complete product export data`；Web `90fa747 feat: govern product csv exports`。父仓本轮固定 Backend gitlink；Web 仍为独立仓库。
+- 修复商品导出静默截断：Backend `list_products_v2` 单页实际最多 100 条，Web 不再以单次 `limit=1000` 假设完整结果，而是按 `name asc` 稳定排序、每页 100 条、最多 4 个并发请求读取全部分页。
+- 浏览器同步导出上限为 5000 条；超限时不生成部分文件，明确要求缩小筛选或后续使用后端异步导出。分页期间总数变化、缺行或重复时同样失败关闭，避免把不完整文件标成成功。
+- Backend 商品列表现在批量返回 `barcode` 和完整 `barcodes[]`（含条码行名、顺序、主条码标识与 UOM），避免商品列表与导出条码列长期为空，也避免逐商品查询详情的 N+1 请求。
+- 导出字段补齐条码单位、库存单位编码/显示名、单位换算、批发/零售默认单位、销售/采购价格摘要、库存估值、最后修改时间和当前筛选口径；导出按钮显示分页读取进度。
+- 验证：Backend `test_wholesale_service + test_gateway_wrappers` 191 tests PASS；真实 HTTP `test_product_barcode_management_v2_roundtrip` PASS，并确认列表与详情返回同一条码/UOM；Backend diff check PASS。Web 全量 55 suites / 365 tests PASS，`npm run tsc` PASS，`npm run biome:lint` 268 files PASS，Web diff check PASS；提交后定向 2 suites / 74 tests PASS、TypeScript PASS。Jest 仍偶发既有 open-handle 提示但退出码为 0。
+
 ## 2026-09-03 商品 CSV 导入治理 P6：已提交，未推送/部署
 
 - 已提交：Web `52a2efd feat: govern product csv imports`。本阶段复用 P3 Backend 的商品详情权限与乐观锁能力，没有 Backend 代码变化。
