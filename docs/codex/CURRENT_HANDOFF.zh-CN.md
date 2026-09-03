@@ -4,6 +4,15 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-03 商品详情写入口一致性 P4：已提交，未推送/部署
+
+- 已提交：Web `cc4bd37 fix: align product detail edit guards`。本阶段没有 Backend 代码变化。
+- 商品详情页的编辑商品、启停、单位错误纠正、资料质量补充和条码新增/设主/删除全部读取 `ProductSummary.canWrite`；只读账号不再能从详情页绕过工作区的交互保护。
+- 详情页启停与条码动作携带当前 `Item.modified`。`DOCUMENT_VERSION_CONFLICT` 使用与工作区共享的判断函数，显示持久错误和“刷新最新资料”，不再只弹短暂 toast。
+- 价格新增/修改/终止继续使用独立 Item Price 权限，不因 Item 普通资料只读而错误关闭价格专职角色的入口。
+- 修复详情页三组 `ProDescriptions` 的列跨度告警，并把该页既有 Alert 标题迁移到新版 `title` 属性。
+- 新增 `Detail.test.tsx`，覆盖只读态和条码版本传递。验证：Web 全量 53 suites / 351 tests PASS，`npm run tsc` PASS，`npm run biome:lint` 264 files PASS，提交后详情/工作区 2 suites / 9 tests PASS，`diff --check` PASS。定向运行仍有既有 Jest open handle 提示但退出码为 0。
+
 ## 2026-09-03 商品维护权限与并发保护 P3：已提交，未推送/部署
 
 - 已提交：Backend `b7d7de9 feat: protect concurrent product maintenance`；Web `9f2c281 feat: guard product workspace edits`。父仓本轮固定 Backend gitlink；Web 继续作为独立仓库维护。
