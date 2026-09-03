@@ -4,6 +4,15 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-03 商品维护权限与并发保护 P3：已提交，未推送/部署
+
+- 已提交：Backend `b7d7de9 feat: protect concurrent product maintenance`；Web `9f2c281 feat: guard product workspace edits`。父仓本轮固定 Backend gitlink；Web 继续作为独立仓库维护。
+- `get_product_detail_v2` 返回目标 Item 的 `permissions.can_write`；Backend 新增可复用的文档权限判断，普通保存、启停和三个条码即时动作均显式要求目标 `Item.write`，不依赖浏览器按钮作为安全边界。
+- 新增共享 `OptimisticLockConflictError`。上述商品写动作接受读取时的 `item_modified`，版本变化时返回 HTTP 409、`DOCUMENT_VERSION_CONFLICT` 和结构化冲突数据，并在任何字段、图片、库存、价格或条码写入前失败关闭。
+- Web 将权限映射为 `ProductSummary.canWrite`。无写权限时，普通资料、单位与包装、库存估值、条码、单位风险纠正和保存入口明确只读；价格矩阵仍按独立 Item Price 权限判断。
+- 普通资料保存、商品列表启停和条码动作均携带商品版本。冲突不再只显示短暂消息，而是保留持久错误提示，并提供“刷新最新资料”动作；刷新会明确放弃本地未保存内容并载入服务器最新版本。
+- 验证：Backend `test_data_permission_service + test_wholesale_service + test_gateway_wrappers` 197 tests PASS；Web 定向 2 suites / 76 tests PASS、全量 52 suites / 349 tests PASS、`npm run tsc` PASS、`npm run biome:lint` 262 files PASS；Backend/Web `diff --check` PASS。既有 Jest open handle 提示仅出现在定向运行且退出码为 0，全量运行正常结束。
+
 ## 2026-09-03 商品维护审计时间线 P2：已提交，未推送/部署
 
 - 已提交：Backend `b7df29c feat: add product change audit timeline`；Web `8a72903 feat: show product change audit timeline`。父仓本轮固定 Backend gitlink；Web 继续作为独立仓库维护。
