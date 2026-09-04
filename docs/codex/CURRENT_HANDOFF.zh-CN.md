@@ -1,8 +1,22 @@
 # 当前交接状态
 
-更新时间：2026-09-03 CST
+更新时间：2026-09-04 CST
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
+
+## 2026-09-04 AI 语义命令 V2：已提交，未推送/未部署
+
+- 新增 `docs/05-development/08-ai-semantic-command-v2.zh-CN.md`，统一 `Intent → Target → Patch → Line Changes → Constraints → Evidence`，明确模型负责语义理解，Backend 只做实体解析、权限、业务校验、换算、状态机、幂等和执行。
+- 商品 Prompt 升级 `product-setup-draft-v7`：目标商品与新规格/新名称/新品牌彻底分离；支持 `patch.new_item_code`、`clear_fields` 和 `active_product`。关键案例“把可口可乐规格改为500ml”只搜索“可口可乐”。
+- 销售/采购 Prompt 升级 v5：新增 `target + header_patch + line_update_mode + line_changes`；Backend 在完整订单快照上合并局部行变更，未提及行保留，只改表头不执行明细替换，重复商品行无 row ID 时失败关闭。
+- 库存 Prompt 升级 v3：模型无法判断调整方式时返回 null，不再默认 `set_target`。库存 validation 已输出稳定 `issues.code/field`；其他草稿迁移期至少返回结构化通用 issue 并保留旧 errors。
+- 自动场景正常路径始终调用结构化意图模型；本地关键词仅在模型不可用、低置信度或非法输出时作为 `degraded_local_rules`。已删除简单问候 local fast path 和 Runtime“带某字”正则参数覆盖。
+- Web 已删除通过中文错误文本定位字段和识别版本冲突的控制流，改为消费 `validation.issues[]` 和稳定错误码；旧 errors 只展示。
+- 订单 V2 执行边界已补齐：表头 clear marker 通过 `header_clear_fields` 贯通生成、Web 编辑保存、执行前刷新、正式执行、交接和版本差异审计；销售备注、采购备注和供应商参考号可被真正清空。新建/`replace_all` 只允许 add 行；商品或 UOM 改变时重新解析计价基础，只有商品和 UOM 都未变化时才保留原订单价格。
+- 代码审查确认长期路线尚未全部完成：统一 Entity Resolver 尚未抽取；客户/供应商会话指代和库存 v3 商品指代仍有正则兼容路径；旧平铺订单 Schema 与查询 DSL 仍保留。设计文档已明确 Phase 1/Phase 2 首轮完成，Phase 3/Phase 4 仅部分完成，不能对外宣称全量完成。
+- 当前验证：Backend Python compile、`test_ai_service` 183 tests、AI repository/draft-state/gateway 205 tests、Backend 全量 unit 918 tests 均 PASS；AI Orchestrator full pytest 199 tests、Ruff、pre-commit、Docker test/runtime 镜像均 PASS；Web TypeScript、Biome、生产构建、定向 2 suites / 31 tests 与全量 58 suites / 377 tests PASS；Parent、Backend、AI Orchestrator、Web `diff --check` PASS。Web 全量 Jest 仍有既有 open-handle 提示，构建提示 Browserslist 数据较旧，但退出码均为 0。
+- 已提交：Backend `f982ffa feat: implement AI semantic command v2`；AI Orchestrator `27d656d feat: upgrade AI semantic command schemas`；Web `ff34d8c feat: align AI draft editor with semantic commands`。父仓提交负责固定 Backend/AI 子模块指针并收录设计文档和 README 索引。
+- 三个代码仓库工作树已清洁；尚未推送或部署。父仓任务前既有的 `AGENTS.md`、部署/规范文档、`.codex` 和多模态总结等用户改动继续保留，不能混入本轮提交。
 
 ## 2026-09-03 AI 库存调整估值与价格候选 P10：已提交，未推送/部署
 

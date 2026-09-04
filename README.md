@@ -175,6 +175,8 @@ Wait for a couple of minutes for ERPNext site to be created or check `create-sit
 
 ### [AI 业务操作台闭环设计](docs/05-development/04-ai-business-workbench.zh-CN.md)
 
+### [AI 语义命令 V2 设计](docs/05-development/08-ai-semantic-command-v2.zh-CN.md)
+
 ### [AI 高并发与性能设计](apps/myapp/AI_HIGH_CONCURRENCY_TECH_DESIGN.zh-CN.md)
 
 ### [Getting Started Guide](docs/getting-started.md)
