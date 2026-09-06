@@ -2,6 +2,39 @@
 
 更新时间：2026-09-06 CST
 
+## 2026-09-06 阶段提交完成，继续草稿契约绑定
+
+- Backend `7d2e969`、AI `5a03311`、Web `fff575d` 已提交本轮异步检测与动作契约阶段改动。AI 按子模块规则先推送 origin/develop，再由父仓固定指针；Backend/Web 不做额外推送或线上部署。
+- 下一步在此提交基线上补四类草稿直调保护、解析凭据复用、动作与草稿一致性及执行前校验。用户既有父仓 AGENTS.md、开发规则、模板、已知问题、.codex 和历史总结不纳入提交。
+
+## 2026-09-06 动作契约 P1 增量：自动入口及查询清除
+
+- AI erp-intent-v7 增加 action_contract（原动作、命令/咨询/否定、对象数量和保留标记）与 query_context_operations（reset/clear_fields），同步 Backend 期望 Prompt，意图 completion 预算 500→900。Schema 新字段可空便于旧响应读取，但自动写入口缺少契约时明确拒绝。
+- Backend 新增 ai_action_contract.py 纯函数能力目录；自动入口拒绝删除/取消/合并/启停等未支持动作、咨询/否定、多目标待确认，返回明确 ValidationError，不签发进入写草稿的 resolution_id。明确查询清除覆盖旧条件继承，全部重置保留当前明确新条件。
+- 验证：Backend 动作/AI service/Gateway 372 tests PASS；AI 221 tests / 19 subtests、pre-commit PASS；Docker test 221 tests PASS，Compose runtime build PASS；相关 diff check PASS。新增动作契约 Schema 与后端清除/多目标/否定测试。
+- 本地 AI 与 Backend 已更新并重启，release=local-action-contract-wip / revision=unversioned。真实 HTTP 使用 gpt-5.6-luna 对“删除百事可乐2和3，只保留一个百事可乐”回归 PASS（约 9 秒），自动解析入口返回 VALIDATION_ERROR 和明确不支持说明；没有调用草稿生成或正式删除。该测试在 test_ai_model_check_http 中，通过 MYAPP_HTTP_ACTION_TEST_MODEL 显式启用计费解析。
+- 边界：本次不是全链路动作契约完成。四类草稿直调和执行前 resolution_id/动作一致性校验仍待接入，完整目标清单、keep/set/clear、新 Web 澄清交互与能力证据状态机仍待实现。未携带查询清除控制字段的旧响应仍走兼容逻辑。不能宣称所有入口已覆盖。
+- 查询清除定向旁证通过：真实 gpt-5.6-luna 将“取消所有筛选，查看全部时间的订单，不限制金额”解析为 reset=true / clear_fields=[date_preset,min_amount]；随后以模拟旧条件（上月、金额至少两万、前三条）调用实际合并函数，结果 all / min_amount=null / latest / limit=10。此项是实际意图服务加模拟旧状态的服务层验证，不冒充浏览器多轮端到端。
+- 未提交、未推送、未部署 staging/production；上轮异步检查、P0 和用户既有改动继续保留。
+
+## 2026-09-06 AI 动作一致性治理：方案完成，P0 第一批实现
+
+- 完整分阶段方案：`docs/05-development/12-ai-action-contract-hardening.zh-CN.md`。覆盖动作/范围/支持能力契约、query keep/set/clear、resolution_id 绑定、UI 原始要求与计划差异、执行前重校验、逐能力证据及后台任务恢复。
+- 本轮 Backend：未知商品/订单 operation 直接 ValidationError；低置信度/无效语义结果不再由词法路由进入写草稿，返回 general / write_intent_requires_clarification；工具、视觉和 JSON Schema 瞬态错误保留旧能力（同时记录错误）。未修改业务数据，未替换运行镜像或重启服务，未提交推送。
+- 最终容器内动作/AI service/治理/Gateway 回归 403 tests PASS，Backend/父仓 diff check PASS。测试包含既有模拟 HTTPError ResourceWarning 与模拟日志写库提示，不代表真实 Provider 验收。新增 `test_ai_action_safety.py`，覆盖否定、低置信度、合法路由和非法操作边界；治理测试新增逐能力瞬态/确定性对照。
+- 尚未完成：模型把删除直接输出为合法 update 时的动作冲突检查；统一 capability/action 目录；四类草稿 resolution_id 绑定；明确查询清除与省略字段的结构化语义；多目标与混合请求完整性；Web 澄清和不支持反馈。不能宣称截图场景已修复。下一步按 P1 贯穿 Schema/Prompt/Backend/API/Web，并做真实 HTTP 与用户入口验收。
+- 之前异步检测的所有未提交改动与父仓用户改动保留，本轮代码只增量修改 Backend 服务/测试/API 文档及父仓方案/交接。
+
+## 2026-09-06 异步模型检测：本地实现与联调，未提交
+
+- Backend 新增持久化检测任务表、start/get/cancel 多层 Gateway、请求幂等、站点活动槽、逐项保存、失败隔离、取消与失联恢复；单项、已选、全部和定时任务共用引擎。定时改 basic，旧同步 API 暂保留兼容，不受活动槽保护。
+- AI availability 新增 basic/full 模式；basic 不探测其他能力，Backend 保留已有能力及能力错误。Web 默认快速检查，支持完整检测、进度与明细、刷新恢复、协作取消、异常及未完成项重试；不再等待同步全量请求。
+- 设计/运维/边界见 `docs/05-development/11-ai-model-check-jobs.zh-CN.md`；Backend API/测试说明、AI API、Web 开发说明已同步。当前串行逐项（站点并发 1），不承诺全量总耗时大幅缩短。尚无 Provider 子任务并发、outbox 自动补投、历史检索和保留期清理。
+- 验证：Backend 检测/治理/Gateway 195 tests PASS；Web tsc、Biome、58 suites / 385 tests PASS（Jest 仍有既有 open-handle 提示）；AI Ruff、pre-commit、pytest 218 tests / 19 subtests PASS；Docker test 218 tests PASS、runtime build PASS；四仓 diff check PASS。未做浏览器视觉/交互自动化验收。
+- 本地定向执行幂等建表补丁成功，正式部署仍需 migrate 登记 patch。已更新本地 AI、Backend、long worker、scheduler；AI readyz=true，release=`local-model-check-wip`、revision=`unversioned`，明确为未提交开发镜像；Web 8001 HTTP 200。
+- 真实 HTTP `test_ai_model_check_http` 2 tests PASS（约 8 秒）：Web 同参数组合通过 Gateway→adapter→service，重复 request_id 返回同一任务，真实 worker 逐项保存并完成，终态 cancel 保持不变。仅检测 `siliconflow/Qwen/Qwen3-VL-8B-Instruct` 一次 basic，结果 available=true；任务 `AI-CHECK-fac771502e8a488892cf5e0c14077020`。没有修改启停或 ERP 业务数据。
+- 当前 Backend、AI、Web 代码/测试/文档及父仓方案/交接均未提交、未推送；没有 staging/production 部署。父仓用户既有 AGENTS.md、开发规则、模板、已知问题、.codex、多模态总结原样保留。后续可进行浏览器验收，再按授权提交；AI 推送后父仓才固定 gitlink。
+
 ## 2026-09-06 本地提交与服务重启完成
 
 - Web `215d502`、Backend `333d854` 已本地提交；AI `9d92616` 已提交并按子模块规则推送 origin/develop。三个子仓工作树干净。

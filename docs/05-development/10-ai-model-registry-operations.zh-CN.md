@@ -1,5 +1,7 @@
 # AI 模型注册表操作与参数兼容性优化
 
+异步检测后续实现见 [AI 模型异步检测设计与运维](11-ai-model-check-jobs.zh-CN.md)。
+
 ## 设计依据（2026-09-06）
 
 - [LiteLLM 参数兼容](https://docs.litellm.ai/docs/completion/drop_params)：不支持的参数默认报错，允许按模型控制参数丢弃或透传。项目不启用全局静默丢弃，以免工具、结构化输出等业务要求被移除。
