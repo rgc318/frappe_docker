@@ -86,6 +86,34 @@ feature/* -> develop -> main -> build/deploy/release
 - `image_tag` 建议使用唯一 tag，例如 `staging-20260526-bff502e`，不要只依赖 `staging-latest` 判断部署内容
 - `Deploy staging stack` 与 `Init staging site` 会让服务器上的 `frappe_docker` 切换到当前 workflow 运行所选择的分支；例如在 Actions 页面选择 `develop` 运行，就会部署 `frappe_docker@develop` 的部署脚本
 
+### 1.2 测试服务器与正式发布的门禁分级
+
+本项目默认先在本地完成代码、静态检查、容器和必要评测，再提交并部署 staging。日常 staging 的目标是尽快验证“同一候选在真实部署环境中的效果”，不是提前执行一次 production 级发布审计。
+
+日常 staging 可以继续部署的情况：
+
+- 本地相关测试和确定性门禁已通过，提交与镜像 revision 可追溯。
+- 剩余失败是单次 Registry/SSH/DNS 波动、Provider timeout/5xx/空响应、CI Runner 中断或镜像拉取缓慢。
+- 失败没有显示业务逻辑、权限、安全、数据一致性、Schema、迁移或制品本身存在问题。
+- 继续部署不会覆盖有效治理报告；需要时保留上一条已验证 Policy，仅把新 revision 作为测试候选运行。
+
+必须阻断 staging 的情况：
+
+- 同一输入可以稳定复现错误业务结果，或目标真实场景验收失败。
+- 单元测试、静态检查、镜像构建、依赖检查或迁移出现确定性失败。
+- 出现越权、跨公司/租户泄露、安全门禁失败、数据损坏、丢失或不可恢复写入风险。
+- 镜像 revision、子模块指针、标签、digest 或报告 provenance 不一致。
+- 部署后服务无法启动、无法健康运行，或新版本造成持续业务中断。
+
+外部瞬时失败的时间控制：
+
+1. 不修改代码，不生成新 commit，不重建多个标签。
+2. 只对同一不可变镜像执行一次有上限的 workflow 重试，或一次有上限的拉取/部署重试。
+3. 旧服务仍健康时保持在线；重试成功后直接执行本次改动对应的 targeted smoke 和真实场景验收。
+4. 重试仍失败则记录为环境阻塞并停止消耗时间，不反复运行完整评测集。
+
+报告必须如实保留失败或 partial 状态，不能改写成 PASS。production、最终正式发布候选、重大数据迁移和安全敏感发布不适用上述放宽规则，仍需完成全部正式门禁、审批、备份与回滚验证。
+
 ---
 
 ## 2. 关键文件
@@ -124,6 +152,7 @@ runtime 镜像同时保留 `/home/frappe/frappe-bench/logs` 日志卷，并提�
 ### staging 运行文件
 
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.staging.yaml`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/haproxy.ai.cfg`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/compose.mariadb.staging.yaml`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/staging.env.example`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/init-staging-server.sh`
@@ -133,11 +162,37 @@ runtime 镜像同时保留 `/home/frappe/frappe-bench/logs` 日志卷，并提�
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/backup-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/restore-staging.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/check-staging.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/verify-ai-replica-set.sh`
+- `/home/rgc318/python-project/frappe_docker/deploy/staging/run-ai-slo-gate.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/init-site.sh`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/INIT_SITE.zh-CN.md`
 - `/home/rgc318/python-project/frappe_docker/deploy/staging/DATA_MIGRATION.zh-CN.md`
 
 `deploy/staging/check-staging.sh` 在 `MYAPP_AI_AGENT_RUNTIME_ENABLED=1` 时会读取内部发布策略快照并失败关闭。staging 必须至少存在一条处于有效时间窗口、`rollout_percentage > 0` 的 staging 发布策略，且有效策略的主模型或 fallback 中同时存在健康的 tool-ready 与 vision-ready 模型；缺少任一条件都会使部署后检查失败。该检查不自动创建、探测或发布策略，正式启用 Agent 和图片聊天前仍必须完成模型可用性/视觉探测、live/full 评测、审批和发布门禁。
+
+staging 的 Backend 和 Worker 默认访问 `http://ai-router:4010`，不直接绑定某一个 Orchestrator 容器。`MYAPP_AI_ORCHESTRATOR_REPLICAS` 可配置 1～10 个同版本副本，建议 staging 使用 2；内部 HAProxy 镜像固定 digest，使用 Docker DNS `server-template`、`leastconn` 和 `/readyz` 主动健康检查。连续失败的副本会被摘流，连续恢复后重新加入。`start-staging.sh` 和 `check-staging.sh` 会枚举全部实际副本，并失败关闭检查：副本数、Docker health、直接 `/readyz`、镜像 ID、release ID、runtime revision、protocol version、Prompt/Schema/Tool Manifest hash，以及 Router 返回身份。同一 stable/candidate 池内禁止混跑不同 revision。
+
+渐进发布使用 `ai-orchestrator` stable 池和 `ai-orchestrator-candidate` candidate 池。`run-ai-progressive-rollout.sh` 先直连验证 candidate，再按默认 `5,25,50,100` 阶段切流；每阶段核对真实分布、canary 和 SLO。流量 bucket、release affinity 和状态持久化在忽略版本控制的 `artifacts/staging/ai-router/`，Router 重启不会丢失阶段。HAProxy Runtime API 原子更新两张 map；unknown release affinity 直接 503。Backend 的 Agent resume 从 Run 读取 `release_id` 并发送 `X-MyApp-AI-Release-Affinity`，保证 checkpoint 回到原运行制品。
+
+达到 100% 后 `finalize-ai-progressive-rollout.sh` 只进入 `draining`，不会立即删除旧 stable。fresh request 继续 100% 进入新版本，旧 release 只承接自己的 resume，默认保留 `AI_ROLLOUT_DRAIN_SECONDS=86400`。截止后运行 `complete-ai-progressive-rollout.sh`，先关闭旧 affinity，再把新版本收敛到 stable 并停止 candidate。阶段失败或人工 `abort-ai-progressive-rollout.sh` 会反向执行：fresh traffic 先恢复旧 stable，candidate 仅为已产生的 release-affined resume 保留到 drain 截止。draining/promoting 未完成前禁止开始下一次不同 release 部署。
+
+GitHub `Deploy staging stack` 的 `progressive_ai_rollout=true` 执行渐进发布并进入 drain；到期后使用同一当前 `image_tag`、设置 `complete_ai_drain=true` 完成退休。两个输入不能同时启用。紧急提前退休只能在服务器上显式设置 `AI_ROLLOUT_FORCE_COMPLETE=1`，并单独记录原因。
+
+`Deploy staging stack` workflow 默认同时启用 `RUN_AI_STAGING_CANARY=1`。canary 在 Backend 容器内按当前 `ai-runtime-contract-v1` 调用真实 Orchestrator，默认覆盖 `/readyz`、意图识别、普通只读 Chat 和商品资料草稿生成；草稿只生成候选，不确认执行，不创建 ERP 单据。可通过 `AI_CANARY_SCENARIOS` 扩展到销售、采购、库存和商品四类草稿，通过 `AI_CANARY_MODEL_ALIAS` 固定模型，通过 `AI_CANARY_COMPANY` 限定公司。
+
+canary 报告写入忽略版本控制的 `artifacts/staging/ai-canary/`，状态只有：
+
+- `passed`：全部场景及响应运行元数据通过，可登记为回滚候选。
+- `partial`：只有 Provider timeout、429、5xx 或网络类瞬时失败；同一制品最多自动重试一次。日常 staging 可保留该事实并继续环境验证，但不会登记为已验证回滚候选；正式候选用 `AI_CANARY_REQUIRE_PASS=1` 阻断。
+- `failed`：契约、认证、Schema、能力、发布 ID、Provider 4xx 或响应内容出现确定性错误；脚本立即非零退出，workflow 自动停止。
+
+canary 完成后，`run-ai-slo-gate.sh` 会生成 `artifacts/staging/ai-slo/<release-id>-<timestamp>.json` 并刷新 `current-alert-state.json`。默认目标由 `AI_SLO_MIN_SUCCESS_RATE=0.995`、`AI_SLO_MIN_SAMPLES=20` 和 `AI_SLO_MAX_P95_MS=30000` 控制；可以通过 `AI_SLO_LOAD_REPORT_PATH` 合并现有负载报告。状态语义为：`passed` 已达到样本和目标，`warning` 表示瞬时 partial 或样本不足，`failed` 表示确定性 canary、契约错误、成功率或延迟越界。`AI_SLO_REQUIRE_PASS=1` 会让 warning 也阻断最终候选。只有显式设置 `AI_SLO_ALERT_WEBHOOK_URL` 才会发送告警；`AI_SLO_ALERT_DELIVERY_REQUIRED=1` 才把投递失败作为阻断条件。
+
+每个 `passed` 报告会生成 `artifacts/staging/ai-releases/<release-id>.json`，绑定共同 release ID、Backend 精确 revision、AI 精确 revision、两个镜像 ID/RepoDigest 与 canary 报告哈希。Backend 构建会校验实际 clone 的 `apps/myapp` HEAD 与构建前解析的 SHA 相同，关闭移动分支造成的 TOCTOU 标记漂移。`rollback-staging.sh` 在修改环境文件前先拉取目标双镜像并验证该发布对；tag 已被覆盖、digest/revision 不同或从未通过 canary 时默认拒绝回滚。若处于 active/draining/promoting，只允许回滚到状态文件记录的旧 stable，并先自动 abort 灰度；其他目标必须先完成当前 drain。`ALLOW_UNQUALIFIED_ROLLBACK=1` 仅作为需要单独记录的 break-glass 应急开关，不能绕过活动灰度的流量安全约束。
+
+正式 staging 配置保持 `STAGING_REQUIRE_PAIRED_RELEASE=1`，使环境校验直接拒绝不一致的 Backend/AI tag。仅用于本机兼容调试的旧配置可以不设置；一旦启用 canary，双 tag 一致仍是无条件前提。
+
+通用 canary 不自动生成 Agent 工具能力 Token。Agent/工具真实验收必须使用专用最小权限 staging 用户和认证 HTTP 场景，避免发布脚本天然获得宽泛 ERP 数据权限。
 
 ---
 

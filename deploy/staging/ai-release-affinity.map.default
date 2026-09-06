@@ -1,0 +1,2 @@
+# Unknown release affinities fail closed through ai_affinity_missing.
+__default__ ai_affinity_missing

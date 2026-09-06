@@ -177,6 +177,8 @@ Wait for a couple of minutes for ERPNext site to be created or check `create-sit
 
 ### [AI 语义命令 V2 设计](docs/05-development/08-ai-semantic-command-v2.zh-CN.md)
 
+### [AI 运行契约、就绪治理与发布一致性设计](docs/05-development/09-ai-runtime-contract-and-readiness.zh-CN.md)
+
 ### [AI 高并发与性能设计](apps/myapp/AI_HIGH_CONCURRENCY_TECH_DESIGN.zh-CN.md)
 
 ### [Getting Started Guide](docs/getting-started.md)

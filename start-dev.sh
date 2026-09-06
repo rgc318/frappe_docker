@@ -10,6 +10,13 @@ if [[ ! -f "${ROOT_DIR}/services/myapp-ai/Dockerfile" ]]; then
   exit 1
 fi
 
+AI_RUNTIME_GIT_REVISION="$(git -C "${ROOT_DIR}/services/myapp-ai" rev-parse --verify HEAD)"
+if [[ -n "$(git -C "${ROOT_DIR}/services/myapp-ai" status --porcelain)" ]]; then
+  AI_RUNTIME_GIT_REVISION="${AI_RUNTIME_GIT_REVISION}-dirty"
+fi
+export MYAPP_AI_RUNTIME_REVISION="${MYAPP_AI_RUNTIME_REVISION:-${AI_RUNTIME_GIT_REVISION}}"
+export MYAPP_AI_RELEASE_ID="${MYAPP_AI_RELEASE_ID:-local-${MYAPP_AI_RUNTIME_REVISION}}"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --with-observability)
@@ -90,3 +97,4 @@ for service in backend queue-short queue-long queue-ai-vector scheduler; do
 done
 "${ROOT_DIR}/verify-ai-gateway-runtime-env.sh" \
   "${ROOT_DIR}/.env.ai.gateway.local" "${AI_GATEWAY_CONTAINER_IDS[@]}"
+"${ROOT_DIR}/verify-ai-runtime-compatibility.sh" "${AI_GATEWAY_CONTAINER_IDS[0]}"

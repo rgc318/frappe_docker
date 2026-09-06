@@ -1,0 +1,2 @@
+# Buckets absent from this map use the ai_stable default in haproxy.ai.cfg.
+__default__ ai_stable

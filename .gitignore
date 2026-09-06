@@ -50,6 +50,7 @@ dev/
 reference_photos/
 screenshots/
 backups/ai/
+artifacts/staging/
 
 # Nested frontend repositories managed separately
 frontend/myapp-mobile/

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       myapp_ref:
-        description: "myapp branch, tag, or commit to build into the image"
+        description: "myapp branch or tag to build into the image"
         required: true
         default: "main"
         type: string
@@ -53,6 +53,24 @@ jobs:
       - name: Capture AI source revision
         id: ai_source
         run: echo "sha=$(git -C services/myapp-ai rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve Backend source revision
+        id: myapp_source
+        env:
+          MYAPP_REF: ${{ inputs.myapp_ref }}
+        run: |
+          set -euo pipefail
+          rows="$(git ls-remote https://github.com/rgc318/myapp.git \
+            "refs/heads/${MYAPP_REF}" "refs/tags/${MYAPP_REF}" "refs/tags/${MYAPP_REF}^{}")"
+          sha="$(printf '%s\n' "${rows}" | awk '$2 ~ /\^\{\}$/ { print $1; exit }')"
+          if [ -z "${sha}" ]; then
+            sha="$(printf '%s\n' "${rows}" | awk 'NR == 1 { print $1 }')"
+          fi
+          if ! printf '%s' "${sha}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Could not resolve immutable myapp revision for ${MYAPP_REF}."
+            exit 1
+          fi
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
       - name: Create apps.staging.json
         run: |
@@ -104,6 +122,8 @@ jobs:
             org.rgc.frappe_ref=${{ inputs.frappe_ref }}
             org.rgc.erpnext_ref=${{ inputs.erpnext_ref }}
             org.rgc.myapp_ref=${{ inputs.myapp_ref }}
+            org.rgc.myapp_revision=${{ steps.myapp_source.outputs.sha }}
+            org.rgc.release_id=${{ inputs.image_tag }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -119,6 +139,8 @@ jobs:
             FRAPPE_PATH=${{ env.FRAPPE_PATH }}
             ERPNEXT_REF=${{ inputs.erpnext_ref }}
             MYAPP_REF=${{ inputs.myapp_ref }}
+            MYAPP_REVISION=${{ steps.myapp_source.outputs.sha }}
+            RELEASE_ID=${{ inputs.image_tag }}
             APPS_JSON_BASE64=${{ steps.apps_json.outputs.value }}
             CACHE_BUST=${{ github.run_id }}-${{ github.run_attempt }}
 
@@ -138,6 +160,7 @@ jobs:
             org.opencontainers.image.revision=${{ steps.ai_source.outputs.sha }}
             org.rgc.frappe_docker_ref=${{ github.ref_name }}
             org.rgc.myapp_ai_ref=${{ steps.ai_source.outputs.sha }}
+            org.rgc.release_id=${{ inputs.image_tag }}
 
       - name: Build and push AI orchestrator
         uses: docker/build-push-action@v6
@@ -150,4 +173,5 @@ jobs:
           tags: ${{ steps.ai_meta.outputs.tags }}
           build-args: |
             MYAPP_AI_RUNTIME_REVISION=${{ steps.ai_source.outputs.sha }}
+            MYAPP_AI_RELEASE_ID=${{ inputs.image_tag }}
           labels: ${{ steps.ai_meta.outputs.labels }}

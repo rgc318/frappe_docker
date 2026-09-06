@@ -18,8 +18,10 @@ fi
 "${ROOT_DIR}/validate-secret-env-files.sh" "${ENV_FILE}"
 
 python3 - "${ENV_FILE}" <<'PY'
-from pathlib import Path
+import os
+import re
 import sys
+from pathlib import Path
 from urllib.parse import urlparse
 
 path = Path(sys.argv[1])
@@ -45,6 +47,19 @@ missing = [key for key in required if not values.get(key)]
 if missing:
     raise SystemExit(f"Missing required staging variables: {', '.join(missing)}")
 
+require_release_pair = os.environ.get(
+    "STAGING_REQUIRE_PAIRED_RELEASE",
+    values.get("STAGING_REQUIRE_PAIRED_RELEASE", "0"),
+).lower() in {"1", "true", "yes"}
+if require_release_pair and values["CUSTOM_TAG"] != values["MYAPP_AI_TAG"]:
+    raise SystemExit("CUSTOM_TAG and MYAPP_AI_TAG must identify the same Backend/AI release pair")
+
+release_tag_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+for key in ("CUSTOM_TAG", "MYAPP_AI_TAG", "MYAPP_AI_CANDIDATE_TAG"):
+    value = values.get(key, "")
+    if value and not release_tag_pattern.fullmatch(value):
+        raise SystemExit(f"{key} must be a Docker tag-safe release identifier of at most 128 characters")
+
 placeholder_markers = ("<github-owner>", "replace-with", "changeit", "example.internal")
 placeholders = [
     key
@@ -58,6 +73,48 @@ for key in ("MYAPP_AI_LITELLM_BASE_URL",):
     parsed = urlparse(values[key])
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise SystemExit(f"{key} must be an absolute HTTP(S) URL")
+
+try:
+    orchestrator_replicas = int(values.get("MYAPP_AI_ORCHESTRATOR_REPLICAS", "1"))
+except ValueError as error:
+    raise SystemExit("MYAPP_AI_ORCHESTRATOR_REPLICAS must be an integer") from error
+if not 1 <= orchestrator_replicas <= 10:
+    raise SystemExit("MYAPP_AI_ORCHESTRATOR_REPLICAS must be between 1 and 10")
+orchestrator_url = urlparse(values.get("MYAPP_AI_ORCHESTRATOR_URL", "http://ai-router:4010"))
+if orchestrator_replicas > 1 and orchestrator_url.hostname != "ai-router":
+    raise SystemExit("Multiple AI replicas require MYAPP_AI_ORCHESTRATOR_URL=http://ai-router:4010")
+
+try:
+    candidate_replicas = int(values.get("MYAPP_AI_CANDIDATE_REPLICAS", "1"))
+except ValueError as error:
+    raise SystemExit("MYAPP_AI_CANDIDATE_REPLICAS must be an integer") from error
+if not 1 <= candidate_replicas <= 10:
+    raise SystemExit("MYAPP_AI_CANDIDATE_REPLICAS must be between 1 and 10")
+candidate_tag = values.get("MYAPP_AI_CANDIDATE_TAG", "")
+if candidate_tag and candidate_tag == values["MYAPP_AI_TAG"]:
+    raise SystemExit("MYAPP_AI_CANDIDATE_TAG must differ from MYAPP_AI_TAG")
+try:
+    rollout_stages = [int(value) for value in values.get("AI_ROLLOUT_STAGES", "5,25,50,100").split(",")]
+except ValueError as error:
+    raise SystemExit("AI_ROLLOUT_STAGES must be comma-separated integers") from error
+if not rollout_stages or any(not 1 <= value <= 100 for value in rollout_stages):
+    raise SystemExit("AI_ROLLOUT_STAGES values must be between 1 and 100")
+if rollout_stages != sorted(set(rollout_stages)):
+    raise SystemExit("AI_ROLLOUT_STAGES must be strictly increasing without duplicates")
+for key, minimum in (
+    ("AI_ROLLOUT_DWELL_SECONDS", 0),
+    ("AI_ROLLOUT_SAMPLE_COUNT", 100),
+    ("AI_ROLLOUT_DRAIN_SECONDS", 60),
+):
+    try:
+        default = {"AI_ROLLOUT_DWELL_SECONDS": "30", "AI_ROLLOUT_SAMPLE_COUNT": "500"}.get(
+            key, "86400"
+        )
+        value = int(values.get(key, default))
+    except ValueError as error:
+        raise SystemExit(f"{key} must be an integer") from error
+    if value < minimum:
+        raise SystemExit(f"{key} must be at least {minimum}")
 
 if len(values["MYAPP_AI_SERVICE_TOKEN"]) < 32:
     raise SystemExit("MYAPP_AI_SERVICE_TOKEN must contain at least 32 characters")

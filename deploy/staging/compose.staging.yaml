@@ -9,7 +9,7 @@ x-depends-on-configurator: &depends_on_configurator
       condition: service_completed_successfully
 
 x-ai-gateway-environment: &ai_gateway_environment
-  MYAPP_AI_ORCHESTRATOR_URL: ${MYAPP_AI_ORCHESTRATOR_URL:-http://ai-orchestrator:4010}
+  MYAPP_AI_ORCHESTRATOR_URL: ${MYAPP_AI_ORCHESTRATOR_URL:-http://ai-router:4010}
   MYAPP_AI_SERVICE_TOKEN: ${MYAPP_AI_SERVICE_TOKEN:?MYAPP_AI_SERVICE_TOKEN is required}
   MYAPP_AI_AGENT_RUNTIME_ENABLED: ${MYAPP_AI_AGENT_RUNTIME_ENABLED:-1}
   MYAPP_AI_VECTOR_SEARCH_ENABLED: ${MYAPP_AI_VECTOR_SEARCH_ENABLED:-0}
@@ -112,7 +112,7 @@ services:
       <<: *ai_gateway_environment
 
   ai-orchestrator:
-    image: ${MYAPP_AI_IMAGE:-myapp-ai}:${MYAPP_AI_TAG:-staging-latest}
+    image: ${MYAPP_AI_IMAGE:-myapp-ai}:${MYAPP_AI_STABLE_TAG:-${MYAPP_AI_TAG:-staging-latest}}
     pull_policy: ${PULL_POLICY:-always}
     restart: ${RESTART_POLICY:-unless-stopped}
     read_only: true
@@ -126,13 +126,15 @@ services:
       <<: *ai_orchestrator_environment
     volumes:
       - ../../ai-governance-reports:/var/lib/myapp-ai/governance-reports:ro
+    deploy:
+      replicas: ${MYAPP_AI_ORCHESTRATOR_REPLICAS:-1}
     healthcheck:
       test:
         [
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:4010/health', timeout=3)",
+          "import json, urllib.request; data=json.load(urllib.request.urlopen('http://localhost:4010/readyz', timeout=3)); assert data.get('ready') is True, data",
         ]
       interval: 10s
       timeout: 5s
@@ -140,6 +142,66 @@ services:
       start_period: 15s
     depends_on:
       ai-vector:
+        condition: service_healthy
+
+  ai-orchestrator-candidate:
+    profiles:
+      - ai-rollout
+    image: ${MYAPP_AI_IMAGE:-myapp-ai}:${MYAPP_AI_CANDIDATE_TAG:-${MYAPP_AI_TAG:-staging-latest}}
+    pull_policy: ${PULL_POLICY:-always}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    environment:
+      <<: *ai_orchestrator_environment
+    volumes:
+      - ../../ai-governance-reports:/var/lib/myapp-ai/governance-reports:ro
+    deploy:
+      replicas: ${MYAPP_AI_CANDIDATE_REPLICAS:-1}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import json, urllib.request; data=json.load(urllib.request.urlopen('http://localhost:4010/readyz', timeout=3)); assert data.get('ready') is True, data",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    depends_on:
+      ai-vector:
+        condition: service_healthy
+
+  ai-router:
+    image: haproxy@sha256:0666a2c2f41d341084ed2da85392b48cdcd766adfa28231f31305724ed5c6ea5
+    platform: linux/amd64
+    restart: ${RESTART_POLICY:-unless-stopped}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    volumes:
+      - ./haproxy.ai.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ../../artifacts/staging/ai-router:/var/lib/haproxy/ai-router:ro
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -q --spider http://127.0.0.1:4010/readyz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      ai-orchestrator:
         condition: service_healthy
 
   ai-vector-init:
@@ -261,7 +323,7 @@ services:
     depends_on:
       configurator:
         condition: service_completed_successfully
-      ai-orchestrator:
+      ai-router:
         condition: service_healthy
 
   scheduler:

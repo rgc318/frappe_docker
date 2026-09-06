@@ -12,9 +12,10 @@ services:
         - -c
         - >-
           import json, urllib.request;
+          ready=json.load(urllib.request.urlopen('http://localhost:4010/readyz', timeout=3));
           data=json.load(urllib.request.urlopen('http://localhost:4010/health', timeout=3));
           delivery=data.get('langfuse_delivery') or {};
-          assert data.get('status') == 'ok' and data.get('langfuse_configured') is True and delivery.get('enabled') is True, data
+          assert ready.get('ready') is True and data.get('status') == 'ok' and data.get('langfuse_configured') is True and delivery.get('enabled') is True, {'ready': ready, 'health': data}
 
   langfuse-worker:
     image: docker.io/langfuse/langfuse-worker:${LANGFUSE_VERSION:-3.212.0}

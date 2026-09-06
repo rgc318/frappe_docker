@@ -76,6 +76,9 @@ services:
   ai-orchestrator:
     build:
       context: ./services/myapp-ai
+      args:
+        MYAPP_AI_RUNTIME_REVISION: ${MYAPP_AI_RUNTIME_REVISION:-unversioned}
+        MYAPP_AI_RELEASE_ID: ${MYAPP_AI_RELEASE_ID:-local-unversioned}
     restart: ${RESTART_POLICY:-unless-stopped}
     read_only: true
     cap_drop:
@@ -96,7 +99,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:4010/health', timeout=3)",
+          "import json, urllib.request; data=json.load(urllib.request.urlopen('http://localhost:4010/readyz', timeout=3)); assert data.get('ready') is True, data",
         ]
       interval: 10s
       timeout: 5s

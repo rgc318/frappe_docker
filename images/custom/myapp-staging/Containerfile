@@ -6,6 +6,7 @@ ARG FRAPPE_BRANCH=v16.18.3
 ARG FRAPPE_PATH=https://github.com/frappe/frappe
 ARG ERPNEXT_REF=v16.18.3
 ARG MYAPP_REF=main
+ARG MYAPP_REVISION=unversioned
 ARG APPS_JSON_BASE64
 ARG CACHE_BUST=manual
 ARG HTTP_PROXY
@@ -56,6 +57,11 @@ RUN --mount=type=cache,target=/home/frappe/.cache/uv,uid=1000,gid=1000 \
     sleep $((attempt * 5)); \
   done; \
   cd /home/frappe/frappe-bench; \
+  actual_myapp_revision="$(git -C apps/myapp rev-parse HEAD)"; \
+  if [ "${MYAPP_REVISION}" != "unversioned" ] && [ "${actual_myapp_revision}" != "${MYAPP_REVISION}" ]; then \
+    echo "myapp source drift: expected ${MYAPP_REVISION}, got ${actual_myapp_revision}" >&2; \
+    exit 1; \
+  fi; \
   echo "{}" > sites/common_site_config.json; \
   uv pip install \
     --upgrade \
@@ -86,11 +92,15 @@ FROM frappe/base:${FRAPPE_BRANCH} AS backend
 ARG FRAPPE_BRANCH=v16.18.3
 ARG ERPNEXT_REF=v16.18.3
 ARG MYAPP_REF=main
+ARG MYAPP_REVISION=unversioned
+ARG RELEASE_ID=unversioned
 ARG CACHE_BUST=manual
 
 LABEL org.rgc.frappe_ref="${FRAPPE_BRANCH}" \
   org.rgc.erpnext_ref="${ERPNEXT_REF}" \
   org.rgc.myapp_ref="${MYAPP_REF}" \
+  org.rgc.myapp_revision="${MYAPP_REVISION}" \
+  org.rgc.release_id="${RELEASE_ID}" \
   org.rgc.cache_bust="${CACHE_BUST}"
 
 USER root

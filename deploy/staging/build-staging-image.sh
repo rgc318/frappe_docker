@@ -62,8 +62,18 @@ FRAPPE_BRANCH="${FRAPPE_BRANCH:-$(read_env FRAPPE_BRANCH || printf 'v16.18.3')}"
 FRAPPE_PATH="${FRAPPE_PATH:-$(read_env FRAPPE_PATH || printf 'https://github.com/frappe/frappe')}"
 ERPNEXT_REF="${ERPNEXT_REF:-$(read_app_ref 'frappe/erpnext' || read_env ERPNEXT_BRANCH || printf 'v16.18.3')}"
 MYAPP_REF="${MYAPP_REF:-$(read_app_ref 'rgc318/myapp' || read_env MYAPP_BRANCH || printf 'main')}"
+MYAPP_REVISION="${MYAPP_REVISION:-}"
 CACHE_BUST="${CACHE_BUST:-local-$(date +%s)}"
 BUILD_NETWORK="${BUILD_NETWORK:-default}"
+
+if [[ -z "${MYAPP_REVISION}" ]]; then
+  remote_rows="$(git ls-remote https://github.com/rgc318/myapp.git \
+    "refs/heads/${MYAPP_REF}" "refs/tags/${MYAPP_REF}" "refs/tags/${MYAPP_REF}^{}")"
+  MYAPP_REVISION="$(printf '%s\n' "${remote_rows}" | awk '$2 ~ /\^\{\}$/ { print $1; exit }')"
+  if [[ -z "${MYAPP_REVISION}" ]]; then
+    MYAPP_REVISION="$(printf '%s\n' "${remote_rows}" | awk 'NR == 1 { print $1 }')"
+  fi
+fi
 
 if [[ -n "${BUILD_HTTP_PROXY+x}" ]]; then
   HTTP_PROXY_ARG="${BUILD_HTTP_PROXY}"
@@ -87,6 +97,7 @@ fi
 : "${CUSTOM_TAG:?CUSTOM_TAG is required}"
 : "${MYAPP_AI_IMAGE:?MYAPP_AI_IMAGE is required}"
 : "${MYAPP_AI_TAG:?MYAPP_AI_TAG is required}"
+: "${MYAPP_REVISION:?Could not resolve immutable MYAPP_REVISION for MYAPP_REF=${MYAPP_REF}}"
 
 APPS_JSON_BASE64="$(base64 -w 0 "${APPS_JSON_FILE}")"
 
@@ -96,6 +107,8 @@ docker build \
   --build-arg FRAPPE_PATH="${FRAPPE_PATH}" \
   --build-arg ERPNEXT_REF="${ERPNEXT_REF}" \
   --build-arg MYAPP_REF="${MYAPP_REF}" \
+  --build-arg MYAPP_REVISION="${MYAPP_REVISION}" \
+  --build-arg RELEASE_ID="${CUSTOM_TAG}" \
   --build-arg APPS_JSON_BASE64="${APPS_JSON_BASE64}" \
   --build-arg CACHE_BUST="${CACHE_BUST}" \
   --build-arg HTTP_PROXY="${HTTP_PROXY_ARG}" \
@@ -109,6 +122,10 @@ echo "Built image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}"
 
 docker build \
   --network "${BUILD_NETWORK}" \
+  --build-arg MYAPP_AI_RUNTIME_REVISION="$(git -C "${ROOT_DIR}/services/myapp-ai" rev-parse --verify HEAD)" \
+  --build-arg MYAPP_AI_RELEASE_ID="${MYAPP_AI_TAG}" \
+  --label "org.opencontainers.image.revision=$(git -C "${ROOT_DIR}/services/myapp-ai" rev-parse --verify HEAD)" \
+  --label "org.rgc.release_id=${MYAPP_AI_TAG}" \
   --build-arg HTTP_PROXY="${HTTP_PROXY_ARG}" \
   --build-arg HTTPS_PROXY="${HTTPS_PROXY_ARG}" \
   --build-arg NO_PROXY="${NO_PROXY_ARG}" \

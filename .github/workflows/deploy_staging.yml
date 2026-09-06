@@ -23,6 +23,21 @@ on:
         required: true
         default: false
         type: boolean
+      run_ai_canary:
+        description: "Run bounded AI scenario canary and qualify the Backend/AI release pair"
+        required: true
+        default: true
+        type: boolean
+      progressive_ai_rollout:
+        description: "Ramp a different AI candidate through 5/25/50/100 before switching the paired release"
+        required: true
+        default: false
+        type: boolean
+      complete_ai_drain:
+        description: "Retire the drained AI release after its recorded deadline and promote the candidate to stable"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -45,6 +60,8 @@ jobs:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           RUN_HTTP_REGRESSION: ${{ inputs.run_http_regression }}
+          PROGRESSIVE_AI_ROLLOUT: ${{ inputs.progressive_ai_rollout }}
+          COMPLETE_AI_DRAIN: ${{ inputs.complete_ai_drain }}
           STAGING_HTTP_USERNAME: ${{ secrets.STAGING_HTTP_USERNAME }}
           STAGING_HTTP_PASSWORD: ${{ secrets.STAGING_HTTP_PASSWORD }}
           STAGING_HTTP_API_KEY: ${{ secrets.STAGING_HTTP_API_KEY }}
@@ -83,6 +100,11 @@ jobs:
             fi
           fi
 
+          if [ "${PROGRESSIVE_AI_ROLLOUT}" = "true" ] && [ "${COMPLETE_AI_DRAIN}" = "true" ]; then
+            echo "progressive_ai_rollout and complete_ai_drain cannot be requested together."
+            exit 1
+          fi
+
           if ! printf '%s' "${STAGING_SSH_PORT}" | grep -Eq '^[0-9]+$'; then
             echo "STAGING_SSH_PORT must be digits only, without spaces or newlines."
             exit 1
@@ -103,13 +125,15 @@ jobs:
           IMAGE_TAG: ${{ inputs.image_tag }}
           SITE_NAME: ${{ inputs.site_name }}
           DEPLOY_REF_NAME: ${{ github.ref_name }}
+          PROGRESSIVE_AI_ROLLOUT: ${{ inputs.progressive_ai_rollout }}
+          COMPLETE_AI_DRAIN: ${{ inputs.complete_ai_drain }}
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}
           port: ${{ secrets.STAGING_SSH_PORT }}
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
           command_timeout: 60m
-          envs: GHCR_USERNAME,GHCR_TOKEN,IMAGE_TAG,SITE_NAME,DEPLOY_REF_NAME
+          envs: GHCR_USERNAME,GHCR_TOKEN,IMAGE_TAG,SITE_NAME,DEPLOY_REF_NAME,PROGRESSIVE_AI_ROLLOUT,COMPLETE_AI_DRAIN
           script: |
             set -euo pipefail
             cd /srv/frappe_docker
@@ -132,6 +156,48 @@ jobs:
               exit 1
             fi
 
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+
+            ROLLOUT_STARTED=0
+            CURRENT_AI_TAG="$(grep -E '^MYAPP_AI_TAG=' deploy/staging/staging.env | tail -n 1 | cut -d= -f2- || true)"
+            if [ -f artifacts/staging/ai-router/rollout-state.json ]; then
+              CURRENT_ROLLOUT_STATUS="$(python3 - artifacts/staging/ai-router/rollout-state.json <<'PY'
+            import json
+            import sys
+
+            print(json.load(open(sys.argv[1], encoding="utf-8")).get("status") or "")
+            PY
+            )"
+              if { [ "${CURRENT_ROLLOUT_STATUS}" = "draining" ] || [ "${CURRENT_ROLLOUT_STATUS}" = "promoting" ]; } && [ "${CURRENT_AI_TAG}" != "${IMAGE_TAG}" ]; then
+                echo "Cannot deploy a different paired release while AI rollout is ${CURRENT_ROLLOUT_STATUS}."
+                exit 1
+              fi
+            fi
+            if [ "${PROGRESSIVE_AI_ROLLOUT}" = "true" ] && [ "${CURRENT_AI_TAG}" != "${IMAGE_TAG}" ]; then
+              echo "Starting progressive AI rollout from ${CURRENT_AI_TAG} to ${IMAGE_TAG}."
+              AI_ROLLOUT_CANDIDATE_TAG="${IMAGE_TAG}" \
+                ./deploy/staging/run-ai-progressive-rollout.sh
+              ROLLOUT_STARTED=1
+            fi
+            if [ "${PROGRESSIVE_AI_ROLLOUT}" = "true" ] && [ -f artifacts/staging/ai-router/rollout-state.json ]; then
+              PENDING_FINALIZATION="$(python3 - "${IMAGE_TAG}" artifacts/staging/ai-router/rollout-state.json <<'PY'
+            import json
+            import sys
+
+            image_tag = sys.argv[1]
+            state = json.load(open(sys.argv[2], encoding="utf-8"))
+            print("1" if (
+                state.get("status") == "active"
+                and state.get("candidate_percent") == 100
+                and state.get("candidate_release_id") == image_tag
+            ) else "0")
+            PY
+            )"
+              if [ "${PENDING_FINALIZATION}" = "1" ]; then
+                ROLLOUT_STARTED=1
+              fi
+            fi
+
             if grep -q '^CUSTOM_TAG=' deploy/staging/staging.env; then
               sed -i "s/^CUSTOM_TAG=.*/CUSTOM_TAG=${IMAGE_TAG}/" deploy/staging/staging.env
             else
@@ -144,14 +210,20 @@ jobs:
               printf '\nMYAPP_AI_TAG=%s\n' "${IMAGE_TAG}" >> deploy/staging/staging.env
             fi
 
-            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
             SITE_NAME="${SITE_NAME}" ./deploy/staging/deploy-staging.sh
+            if [ "${ROLLOUT_STARTED}" = "1" ]; then
+              ./deploy/staging/finalize-ai-progressive-rollout.sh
+            fi
+            if [ "${COMPLETE_AI_DRAIN}" = "true" ]; then
+              ./deploy/staging/complete-ai-progressive-rollout.sh
+            fi
 
       - name: Run health check
         if: ${{ inputs.run_health_check }}
         uses: appleboy/ssh-action@v1.2.2
         env:
           RUN_STAGING_HTTP_REGRESSION: ${{ inputs.run_http_regression && '1' || '0' }}
+          RUN_AI_STAGING_CANARY: ${{ inputs.run_ai_canary && '1' || '0' }}
           STAGING_HTTP_USERNAME: ${{ secrets.STAGING_HTTP_USERNAME }}
           STAGING_HTTP_PASSWORD: ${{ secrets.STAGING_HTTP_PASSWORD }}
           STAGING_HTTP_API_KEY: ${{ secrets.STAGING_HTTP_API_KEY }}
@@ -163,7 +235,7 @@ jobs:
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
           command_timeout: 15m
-          envs: RUN_STAGING_HTTP_REGRESSION,STAGING_HTTP_USERNAME,STAGING_HTTP_PASSWORD,STAGING_HTTP_API_KEY,STAGING_HTTP_API_SECRET,STAGING_HTTP_BEARER_TOKEN
+          envs: RUN_STAGING_HTTP_REGRESSION,RUN_AI_STAGING_CANARY,STAGING_HTTP_USERNAME,STAGING_HTTP_PASSWORD,STAGING_HTTP_API_KEY,STAGING_HTTP_API_SECRET,STAGING_HTTP_BEARER_TOKEN
           script: |
             set -euo pipefail
             cd /srv/frappe_docker

@@ -6,6 +6,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/deploy/staging/staging.env}"
 STAGING_MODE="${STAGING_MODE:-${DEPLOY_MODE:-internal}}"
 COMPOSE_BASE="${ROOT_DIR}/deploy/staging/compose.staging.yaml"
+COMPOSE_PROFILE_ARGS=()
+ROLLOUT_STATE_PATH="${AI_ROUTER_ROLLOUT_STATE_PATH:-${ROOT_DIR}/artifacts/staging/ai-router/rollout-state.json}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing env file: ${ENV_FILE}"
@@ -25,6 +27,7 @@ fi
 
 compose() {
   docker compose \
+    "${COMPOSE_PROFILE_ARGS[@]}" \
     --env-file "${ENV_FILE}" \
     -f "${COMPOSE_BASE}" \
     -f "${ROOT_DIR}/overrides/compose.redis.yaml" \
@@ -33,6 +36,30 @@ compose() {
     "$@"
 }
 
+"${ROOT_DIR}/deploy/staging/ensure-ai-router-state.sh"
+if [[ -f "${ROLLOUT_STATE_PATH}" ]]; then
+  readarray -t rollout_values < <(
+    python3 - "${ROLLOUT_STATE_PATH}" <<'PY'
+import json
+import sys
+
+state = json.load(open(sys.argv[1], encoding="utf-8"))
+print(state.get("status") or "")
+print(state.get("candidate_percent") or 0)
+print(state.get("stable_pool_release_id") or state.get("stable_release_id") or "")
+print(state.get("candidate_release_id") or "")
+print(state.get("candidate_replicas") or 1)
+PY
+  )
+  if [[ "${rollout_values[0]}" =~ ^(active|draining|promoting)$ ]] && \
+    [[ "${rollout_values[1]}" != "0" || "${rollout_values[0]}" != "active" ]]; then
+    export MYAPP_AI_STABLE_TAG="${rollout_values[2]}"
+    export MYAPP_AI_CANDIDATE_TAG="${rollout_values[3]}"
+    export MYAPP_AI_CANDIDATE_REPLICAS="${rollout_values[4]}"
+    COMPOSE_PROFILE_ARGS=(--profile ai-rollout)
+    echo "Preserving ${rollout_values[0]} AI rollout at ${rollout_values[1]}% candidate traffic."
+  fi
+fi
 echo "Pulling latest staging images..."
 compose pull
 
