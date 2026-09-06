@@ -1,8 +1,46 @@
 # 当前交接状态
 
-更新时间：2026-09-04 CST
+更新时间：2026-09-06 CST
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
+
+## 2026-09-06 AI 运行健壮性与渐进发布治理：本地提交已收口
+
+- Backend Agent resume release affinity 已提交为 `e633bdb feat(ai): preserve release affinity for agent resume`。同步与 SSE 恢复都会携带精确 release affinity；未知、缺失或已退休 release 失败关闭，不跨 Runtime/Prompt revision 恢复。
+- 父仓发布治理已提交为 `b7fe1a16 feat: harden AI runtime rollout governance`，包含 canary、SLO、多副本路由、stable/candidate 双发布、fresh traffic rollout map、resume release-affinity map、双向 drain、受控回滚、发布对证据和对应设计/运维文档。该提交固定 Backend gitlink，但按子模块规则没有提交尚未推送的 AI Orchestrator gitlink。
+- AI Orchestrator 当前提交为 `9c4668c feat: validate structured model output capability`，Web 当前提交为 `d40ec7d feat(ai): display structured model eligibility`；Backend、AI Orchestrator、Web 与父仓均尚未推送，也未部署 staging 或 production。
+- 当前验证基线：Backend affinity smoke 5 tests、目标测试 240 tests PASS；父仓发布门禁 31 tests PASS；Workflow YAML 与内嵌 Shell、Compose、HAProxy 双 map、Shell/Python 语法和各仓 diff check PASS；隔离 HAProxy Runtime API 双 map 全量切换约 2 秒。
+- 本次收口补齐新增 Shell 运维脚本的 Git executable mode，并再次执行 Shell syntax 与父仓 whitespace 检查。`.codex`、`AGENTS.md`、长期开发规则/模板/已知问题及多模态总结继续作为用户既有未提交状态保留。
+- 后续推送顺序必须为：先推送 AI Orchestrator，再推送 Backend 与 Web；随后在父仓提交 AI Orchestrator gitlink，最后推送父仓。推送和 staging 部署均需用户另行授权。
+
+## 2026-09-05 AI 运行契约与就绪治理：Phase 0～2 与 Phase 3 三项治理已提交
+
+- 设计文档 `docs/05-development/09-ai-runtime-contract-and-readiness.zh-CN.md` 已更新为当前实现：进程存活、运行就绪、场景就绪、模型健康、模型能力和策略资格分层；fresh request 使用协议/Schema 协商，Prompt revision 只作为运行审计事实，legacy 请求和 Agent resume 保留精确 Prompt 匹配。
+- AI Orchestrator 现支持 `ai-runtime-contract-v1`、7 个 Schema family、9 场景兼容矩阵和完整运行 Manifest。Chat、意图、Agent、SSE 与四类草稿响应返回实际 `protocol_version / schema_version / prompt_version / runtime_revision / release_id`；不兼容协议/Schema 返回结构化 `AI_RUNTIME_CONTRACT_MISMATCH` / `AI_SCHEMA_VERSION_MISMATCH`。`MYAPP_AI_RELEASE_ID` 已进入配置、Docker build arg 和 standalone Compose。
+- Backend fresh request 发送 `protocol_version / supported_schema_versions / client_capabilities`，不再发送当前 Prompt 常量；响应元数据缺失或不兼容时失败关闭。`MyApp AI Run` 创建时保存请求能力，完成/暂停时保存实际协议、Schema、Prompt、Runtime revision 和 Release ID；迁移补丁 `extend_ai_run_runtime_contract_fields` 已加入 patches 并在 localhost migrate 成功。
+- Agent resume 不再与 Backend 当前 Prompt 常量比较，而是读取 Run 已持久化的实际 Prompt revision，并由 Orchestrator 对原 checkpoint 做最终精确匹配。Web 新增 `AI_SCHEMA_VERSION_MISMATCH` 系统版本分类，协议、Schema 和 legacy Prompt 冲突都明确提示同步运行制品，切换模型或重复请求无效。
+- 父仓 `verify-ai-runtime-compatibility.sh` 现比较协议和全部 7 个 Schema family，不再比较 Prompt revision；本地/生产/staging 启动脚本注入 Orchestrator Git revision 与 Release ID，staging 镜像使用共同 image tag 作为 Release ID。
+- 验证：AI Orchestrator 宿主机全量 206 tests、Docker test target 206 tests、runtime/test 镜像构建与 Ruff PASS；Backend `test_ai_service + test_ai_repository + test_gateway_wrappers` 392 tests、Python compile、localhost migrate PASS；真实数据库回滚式写入已确认 Run 保存全部实际元数据。Web TypeScript、Biome 和 `ai-failure` 10 tests PASS；Shell syntax、Parent/Backend/Orchestrator/Web `diff --check`、Parent/Staging/Langfuse/Standalone Compose 配置 PASS。
+- 真实协议验证：携带故意过期 Prompt 的 fresh Chat 仍按 `chat-v1` 成功，响应返回实际 `erp-readonly-v11`。当前 Compose 容器的 Backend 兼容门禁 PASS：`protocol=ai-runtime-contract-v1`、`schemas=7`、`scenarios=9`；Backend 真实调用确认请求不含 `prompt_version`，Run 在事务内保存 `chat-v1 / erp-readonly-v11 / runtime revision / release ID / completed`，随后 rollback，示例 Run 未落库。
+- 新镜像初次构建受 Registry 瞬时缺包影响失败。进一步定位到 Dockerfile 把每次变化的 Release/Revision ARG 放在依赖安装前，导致版本变化无条件击穿依赖缓存；现已把制品元数据移到依赖与应用安装层之后。修复后依赖层直接命中缓存，runtime 镜像约 12 秒构建完成并切换成功。`frappe_docker-ai-orchestrator-1` 当前 Healthy，镜像 `sha256:aa4911ce21a5...`，`/readyz` 与真实 Backend 门禁均为 Phase 2 PASS。
+- Phase 2 已分别提交：AI Orchestrator `be07390 feat: version AI runtime schemas independently`、Backend `b583d60 feat: negotiate AI runtime contract schemas`、Web `b32f927 fix: surface AI runtime schema mismatches`；均未推送。父仓相关编排、兼容脚本和设计文档现已随 `b7fe1a16` 提交；AI 仓按项目规则必须先推送，因此父仓仍未固定新的 AI gitlink。
+- Phase 3 首轮已完成代码实现：Backend 健康快照新增 `health_expires_at / health_failure_count / last_health_trigger`，默认 TTL 30 小时并限制为 5 分钟～7 天；统一派生 `effective_health_status`，从未探测为 `unknown`，过期成功/降级为 `stale`，过期失败为 `half_open`。固定模型只阻断新鲜 `unavailable`；Runtime Policy 和 Web 都消费派生状态，同时保留原始状态审计。
+- Orchestrator 对 `half_open` 使用 Redis `SET NX EX 15` 分布式恢复探测租约；冲突时自动链继续 fallback，固定模型返回 `AI_MODEL_HEALTH_HALF_OPEN_BUSY`。`stale / unknown` 不再被旧健康快照硬阻断。Web 模型选择器和治理表已补充“状态已过期、恢复探测中、尚未检测”、过期时间和连续失败次数。
+- Phase 3 健康租约已提交：Backend `56a45a5 feat(ai): expire stale model health snapshots`、AI Orchestrator `61635fa feat: coordinate half-open model recovery`、Web `294fcf2 feat(ai): display effective model health`。场景资格与 fallback 首轮也已提交：Backend `6e6b1e5 feat(ai): resolve scenario-eligible model chains`、AI Orchestrator `5c7646b feat: enforce scenario model eligibility`。均未推送。
+- Agent 就绪预检现在按有序候选逐个计算生命周期、策略能力、工具能力和有效健康资格；主模型漂移但 fallback 合格时继续进入 Agent，并返回 `selected_model_alias / eligible_model_aliases / ineligible_models`。Orchestrator 在健康、熔断、预算和并发门禁前执行相同防御性过滤，提升首个合格 fallback 并记录 `primary_model_ineligible_for_scenario`；固定模型不合格时返回稳定 `AI_SELECTED_MODEL_INELIGIBLE`，自动链无合格模型返回 `AI_SCENARIO_MODEL_UNAVAILABLE`。
+- Phase 3 健康租约与 Agent 资格阶段验证：Backend 相关 424 tests PASS、Python compile PASS、localhost migrate PASS；数据库确认健康新列与 `(last_health_status, health_expires_at)` 索引存在。回滚式真实验证确认过期 `unavailable` 在固定模型校验和 Runtime Policy 中派生为 `half_open`，且测试写入未保留。Orchestrator 当时全量 212 tests 和 Ruff PASS；真实 Redis NX 验证为首次放行、第二次拒绝、TTL 15 秒；运行镜像内合成策略验证主模型工具能力不合格时提升到 fallback。Web TypeScript、Biome 274 files、全量 58 suites / 381 tests 和四仓 `diff --check` PASS；Jest 仍有既有 open-handle 提示但退出码为 0。该阶段旧运行镜像现已由下述结构化资格 revision 取代。
+- Phase 3 结构化输出独立资格已完成并提交：AI Orchestrator `9c4668c feat: validate structured model output capability`、Backend `34b2b26 feat(ai): govern structured output eligibility`、Web `d40ec7d feat(ai): display structured model eligibility`，均未推送。模型检测现在分别记录 Provider 原生 `supports_json_schema` 和最终任务资格 `supports_structured_output`；只有原生 Schema 明确 HTTP 400 才使用受控 JSON 回退，最终仍需精确 JSON 与本地 Schema 校验。意图识别和四类草稿只依赖后者；自动链可提升结构化合格 fallback，固定模型资格不足失败关闭。Web 同时展示“原生 JSON Schema”“结构化输出”和结构化稳定错误码。
+- 本轮结构化资格验证：Orchestrator 宿主机与 Docker test 镜像均为全量 216 tests PASS，Ruff、pre-commit PASS；Backend 全量 unit 931 tests、Python compile PASS；Web TypeScript、Biome 274 files、全量 58 suites / 381 tests PASS；三个代码仓 `diff --check` PASS。`bench --site localhost migrate` 成功并确认 `supports_structured_output / last_structured_error_code` 列存在。当前 Orchestrator 镜像 `sha256:910859ba4ec6...`，精确 revision/release 为 `9c4668cbd8d0d5361fab30a09208048c7c35b457`，容器 Healthy，7 Schema/9 场景兼容门禁 PASS。真实 Provider 检测确认 `gpt-5.6-luna` 基础、工具、原生 JSON Schema、结构化输出和视觉均通过，数据库写入 `supports_json_schema=1 / supports_structured_output=1`；随后 Backend 固定该模型执行真实结构化意图识别成功并返回 `resolution_mode=structured_intent`。
+- Phase 3 staging 发布闭环已实现并随父仓 `b7fe1a16` 提交：新增机器可读 `passed / partial / failed` canary，默认覆盖 readiness、意图、普通只读 Chat 和商品草稿，只生成候选不执行；瞬时 Provider/network 错误对同一制品最多重试一次，确定性契约/认证/Schema/能力/Provider 4xx 自动阻断。只有 `passed` 才把 Backend/AI 精确 revision、镜像 ID/digest、共同 release ID 和报告哈希登记为回滚发布对，`rollback-staging.sh` 在修改 tag 前失败关闭验证，另保留显式 break-glass 开关。构建同时校验实际 myapp clone HEAD，防止移动分支在解析与 clone 之间漂移。
+- 本地真实 canary 4/4 PASS，约 13 秒：readiness、intent、chat、product setup draft 均返回完整运行元数据；意图/草稿按场景资格提升到 `gpt-5.6-luna`，Chat 在 Provider circuit fallback 后由 `gpt-5.5` 成功完成。父仓 Python 门禁 6 tests、Shell syntax、Python compile 和 `git diff --check` PASS。当前旧本地 Backend 镜像没有新增 release/revision label，因此未伪造或登记本地回滚发布对。
+- Phase 3 多副本与 SLO 首轮已实现并随父仓 `b7fe1a16` 提交：staging Backend/Worker 默认经内部 `ai-router` 访问 Orchestrator，副本数可配置 1～10，HAProxy 使用固定 digest、Docker DNS、`leastconn` 和 `/readyz` 主动摘流。启动/验收逐副本核对 Docker health、直接 readiness、同一 image ID、release/runtime/protocol 和三个 Manifest hash，再核对 Router 身份。隔离网络实测两个副本均收到流量；一个副本 `/readyz` 503 后 20/20 请求全部进入健康副本，恢复后自动重新加入。HAProxy 配置校验 PASS，真实现有容器的副本集门禁 PASS。
+- `evaluate-ai-slo.py` / `run-ai-slo-gate.sh` 已提供 `passed / warning / failed` 判定、机器告警、状态落盘、可选 Webhook 和严格模式。契约错误始终 critical；小于最小样本数返回 `AI_SLO_INSUFFICIENT_SAMPLE`，不伪装 PASS。Webhook 未配置时不会产生外部调用。
+- Phase 3 stable/candidate 渐进发布已完成实现：持久 `rollout.map` 管理 fresh request bucket，持久 `release-affinity.map` 将 Agent resume 精确路由到 Run 创建时的 release；未知 release 返回 503。HAProxy Runtime API 使用事务批量更新两张 map，阶段门禁同时检查状态、持久 map、真实流量分布、canary 和 SLO。隔离 Runtime API 实测 100% 双 map 切换约 2 秒并通过最终状态核对。
+- Backend resume 同步和 SSE 均发送 `X-MyApp-AI-Release-Affinity`；repository 在 Run 行锁内读取 `release_id`，缺失时失败关闭，避免旧 Run 随机落入另一 Prompt/runtime revision。`test_ai_service + test_ai_repository` 当前 240 tests PASS，含请求头和审批恢复断言。
+- 发布生命周期为 `active → draining → promoting → completed`。达到 100% 后旧 stable 不会立即停止，而是在 `AI_ROLLOUT_DRAIN_SECONDS` 内只承接旧 release resume；到期后先删除旧 affinity，再把 candidate 收敛为 stable。灰度失败/abort 使用反向 drain：fresh traffic 立即恢复旧 stable，但 candidate 保留到其 checkpoint 窗口结束。活动 drain 会阻止下一次不同 release，paired rollback 会先安全 abort。
+- 父仓发布门禁当前 31 tests PASS；Shell syntax、Python compile、Workflow YAML 与内嵌 Shell、HAProxy 双 map 配置、staging Compose 普通/rollout profile、staging env 校验和四仓 `diff --check` 均 PASS。
+- Backend release affinity 已提交为 `e633bdb feat(ai): preserve release affinity for agent resume`，父仓 Phase 3 发布治理已提交为 `b7fe1a16 feat: harden AI runtime rollout governance`；两者均未推送。AI Orchestrator `9c4668c` 也未推送，因此按仓库规则不能把父仓 `services/myapp-ai` gitlink 固定并提交。
+- Parent 原有 `AGENTS.md`、开发规则/模板/已知问题、`.codex` 和多模态总结等用户改动继续保留，后续提交不得混入或覆盖。AI 子仓未推送前仍不提交父仓 AI gitlink；本阶段仅补充交接记录和新增 Shell 脚本执行位，不 push。
 
 ## 2026-09-04 AI 语义命令 V2：已提交，未推送/未部署
 
