@@ -2,7 +2,34 @@
 
 更新时间：2026-09-06 CST
 
+## 2026-09-06 本地提交与服务重启完成
+
+- Web `215d502`、Backend `333d854` 已本地提交；AI `9d92616` 已提交并按子模块规则推送 origin/develop。三个子仓工作树干净。
+- 本地 AI 使用 Compose 重建并替换，revision `9d926164af6871c0a9f4b259580ba98e66acffcf`、release `local-9d92616`，readyz 为 true；运行容器实际请求构建验证默认 reasoning_effort 不再发送。
+- Web 开发服务已在当前 Web 工作区重启，监听 http://localhost:8001，HTTP 200；Backend 容器重启后 /api/method/ping HTTP 200。浏览器需强制刷新获取快捷启停页面。未执行真实启停或正式业务写入，未部署 staging/production。
+- 父仓本次仅提交两个子模块指针、模型管理设计文档及交接文件。用户既有 AGENTS.md、开发规则、模板、已知问题、.codex 和历史多模态总结继续保留。下方“未提交/部署”描述为对应阶段历史，当前状态以本节为准。
+
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
+
+## 2026-09-06 模型注册表快捷治理与 DeepSeek 参数兼容：本地实现，未提交/部署
+
+- 用户截图 Run `AI-RUN-fd9619689f494a528c2998c493808849` 实际固定 DeepSeek；LiteLLM 最小请求 HTTP 200，加默认 `reasoning_effort=none` 后 HTTP 400 / UnsupportedParamsError，确认请求参数差异是可复现根因。运行详情缺少 completed result 时错误显示自动选择。
+- 方案与参考来源见 `docs/05-development/10-ai-model-registry-operations.zh-CN.md`。AI 共享请求构建器现在省略空/none 推理参数，显式等级仍保留。none 表示供应商默认行为，不保证关闭推理。
+- Web 模型表固定身份与操作列，新增单行/批量启停、原因表单、处理中防重复提交、失败项保留与错误汇总；只调用既有治理 service 提交 status，保留后端权限、审计、幂等和启用前元数据校验。“可用”标签改为“基础探测通过”。失败详情继承消息固定选择方式。
+- 验证：Web TypeScript、Biome、58 suites / 383 tests PASS；AI Ruff、pre-commit、pytest 217 tests / 19 subtests PASS；Docker test 217 tests PASS，runtime 构建 PASS。Docker buildx 缓存写权限经授权后完成。Jest 仍有既有 open-handle 提示但退出成功。
+- 未修改真实模型启停、未替换本地运行容器、未部署线上；当前运行服务需要后续切换制品才能使用参数修复。未执行浏览器视觉验收或完整真实业务场景重放。后续参数能力矩阵、同参数场景探测、细分 Provider 错误、意图降级工具状态及逐策略影响预览详见方案的已知边界。
+- 本轮未提交文件属于 AI 三个文件、Web 七个文件和父仓方案/交接；Backend 上轮上下文修复及父仓用户既有改动原样保留。
+
+## 2026-09-06 四类 AI 草稿上下文目标不变量审查：已本地修复，未提交/未部署
+
+- 真实会话 `AI-CONV-700241df3bd1461d8eef4649e4eaec13` 复现：14:33 的商品规格草稿和执行已把 `可口可乐-5000ML-2` 写为 `resolved`；14:59 用户上传图片并说“把这张图换成它的封面”时，模型正确返回 `operation=update + target.context_ref=active_product`，Backend 也成功解析出 `conversation_active_entity`。
+- 根因不是模型不理解指代，也不是 `90230e4` 的名称解析修复失效。`generate_ai_product_setup_draft_v1` 首次标准化后把服务端商品编码写入 `_target_item_code`，但 `_build_product_setup_draft` 再次调用标准化函数；第二次处理重新读取模型原始 `target.item_code=null`，覆盖了服务端绑定，最终形成 `target_source=conversation_active_entity` 但 `target_item_code=null` 的矛盾审计和 `PRODUCT_TARGET_NOT_FOUND`。
+- 失败草稿随后又通过 `_build_draft_conversation_state` 把原 `resolved` 商品降级为 `not_found`，导致后续正式业务草稿无法继续使用结构化上下文；普通 Chat 仍能从历史消息文字理解“它”，因此出现聊天回答正确、业务草稿失败的不一致。
+- 没有停留在商品封面单场景。对商品、库存、销售、采购四类草稿的生成、编辑、会话状态投影和执行前重建做了统一审查，发现同类结构性风险：订单 Semantic normalizer 也不幂等；草稿编辑可能信任浏览器回传的 provenance；销售/采购行按数组下标继承来源，重排后可能串行；切换订单号仍可能带着旧 `source_order_modified`；商品、订单和客户/供应商的上下文操作失败都可能反向污染已验证活动实体。
+- 机制级修复：商品和订单 Semantic normalizer 对 V2 命令幂等；服务端本轮绑定目标优先于旧 `_state.entity`；四类草稿统一持久化商品/订单/客户供应商 `target_source + target_context_ref`；浏览器编辑时先剥离这些服务端字段，只在目标身份没变时从当前持久化版本恢复。订单行按 `row_id`、唯一 `source_hash` 或唯一商品身份匹配，重复商品无稳定身份时放弃 provenance 而不猜测；订单号变化时清除旧 modified 快照。执行前重建继续贯通服务器 provenance。
+- 会话状态统一遵守：引用当前 `resolved` 商品、订单或客户/供应商的操作失败，不等同于一次新实体查询失败，因此不降级活动实体；用户明确查询/切换新实体所得的 ambiguous/not_found、状态过期和手工清除仍是权威清空信号。状态保留只读取当前 `active_entities`，不会从旧 `last_result_set` 复活已经被明确清空的实体。
+- 回归现为 210 组 `test_ai_service` 全通过，其中新增 10 组机制级测试，覆盖商品二次标准化与新封面、订单二次标准化、显式新商品优先旧 `_state`、库存/销售/采购失败状态矩阵、订单/客户供应商显式切换、客户端 provenance 伪造、订单行重排与重复商品、商品/库存编辑、订单目标切换和执行前刷新。`test_ai_repository + test_gateway_wrappers` 202/202 通过；Python compile 和 Backend diff check 通过。容器未安装 Ruff，未伪造 Ruff 结果。
+- 当前未提交改动仅在 Backend 子仓：`AI_TECH_DESIGN.zh-CN.md`、`API_GATEWAY.zh-CN.md`、`myapp/services/ai_service.py`、`myapp/tests/unit/test_ai_service.py`。父仓仅新增本交接记录并显示 Backend gitlink dirty；用户原有 `AGENTS.md`、长期规则/模板/已知问题、`.codex` 和多模态总结继续保留。尚未 push、未部署 staging/production，也未修补该历史会话的当前状态；再次验证旧会话前需明确提及一次商品或经授权恢复其活动实体。
 
 ## 2026-09-06 商品草稿确定性目标衔接修复：已提交、推送并部署 staging
 
