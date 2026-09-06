@@ -216,6 +216,7 @@ Backend 草稿校验项统一为：
 - Phase 1 已实现：商品 `product-setup-draft-v7` 使用 target/patch；自动场景模型优先，本地规则仅标记为 `degraded_local_rules`。
 - Phase 2 已实现首轮：销售/采购 v5 支持 header patch 与 line changes；Backend 在完整订单快照上合并，表头-only 不触碰明细，重复商品行无 row ID 时阻断；明确清空表头通过 `header_clear_fields` 贯通草稿生成、Web 编辑保存、执行前刷新、正式执行和版本差异审计；`replace_all`/新建只接受 add 行；商品或单位变化时重新解析价格基础，单纯数量等修改继续保留原订单价格。
 - Phase 3 已实现迁移契约，但统一解析器尚未完成：Backend 返回 `validation.issues[]` 并保留旧 errors；Web 已删除中文错误文本和版本冲突文案控制流。库存错误已提供稳定 code/field，其他领域在滚动迁移期允许 field 为空并继续显示旧 errors。客户、供应商、仓库和商品尚未全部收敛到同一个 Entity Resolver。
+- 2026-09-06 商品目标衔接修复：商品完善草稿已消费共享商品解析器返回的确定性 `selected`，不再出现“解析器已 resolved、草稿适配层却丢弃目标”的假未找到。没有 `selected` 的单一模糊候选仍要求人工确认，并与多候选、零候选分别返回 `PRODUCT_TARGET_CONFIRMATION_REQUIRED / PRODUCT_TARGET_AMBIGUOUS / PRODUCT_TARGET_NOT_FOUND`；三者字段均为 `target.item_code`。该修复没有放宽“模糊目标不能自动写入”的安全边界。
 - Phase 4 已完成关键清理，但不是全部完成：Runtime 不再用“带某字”正则覆盖模型工具参数；简单问候与明确草稿不再走 local fast path。订单 V2 的订单/商品指代只消费 Schema `context_ref`；客户/供应商指代和库存 v3 仍保留会话正则兼容路径，旧平铺订单 Schema 和查询 DSL 也仍作为显式兼容/降级保留，待对应 Schema 升级和真实模型覆盖率稳定后删除。
 
 因此，当前可以认定 Phase 1 和 Phase 2 首轮闭环已完成并具备回归保护；不能把长期 Phase 3/4 路线描述为全部完成。

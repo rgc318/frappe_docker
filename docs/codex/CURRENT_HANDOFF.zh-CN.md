@@ -4,6 +4,14 @@
 
 本文件只记录当前短期状态、运行基线、风险和接手步骤。本轮连续修复总结见 `docs/codex/AI_REPAIR_WORK_SUMMARY_2026-09-01.zh-CN.md`，更早的多模态阶段成果见 `docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`；长期规则以 `AGENTS.md` 和 `docs/codex/DEVELOPMENT_GUIDE.zh-CN.md` 为准。
 
+## 2026-09-06 商品草稿确定性目标衔接修复：Backend 已提交并推送，父仓待收口
+
+- 真实故障“修改可口可乐的规格为500ml”不是模型理解失败：Run 使用 `gpt-5.6-luna / product-setup-draft-v7 / runtime 9c4668c` 正常完成，Backend 找到唯一启用候选 `可口可乐-5000ML-2`，但商品草稿适配层丢弃了共享解析器的 `selected`，随后误报“未找到唯一商品”。
+- Backend 已修复 `_resolve_existing_product_for_setup`：显式商品编码继续作为权威目标；名称和条码统一进入共享解析器，按权限、启停和匹配等级处理。解析器返回确定性 `selected` 时加载正式 Item 并绑定草稿；没有 `selected` 的单一模糊候选仍不自动绑定，保持人工确认边界。
+- 商品目标验证现区分 `PRODUCT_TARGET_CONFIRMATION_REQUIRED / PRODUCT_TARGET_AMBIGUOUS / PRODUCT_TARGET_NOT_FOUND`，字段统一为 `target.item_code`；“找到一个可能商品”不再显示为“未找到”。Backend API/AI 技术设计和父仓语义命令 V2 文档已同步。
+- 验证：新增 4 组目标解析/安全边界回归；定向 7 tests PASS；完整 `test_ai_service` 196 tests PASS；`test_ai_repository + test_gateway_wrappers` 202 tests PASS；Python compile、Ruff 和 Backend/Parent diff check PASS。真实站点只读调用确认简称 `可口可乐` 与完整名称 `可口可乐 5000ml` 都只解析到当前启用的 `可口可乐-5000ML-2`，草稿构建为 `operation=update / specification=500ml / ready_for_handoff=true / issues=[]`，没有创建或执行新草稿。
+- Backend 修复及 Backend 文档已提交为 `90230e4 fix(ai): bind resolved product draft targets` 并推送到 `origin/develop`。AI Orchestrator `9c4668c` 已推送到 `origin/main`，Web `d40ec7d` 已推送到 `origin/main`。父仓当前仅待提交 Backend/AI gitlink、语义命令 V2 文档与本交接文件；其他既有用户改动不得混入。尚未部署 staging 或 production。
+
 ## 2026-09-06 AI 运行健壮性与渐进发布治理：本地提交已收口
 
 - Backend Agent resume release affinity 已提交为 `e633bdb feat(ai): preserve release affinity for agent resume`。同步与 SSE 恢复都会携带精确 release affinity；未知、缺失或已退休 release 失败关闭，不跨 Runtime/Prompt revision 恢复。
