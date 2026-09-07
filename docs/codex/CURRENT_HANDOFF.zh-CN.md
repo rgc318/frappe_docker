@@ -1,11 +1,71 @@
 # 当前交接状态
 
-更新时间：2026-09-07 CST
+更新时间：2026-09-08 CST
+
+## 2026-09-08 生命周期功能已提交与跨模块回归
+
+- AI `ab94491` 已提交并按子模块规则推送 origin/develop；Backend 功能 `e824a66`、独立价格校验修复 `49e4ca3`；Web `74a3a78`。Backend/Web 仅本地提交，未推送；没有 staging/production 部署。父仓本次记录 Backend/AI gitlink、方案 13、本节及新增分层验证报告 14。
+- 后端全量 1019 tests PASS；真实站点生命周期事务 8 tests PASS（新增跨用户计划读取/执行隔离）；真实模型生命周期+旧编辑 HTTP 4 tests PASS。只读自动路由/公司会话→SSE 两用例最终均通过；公司会话用例首次连接中断，一次独立复测成功，不隐去初始失败。
+- Web tsc、Biome、全量 60 suites / 404 tests、生产构建 PASS；提交钩子仅格式化本次文件，提交后再次运行 tsc/全量 404 tests PASS。AI test 镜像 223 tests PASS，Ruff/pre-commit PASS；独立 Redis/Qdrant/合成 Provider 容器集成的健康、Chat、向量 upsert/search/delete PASS。
+- 独立集成使用项目 myapp-ai-lifecycle-verify、14010 端口；容器、网络和两个本次自建测试卷已按测试流程清理，未触碰现有 ERP/AI 数据。生命周期数据库夹具均 rollback，HTTP 只生成后放弃计划/草稿并归档会话，没有启停或删除用户商品。
+- 跨模块检查发现并独立修复了原有 terminate*product_price_v1 局部 `*` 遮蔽翻译函数：错误商品/过期版本曾稳定抛 UnboundLocalError，新增回归验证修复后业务校验拒绝且无价格写入。Backend 全仓 Ruff 现通过。
+- 完整测试命令、证据层次和限制见 `docs/05-development/14-ai-product-lifecycle-verification.zh-CN.md`。没有真实浏览器、Mobile、多进程压力或提交后外部索引恢复验收，不宣称全场景零风险。
+- 保留未提交的 Web public/scripts/loading.js：开头已有 `npmnpm/**`，可能使加载脚本运行时报错，已向用户询问是否单独修复，未获明确答复前不撤销/提交该用户改动。这意味着本地脏工作区仍有已知非 AI 遗留问题，不能称全部功能完全无问题。
+- Parent 用户既有 AGENTS.md、DEVELOPMENT_GUIDE、KNOWN_ISSUES、HANDOFF_TEMPLATE、.codex 和历史总结仍不纳入本次提交。上线须同步 Backend/AI v8/Web 并 migrate；本地运行 AI 仍为上一轮已测 local-lifecycle-v8-wip（源码与本次 AI 提交一致，未重新标记制品）。
+
+## 2026-09-07 商品生命周期 AI→Gateway→Web 闭环已接入（未提交）
+
+本节优先于下方“仅内部预检/删除关闭”的历史记录。
+
+- Backend：独立 create/get/list/discard/resolve/execute 生命周期计划及 AI generate 公开 POST Gateway/adapter。15 分钟 owner 隔离不可变计划；完整目标、保留目标、模糊候选逐项选择，原计划 superseded；权限/版本/确认/幂等键校验，整批启停使用 Item.save、删除使用原生 frappe.delete_doc；独立持久回执支持成功重放。
+- 删除保守阻断：任何库存历史、Bin（含零库存）、价格、变体、附件、封面或静态/动态引用。原生 on_trash 前锁定读取可级联依赖；Item 最新锁定 modified 与计划比较。执行异常全事务回滚及 after_commit 回调清空；生成/候选解析异常也在 Gateway 包络转换之前回滚。没有忽略权限/引用、force 删除或修改框架源码。
+- AI：Intent v8 新增 product_targets/preserve_product_targets 的 query+原文 evidence，同步/异步预算上限 4096。完整动作/数量/保留/证据及置信度校验；唯一精确目标可自动绑定，单个模糊候选仍须选择，候选超量不截断执行。复用原一次性解析凭据、模型及会话版本；生成计划更新实体上下文，未决/多个含保留对象不得沿用旧单目标。计划仅表示待确认，不声明执行成功。
+- Web：独立 product-lifecycle 领域 service、计划 Modal/卡片/最近 50 条历史入口。删除三个显式勾选，启停两个；展示共享范围、原文/目标/保留/阻断/过期；每次打开读取服务器，替换/刷新清空确认，写操作单飞；稳定计划幂等键和回执恢复。自动路由删除不走 Chat 或编辑草稿。既有草稿范围锁、SSE 引用保持及逐轮切换模型改动均保留。
+- 本地真实 HTTP：以现有百事可乐-2做仅预检/非法确认拒绝，2 tests PASS（含固定 gpt-5.6-luna 的 resolve→generate）。生成测试计划已放弃、会话已归档，没有执行该商品启停/删除。真实删除只对事务内自建 LIFECYCLE-TEST-\* 夹具，全部 rollback。
+- Backend 定向 420 tests PASS；最终补充原生引用错误脱敏回归后计划服务 13 tests PASS（使用本版 Frappe clear_last_message，不调用不存在的 clear_messages）。站点隔离事务 7 tests PASS，覆盖 Gateway→adapter→原生删除、Deleted Document、成功重放、启停、版本变化、新增价格阻断、第二项 save/delete 失败及回调清空。Backend 新增文件 Ruff PASS。既有模拟错误日志/ResourceWarning 和 job_name 弃用提示不影响退出码。
+- AI Ruff/pre-commit PASS；Docker test target 223 tests PASS；runtime 构建成功。本地 AI 容器已重建/重启为 `local-lifecycle-v8-wip`、revision=unversioned（未提交开发镜像），health/readyz 正常且 intent=v8。Backend 热重载后的真实 HTTP 已通过；没有重启用户 Web 服务。
+- Web 最终全量 60 suites / 404 tests PASS，新增 service/页面路由定向 3 suites / 41 tests PASS；最终 tsc、Biome PASS。曾遇到 Umi Jest 的 imported type/JSX 转换限制及测试 mock 缺少 idempotencyKey，已修正，没有修改依赖或全局测试配置。保留既有 Jest open-handle 提示，退出码 0。四仓 diff --check PASS。
+- 文档已更新方案 13、Backend API/测试、AI API、Web AI 设计；未 commit/push/staging/production。父仓用户 AGENTS/长期规则/KNOWN_ISSUES/模板/.codex/历史总结和 Web public/scripts/loading.js 均保留。Backend/AI/Web 所有本阶段改动仍在各自工作树，父仓 gitlink 尚未更新。
+- 验收边界：没有真实浏览器、多进程压力或外部向量删除提交后验收；不能把 HTTP/组件/回滚事务测试称为以上验证。原生框架没有全局外键，本实现不承诺任意第三方裸 SQL 并发写入的引用完整性；新增此类写入口需统一锁/约束及专门并发测试。附件/封面故意阻断，不做不可回滚文件删除。普通商品页面不另建删除实现。
+- 下一步：按用户意愿浏览器验收并分仓提交；上线时同步 Backend/AI v8/Web，执行 migrate 记录已在 localhost 直接建表的 create_product_lifecycle_plan patch。不得直接推送部署未获授权的服务器。
+
+## 2026-09-07 生命周期持久计划与启停执行：内部增量已验证
+
+- 新建表 patch `create_product_lifecycle_plan` 已登记 patches.txt，并在 localhost 直接幂等建表成功；部署仍需 migrate 登记 PatchLog。计划保存 owner、15 分钟有效期、不可变目标版本快照、请求号和独立回执。
+- 内部 create/get/execute_product_lifecycle_plan 支持 enable/disable：两个显式确认、整数版本、非空幂等键；计划/商品行锁、全目标权限和 modified 重检、全部 Item.save 成功才写回执。同计划同请求重放，异请求拒绝；数据库 owner/request 唯一。失败 full rollback 同时清理 after_commit 队列，成功不自行 commit，不得与其他业务待提交写入混用。
+- 删除执行仍关闭，不能自动转停用。未开放 Gateway/AI Schema/Prompt/Web，不能宣称聊天生命周期功能已交付。未改变上一轮删除保守预检。
+- 验证：容器 unit（计划、预检、动作安全、商品）79 tests PASS；真实站点隔离事务 3 tests PASS（启停及旧回执重放不重复写、版本冲突、第二项失败整批回滚）。测试从 sites 目录运行，首次 bench 根目录启动因日志路径失败，已按运行环境修正命令。全部临时商品/计划回滚，没有修改用户商品，无真实删除。Frappe 有既有 job_name 弃用警告。
+- Backend 新增 patch/服务/单测/事务测试、patches.txt、两份文档以及父仓方案/交接未提交，前几轮 Web 增量及用户既有改动原样保留。未推送/部署。下一步补真实权限/多进程并发门禁、公共 Gateway 与计划预览确认 UI，再接 AI 完整目标解析；删除需先验证媒体/外部清理及并发引用。
+
+## 2026-09-07 商品生命周期开发启动：内部预检首批完成
+
+- 新方案 `docs/05-development/13-ai-product-lifecycle.zh-CN.md`：enable/disable/delete 独立动作，完整目标、共享 Item 主档影响、持久计划/版本/确认、整批权限与事务、幂等回执和提交后外部清理。不包括订单取消/合并。
+- Backend 新增内部非 whitelisted `product_lifecycle_service.preview_product_lifecycle`：最多 20 个明确编码，空/重复/未知动作/无原因拒绝；全部目标先 read + write/delete 权限；删除阻断库存流水、任何 Bin（含零库存）、Item Price、变体和 Frappe 静态/动态引用，错误响应不泄露关联单据名。预检没有调用 on_trash/save/delete，不签发计划凭据，execution_available 始终 false。
+- 容器 bench Python：test_product_lifecycle_service + test_ai_action_safety + test_wholesale_service 67 tests PASS。首次测试夹具 patch 未绑定 frappe.db 代理失败，改显式 MagicMock 后通过。管理员真实站点只读预检：百事可乐-2/-3 删除均被库存历史、Bin、价格和关联引用阻断；enable/disable 预检通过但不可执行。探针结束 rollback，没有启停或删除商品。
+- Backend 两份文档、新服务/测试和父仓方案/交接未提交；原 Web 范围锁定/SSE 修复增量及用户 loading.js/父仓既有改动保留，未推送/部署。本轮没有修改 AI Schema 或打开删除路由，不能宣称聊天删除功能交付。
+- 下一步：实现持久生命周期计划和正式幂等执行/审计，在隔离自建夹具验证整批回滚、版本/权限重检和引用并发；然后接 Gateway/adapter/AI 完整目标解析/Web 二次确认。严禁用用户现有商品做真实删除测试。
+
+## 2026-09-07 搜索卡片闪退：SSE 与恢复轮询互斥修复
+
+- 截图卡片先出现后消失的代码根因：AI 页面每 3 秒恢复轮询把尚未持久化的空消息覆盖到正在接收的 SSE 消息，最终完成响应再恢复引用。index.tsx 现于本地 loading 期间暂停恢复轮询；轮询响应返回后再次检查 active 与 submitInFlightRef，避免异步旧响应覆盖新请求。历史 running/waiting_approval Run 无本地请求时继续轮询恢复。
+- 新增页面测试：引用及正文跨 3.3 秒仍保留且本地流期间不发恢复查询；同会话两轮依次选 GLM/Luna，resolve 和 stream 都携带对应 modelAlias，第二轮 conversationId 不变。此为 Mock 页面回归，不冒充真实双模型或浏览器端到端验收。
+- Web 全量 58 suites / 396 tests PASS，tsc、Biome、diff check PASS；Jest 仍有既有 open-handle 提示，退出码 0。Web 8001 HTTP 200；没有正式业务写入、没有 Backend 改动。首次新用例因模型选择器异步渲染等待不足失败，修正等待条件后全量通过。
+- 本轮 index.tsx/index.test.tsx 和两份 Web 文档，与上轮草稿字段锁定增量及本交接仍未提交、未推送、未部署。用户 public/scripts/loading.js 和父仓既有改动保持不动。下一步可做浏览器手工复核和真实同会话双模型验证，再按授权提交。
+
+## 2026-09-07 Web 动作与范围字段锁定：增量已验证，未提交
+
+- 用户启动本地 Web 后，8001 两次探测均 HTTP 200。没有浏览器端到端或视觉验收，不将页面入口可达当作完整交互验收。
+- 在上一轮范围提示基础上，domain service 新增 boundFields；共享编辑器禁用已绑定操作、商品/订单目标以及库存仓库/方向。未解析目标仍可首次选择，修改契约允许选未解析候选，新建契约不能通过重复候选偷偷切换成修改。数量、金额等业务字段保留编辑，全局 busy/版本冲突锁定优先。
+- Web tsc、Biome PASS；本轮全量 58 suites / 393 tests PASS。随后补商品锁定测试和显式全局锁定优先，最终定向 2 suites / 58 tests PASS，tsc/Biome 和 Web/父仓 diff check PASS。前一轮真实 HTTP 2 tests、后端动作/检测 27 tests 通过；本轮未改 Backend、未执行 ERP 业务写入。
+- Web 六个任务文件（service、编辑器、两份测试、两份文档）以及本交接未提交；用户新增 public/scripts/loading.js 改动保持不动。Backend 干净，未推送、未部署。上一阶段已提交版本仍为 Backend 67afa3b / Web 9fd9ee5 / Parent 7ce1a508。
+- 整体方案未完成：原文目标/字段授权证据、完整查询 keep/set/clear、专门澄清交互、逐能力证据和任务恢复仍需继续。当前锁定只能防止后续动作/目标漂移，不能证明模型初次理解正确。
 
 ## 2026-09-07 动作契约增量已提交，继续 Web 范围提示
 
 - Backend `67afa3b`、Web `9fd9ee5` 已提交上一轮验证增量；父仓提交对应 Backend 指针、方案和本交接。未推送或部署线上，用户既有父仓改动不纳入。
 - 后续开发聚焦共享草稿编辑器的服务端已绑定范围提示，仍以 Backend 校验为权威，不在页面重新解析原话。
+- 父仓阶段提交为 `7ce1a508`。提交后 Web 增量已实现：service 映射 boundScopeSummary，共享编辑器展示目标/仓库/库存方向及重新生成指引，缺少快照不推断绑定。新增 service 和编辑器测试；tsc、Biome、58 suites / 388 tests 与 Web diff check PASS。首轮新增用例 JSX 与 Jest 配置不兼容，改为既有 React.createElement 写法后全量通过；仍有既有 open-handle 提示，退出码 0。
+- 本次继续开发的 Web 六个文件（代码、测试、开发/设计文档）与此交接尚未提交；Backend 工作树干净。没有浏览器视觉验收，未全面禁用表单范围字段，后端继续拒绝非法改绑。下一步补动作/范围字段只读交互及原文目标、字段授权证据；未推送或部署。
 
 ## 2026-09-07 草稿目标锁定与库存完整性：验证完成，增量待提交
 
@@ -18,7 +78,7 @@
 
 - 已完成阶段提交：Backend 7d2e969、AI 5a03311、Web fff575d、父仓 b0d03256。AI 已按子模块规则推送 origin/develop；其余未推送，未部署线上。用户既有父仓改动未纳入。
 - 后续 Backend/Web 增量：四类草稿 API 参数贯通 scenario_resolution_id，Web 透传自动解析凭据；绑定用户、公司、原文、附件、会话和状态版本，有效凭据复用意图、不重复模型调用，无效凭据拒绝。直接调用无凭据时共享动作解析和能力校验，不能绕过自动入口。
-- 新生成草稿最终 operation 必须匹配原动作，保存服务端 _action_contract；编辑/恢复继承数据库锁定版本中的契约并拒绝改变动作，客户端不能新增/覆盖/移除。交接与执行前校验，业务刷新保留契约。旧模型草稿缺少契约需重新生成；ui_product_action 确定性商品卡片动作不要求模型契约，但保留原权限和业务校验。
+- 新生成草稿最终 operation 必须匹配原动作，保存服务端 \_action_contract；编辑/恢复继承数据库锁定版本中的契约并拒绝改变动作，客户端不能新增/覆盖/移除。交接与执行前校验，业务刷新保留契约。旧模型草稿缺少契约需重新生成；ui_product_action 确定性商品卡片动作不要求模型契约，但保留原权限和业务校验。
 - 当前验证：Backend 动作/AI service/repository/Gateway 428 tests PASS；Web tsc、Biome、58 suites / 386 tests PASS；真实 HTTP test_ai_draft_action_http 2 tests PASS（约 23 秒），gpt-5.6-luna / 百事可乐-3：直接删除拒绝、解析凭据透传生成合法修改草稿、契约落库、篡改 operation 拒绝。测试草稿已放弃、会话已归档，无 ERP 商品修改/删除。该轮无 AI 源码变化，沿用上一阶段已验证本地 AI；Backend 为联调已重启。
 - 新增改动尚未再次提交（Backend、Web、父仓文档/交接）；下一步收口最新交接保护回归与 whitespace 检查。剩余完整目标集合/字段授权证明、澄清 UI、逐能力证据与任务恢复不在本轮完成范围。
 
@@ -313,13 +373,13 @@
 
 ### 当前功能基线
 
-| 仓库 | 分支 | 当前提交 | 工作树 |
-| --- | --- | --- | --- |
-| Parent | `develop` | `baeb2d82 fix(ai): enforce runtime state consistency`；交接文档提交可能位于其后 | 保留用户已有文档修改和未跟踪本地资料 |
-| Backend `apps/myapp` | `develop` | `8969453 feat: govern product uom corrections` | clean |
-| AI Orchestrator `services/myapp-ai` | `develop` | `25e55e7 fix: refresh stale model health policy cache` | clean |
-| Web `frontend/myapp-web` | `main` | `37f2ea4 feat: support governed product uom corrections` | clean |
-| Mobile | 未核对 | 本阶段未修改 | 不得顺带清理或提交 |
+| 仓库                                | 分支      | 当前提交                                                                        | 工作树                               |
+| ----------------------------------- | --------- | ------------------------------------------------------------------------------- | ------------------------------------ |
+| Parent                              | `develop` | `baeb2d82 fix(ai): enforce runtime state consistency`；交接文档提交可能位于其后 | 保留用户已有文档修改和未跟踪本地资料 |
+| Backend `apps/myapp`                | `develop` | `8969453 feat: govern product uom corrections`                                  | clean                                |
+| AI Orchestrator `services/myapp-ai` | `develop` | `25e55e7 fix: refresh stale model health policy cache`                          | clean                                |
+| Web `frontend/myapp-web`            | `main`    | `37f2ea4 feat: support governed product uom corrections`                        | clean                                |
+| Mobile                              | 未核对    | 本阶段未修改                                                                    | 不得顺带清理或提交                   |
 
 Parent 当前不应提交或覆盖：`AGENTS.md`、`STAGING_DEPLOYMENT.zh-CN.md`、`docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`、`docs/codex/HANDOFF_TEMPLATE.zh-CN.md`、`docs/codex/KNOWN_ISSUES.zh-CN.md` 中用户已有修改，以及未跟踪 `.codex`、`docs/codex/AI_MULTIMODAL_WORK_SUMMARY_2026-08-16.zh-CN.md`。本轮已在 `KNOWN_ISSUES` 工作树中补充 502 条目并修正旧状态，但该文件包含用户原有未提交内容，提交时不得整文件混入；若继续完善交接或已知问题，应只提交能与用户状态安全分离的文档改动。
 
@@ -603,12 +663,12 @@ Parent 当前不应提交或覆盖：`AGENTS.md`、`STAGING_DEPLOYMENT.zh-CN.md`
 
 以下内容是 2026-08-27 的历史状态，已被上方 2026-08-29 部署与验收结论取代，不得再作为当前 staging 阻断依据。当时商品语义查询、候选澄清和 Web 商品选择器修改均已提交推送，但 staging 仍运行旧基线。
 
-| 环境 | 当前版本 | 状态 | 接手动作 |
-| --- | --- | --- | --- |
-| 本地 | Parent `df86bbd8`、Backend `4009f29`、AI `af53a18`、Web `fc85745` | Backend/AI/Web 均已提交推送；Parent 尚未提交 Backend/AI gitlink | 等 Provider 稳定后只对同一 AI revision 重新执行一次完整 live gate；通过前不得发布 |
-| staging ERP/AI | `staging-20260825-ea64c9c6` | 保持上一版已验证基线；本轮 revision 未部署 | 只有同 revision 完整 live gate PASS 后才可发布新 Policy、构建和部署 |
-| staging Web | `staging-20260824-a786d94c` | 未变更 | 随本轮最终 staging 发布统一验收 |
-| production | 未操作 | 未部署本轮修改 | 未经用户明确授权不得操作 |
+| 环境           | 当前版本                                                          | 状态                                                            | 接手动作                                                                          |
+| -------------- | ----------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 本地           | Parent `df86bbd8`、Backend `4009f29`、AI `af53a18`、Web `fc85745` | Backend/AI/Web 均已提交推送；Parent 尚未提交 Backend/AI gitlink | 等 Provider 稳定后只对同一 AI revision 重新执行一次完整 live gate；通过前不得发布 |
+| staging ERP/AI | `staging-20260825-ea64c9c6`                                       | 保持上一版已验证基线；本轮 revision 未部署                      | 只有同 revision 完整 live gate PASS 后才可发布新 Policy、构建和部署               |
+| staging Web    | `staging-20260824-a786d94c`                                       | 未变更                                                          | 随本轮最终 staging 发布统一验收                                                   |
+| production     | 未操作                                                            | 未部署本轮修改                                                  | 未经用户明确授权不得操作                                                          |
 
 本节及 0H、0G、0F 等后续章节仅用于历史追溯，其中的旧 revision、旧失败数和旧 staging 基线不能覆盖文件顶部的当前状态与新分级规则。
 
