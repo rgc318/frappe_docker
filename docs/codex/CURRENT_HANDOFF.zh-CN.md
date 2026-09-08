@@ -1,6 +1,51 @@
 # 当前交接状态
 
-更新时间：2026-09-08 CST
+更新时间：2026-09-09 CST
+
+## 2026-09-09 分仓提交与推送交接
+
+- 本节覆盖下方“未提交”历史状态。AI `6700dcc`（origin/develop）、Backend `f917b62`（origin/develop）与Web `1a722cc`（origin/main）均已提交并推送。父仓本次只提交上述 Backend/AI gitlink、方案15/16和本交接，随后推送origin/develop；父仓提交由包含本节的提交确定，避免在文档中自引用哈希。
+- 交付内容：逐单位商品价格 Schema/Prompt v8、共享数量关系推导、默认标准价及用户明确价保护、编辑/恢复/执行贯通、币种与旧契约防降级校验；同时提交前轮无凭据成功回答防护、订单精确单位参考价，以及Web生命周期阻断红色提示。没有扩大为阶梯定价、客户专价或通用删除价格能力。
+- 本次提交前重新验证：Backend容器bench Python全量1053 tests及Ruff；AI pytest226 tests /25 subtests及Ruff；Web tsc/Biome/全量61 suites、411 tests；四仓diff check均通过。上轮已通过的Docker test226 tests、runtime构建、隔离真实创建/修改事务、真实模型HTTP生成→编辑→恢复旁证详见下一节，本轮不重复付费模型测试。Web提交钩子正常运行，提交后另作定向复验。既有ResourceWarning、Starlette弃用、Jest open-handle仍如实保留，退出码0。
+- 推送包含此前同分支已经提交但未推送的相关生命周期、动作契约和异步检测历史，不重写历史、不force push。AI先推送，再固定父仓gitlink；Web独立仓不写入父仓索引。
+- 本地运行未因本次提交重新构建/重启：AI仍为上一轮已验证开发镜像 `local-product-pricing-v8-wip` / `unversioned`，不是以新提交哈希标记的不可变发布制品。Backend使用bind mount源码，Web本地开发源码；本次未手动触发staging/production部署，也不把git push当成部署验收。
+- 保留未提交用户状态：父仓 `AGENTS.md`、`docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`、`KNOWN_ISSUES.zh-CN.md`、`HANDOFF_TEMPLATE.zh-CN.md`、`.codex`及旧多模态总结；Web `public/scripts/loading.js`（已知npmnpm前缀问题，未修复/提交）。Backend/AI任务提交后干净。
+- 下一步：如需部署，固定同步Backend/AI商品Prompt v8/Web版本并按已有部署流程验证；此前生命周期等patch部署仍需migrate，本次价格增量未新增迁移。优先补真实浏览器含图片/OCR、更多模型/多轮纠正验收；旧带价模型草稿重新生成，缺包装数量必须人工补齐。任何后续浏览器问题须区分用户loading.js遗留改动与本次功能，不自动撤销用户文件。
+
+## 2026-09-09 AI 商品逐单位价格贯通与本地验证（未提交）
+
+- 本轮从安全阻断推进到实际 typed 明细：AI 商品 Prompt v8 / prices[] / uom_relations[] / pricing_unresolved；Backend product-pricing-v1，Web 价格/计价单位/包装等式编辑器、摘要/详情、版本冲突字段。示例Retail3.5/Bottle、Wholesale30/Box、Buying25/Box，默认Standard Selling30/Box；12瓶=1箱须明确填写，绝不按售价比推算。服务端默认标准价随批发价刷新，用户明确价保护，恢复版本来源从服务端历史快照恢复。
+- 正式执行传完整各单位价格、换算和批零默认单位；新建移除冗余旧 standard_rate 写入。真实事务进一步发现公司币种/正式价格表币种不一致会导致ERPNext改币种和重复校验，现 typed 生成/执行提前拒绝，不重标货币。修改只upsert价格，删除正式价格不能通过移除草稿行假装完成；初次模型局部价格补丁合并已有价格。缺单位、矛盾/未连接/缺数量关系、重复行、非法金额、旧标量模型返回等阻断。新 typed 草稿隐藏并拒绝旧标量商品交接页，使用 AI 编辑器复核执行。
+- 验证已通过：Backend全量1053 tests及全仓Ruff；AI pytest226 tests /25 subtests、Ruff、pre-commit、Docker test226 tests、runtime镜像构建；Web tsc/Biome，全量61 suites/409 tests，随后新增UI两用例及最后展示调整定向6 suites/64 tests通过。真实站点隔离事务1 test覆盖创建/修改四条Item Price、Bottle=1/12Box及rollback后Item不存在；首次外币夹具触发重复错误后补币种校验，最终同币种完整事务通过。不隐去首次失败。
+- 真实 gpt-5.6-luna 公共HTTP：首次基础流程1 test（约33秒）通过；最终扩展流程1 test（29.6秒）通过：自动resolve→生成→缺包装阻断→补12瓶=1箱→编辑/读取→通过校验→Wholesale改32/默认SS同步32→恢复历史版本回30且保留default。扩展首轮入口收到非JSON响应，复测遇到未登记品牌的正常业务阻断；夹具随后显式清空可选品牌以隔离定价验收，并非代码绕过品牌验证，最终通过。所有测试草稿放弃/会话归档，无正式ERP写入。没有浏览器端到端、图片/OCR或所有模型语义验收，不能宣称任意输入零缺陷。
+- 本地AI已构建替换并Backend重启，readyz=true、product-setup-draft-v8、release=local-product-pricing-v8-wip、revision=unversioned（未提交开发镜像）；不用用户自行重启后端。Web开发进程未替换，刷新读取源码；未做staging/production部署、未提交/推送。
+- 文档：方案16新增当前实际契约及限制，Backend API/测试、AI API、Web设计同步。三个子仓及父仓任务文档仍脏；上轮响应安全和生命周期红色样式继续保留，用户public/scripts/loading.js与父仓AGENTS/开发规则/已知问题/模板/.codex等原样保留，不纳入本轮归属。
+- 边界：仅四个标准价格表及单币种；阶梯/客户专价/有效期条件明确阻断，旧模型价格草稿需重新生成。旧商品交接表单尚未扩成多明细，图片证据/更多真实多轮与浏览器测试仍待后续。不批量修改用户商品。
+
+## 2026-09-08 商品/订单价格单位审查与安全修复（未提交，完整多单位 AI 建档仍待实现）
+
+- 用户截图新增商品：3.5 元每瓶、30 元每箱、库存单位箱、进价25元每箱；原草稿 standard_selling_rate=3.5、standard_buying_rate=25，丢失30元。确认不仅模型/Prompt：AI Schema 只有四个价格标量，无逐价格单位及换算，执行不传这些能力；正式商品领域已有多单位/逐单位价格能力。完整目标与分期验收见新增方案16 `docs/05-development/16-ai-price-uom-contract.zh-CN.md`。
+- 新增 Backend `ai_price_safety.py`：服务端动作契约保存有限语法原文单价证据；生成检测金额遗漏，生成/编辑/恢复/交接/执行阻断当前标量草稿无法表达的非基准单位报价。数据库锁定版本重新校验，删除客户端证据/伪造通过无效；有价格的旧模型商品草稿缺少价格证据需重新生成，未修改历史数据。证据语法检查是保守防丢失层，不是模型替代品，无法覆盖全部中文、图片或跨轮省略。
+- 跨模块确认并修复：销售/采购参考价原先按价格表取第一条，现按当前计价单位唯一匹配，缺失/多候选不自动当作当前单位价格；已有商品 baseline 同步按批零默认单位选择。生成、编辑及执行重建五条路径共用单位/价格错误汇总。订单编辑更换单位且单价数字未变时清除旧价、重取匹配参考价或要求输入并提示核对；价格 _state 不再信任浏览器，仅继承同身份同单位的服务端旧行。
+- 库存核查已有 resolve_item_quantity_to_stock、估值输入单位/stock_unit_rate/来源选择，未发现本次相同的无单位价格结构；不表示整个库存或模型语义无缺陷。销售/采购模型首次提取中数量单位与计价单位分离仍需后续结构化契约，不能声称所有原文价格问题已解决。
+- 验证：新增价格安全套件 **12 tests PASS**（包含子用例矩阵、真实商品构建器和锁定版本保存验证）；最终 Backend 全量 **1044 tests PASS**；Backend 全仓 Ruff PASS，四仓 diff check PASS。既有模拟 HTTPError ResourceWarning / 无站点日志提示仍存在。没有真实 Provider、HTTP、浏览器或 ERP 写入验收。
+- 本次只改 Backend（ai_service/ai_repository、新价格安全模块/测试、API/测试文档）及父仓方案/交接。上轮响应安全模块和 Web 红色样式继续未提交；用户 loading.js 与父仓用户改动保留。未改 AI Prompt/Schema，无数据库迁移，未重启、提交、推送或部署。
+- 未完成项明确保留：Orchestrator prices[]/uoms[] 契约和 Prompt/runtime 同步、Web 多价格单位表、每箱瓶数澄清、默认标准价推断确认策略、正式创建/修改的多价格单位透传以及 HTTP/Web/真实模型验收。当前是安全阻断阶段，不能描述为已经自动正确填好截图中的零售/批发/默认价；下一步应按方案16贯穿这一整条链路，不再仅增加词法规则。
+
+## 2026-09-08 无执行凭据成功回答：审查与第一阶段加固（未提交）
+
+- 已取证封面请求 AI-RUN-822d1e7844de46d1a4a9d1665122588a：意图解析超时进入 general / degraded_local_rules，未生成草稿、未执行图片写入却输出成功。方案新增 `docs/05-development/15-ai-result-evidence-hardening.zh-CN.md`，覆盖入口、缓存/固定场景/重试/Agent、Chat/SSE、正式图片保存、草稿执行和生命周期回执；不是全仓所有业务接口完整审计。
+- Backend 新增 `ai_response_safety.py`：意图调用失败不再返回空对象，空/未知/低置信度/非法置信度停止；公共 Chat 在创建 Run/签发能力前统一拒绝写意图或动作契约。固定场景也解析一次，兼容分支复用，不重复调用。自动前置入口不签发不可靠凭据；旧低置信度缓存不能继续聊天。
+- 公共输出增加典型无凭据成功断言检查，SSE 完整缓存正文、128,000 字符上限、最终正文一致性验证，检查和持久化完成后才发布正文，保留实时工具/进度事件。同步及恢复最终保存共用出口检查；准备阶段 AiServiceError 直接返回 SSE error，不变成通用 Frappe 500。不会自动执行任何商品或图片操作。
+- 取舍/限制：解析故障时只读聊天也必须重试；SSE 正文不再逐 Token 即时展示，first_token_ms 仍是上游首 Token 耗时。输出词法规则是纵深防护，不能证明任意措辞无幻觉；独立 Orchestrator 内部出口、统一执行 receipt 展示、可恢复澄清/封面赋值与重绘选项、独立解析审计仍属后续。未新增生成图片工具，未保证模型一定将封面原句正确路由为商品草稿。
+- 验证：Backend 容器 bench Python 全量 `unittest discover -s apps/myapp/myapp/tests/unit -t apps/myapp -q` 最终 **1032 tests PASS**；新增安全套件 13 tests，包含多场景/Agent 开关、带图超时三个入口、任意 SSE 切片与恢复、伪回执、正常查询/历史/否定及长度限制。Backend 全仓 Ruff（使用 AI venv 内 Ruff、Backend 自身配置）PASS，四仓 diff check PASS。旧测试里预期降级继续的断言已改为拒绝，Agent/会话测试显式隔离意图 Provider。测试存在既有模拟 HTTPError ResourceWarning / 日志无站点提示；没有真实 Provider、HTTP、浏览器或跨资源事务验收，不冒充上线通过。
+- 本轮 Backend 6 个新增/修改文件及父仓方案/交接未提交；Backend API/测试说明已同步。没有更改 AI 源码、Prompt、数据库结构，没有重启/推送/部署。Web 红色预检样式的上轮未提交改动及用户 loading.js、父仓用户既有改动继续保留。
+- 下一步：用 Web 实际自动识别→草稿或 SSE 顺序做隔离 HTTP/浏览器验收，验证中止原因可见及正常图片草稿仍可确认；随后按方案推进服务端回执驱动结果块、澄清和独立解析记录。不要把本轮第一阶段称为全方案已完成。
+
+## 2026-09-08 生命周期预检阻断红色高亮（未提交）
+
+- 按用户截图反馈，仅修改 Web 计划弹窗：预检失败顶部显示红色“预检未通过”；每个阻断商品增加红色“不允许执行”标签，原因红色加粗；整批不通过提示改为红色错误 Alert 并带图标，权限/执行失败原因也标红。共享范围的一般风险仍为黄色警告，正常通过不标红。不改变后端状态及执行权限。
+- Web tsc、两份改动文件 Biome check、计划组件 6 tests、diff --check PASS，覆盖阻断/权限错误视觉标识及正常通过样式。同步更新 Web AI 设计文档；未提交、未推送、未部署，保留已有 loading.js 改动。
 
 ## 2026-09-08 生命周期功能已提交与跨模块回归
 
