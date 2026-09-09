@@ -2,6 +2,39 @@
 
 更新时间：2026-09-09 CST
 
+## 2026-09-09 库存草稿单位治理跳转入口
+
+- Web 已提交并推送：`4249d304a589098bf95651fc8f6d44370d6e8004`（`fix(ai): link inventory unit errors to governed repair`）。GitHub Actions Build run `34344873147` 成功，发布唯一标签 `staging-web-20260909-4249d30`，没有覆盖 `latest`。
+- 验证：TypeScript、全仓 Biome lint、61 suites / 413 tests、diff check 通过；保留既有 Jest open-handle 提示。新增用例验证异常/正常分支、编码转义、新标签页及编辑输入保留。未执行登录态浏览器端到端验收。
+- Web 库存调整草稿在当前商品 `requires_uom_migration=true` 时增加“查看商品 / 处理单位异常”入口，复用详情页 `uom_migration=1` 深链。新标签页保留原草稿输入，商品完善草稿旧入口也改为新标签页。当前选择与服务端商品不一致时不显示旧目标链接。
+- 处理后沿用保存草稿重新校验；界面明确提示产生继任商品时回对话确认并重新生成，不自动改绑目标。Web 开发文档已随业务提交更新。用户 `public/scripts/loading.js` 与既有父仓改动保留。
+- 首次从目标服务器拉取该镜像时 GHCR 返回 `Get "https://ghcr.io/v2/": EOF`，失败发生在 `docker rm` 之前，旧 Web `staging-web-20260909-1a722cc` 持续 healthy、无服务切换。按 staging 策略对同一不可变标签执行唯一一次有界重试，不重建、不换标签。
+- 有界重试成功，目标服务器 Web 已切换为 `staging-web-20260909-4249d30`；OCI revision 为 `4249d304a589098bf95651fc8f6d44370d6e8004`，RepoDigest 为 `sha256:e75305d5ca08a8eca1ec86a1743f884d4ded56498de3237012381b865434bbc4`，image ID 为 `sha256:3886962bcaf1b30f0461bc3fca32f6aebbc0bdeda0e121aac676e474b9e06475`。启动窗口出现短暂 connection reset，随后 Docker health=`healthy`、RestartCount=0，未触发旧镜像回退。
+- 稳定态复核确认 Backend/ERP Frontend/Websocket/三类 Queue/Scheduler 仍运行 `staging-20260909-55db6d02`，AI Orchestrator 仍运行同标签且 healthy；Web 运行新标签且 healthy。从当前工作机经内网 IP 验证 `:30080/healthz`、`/user/login`、`/api/method/ping`、`/ai/workspace` 以及 `:28080/`、`/api/method/ping` 全部 HTTP 200。根盘仍为 98GB、已用 65GB、可用 28GB、使用率 70%。本次没有再次清理空间、运行迁移或修改商品/价格等业务数据。
+
+## 2026-09-09 staging 商品主数据与异常单位只读审计
+
+- 用户要求检查并整理测试服务器商品数据，重点处理 `可口可乐-5000ML` 的抽象库存单位。本轮仅通过 staging Backend/数据库和正式 `assess_product_uom_migration_v1` 做只读审计，没有修改 Item、UOM、价格、库存、单据、品牌或分类。
+- 当前站点共有 353 个 Item，343 个启用且均为库存商品；其中明显测试/抽象数据包括 245 个 `HTTP-*`、68 个 `链路/采购链路/销售结算链路-*`、4 个 `RANGE-PRODUCT-*`、10 个 Demo `SKU001..010` 和 13 个随机/TEST 类商品。上述类别中仍启用 330 个；278 个当前零库存且无未完销售/采购单，可作为第一批可逆停用隔离候选；52 个仍有库存，不能直接当作无状态夹具删除或清空。历史单据和库存流水必须保留。
+- `可口可乐-5000ML` 当前启用，名称仍为“可口可乐 5000ml”，但 Version 显示规格曾从 `5000ml` 改为 `500ml`；分类为 `Demo Item Group`，品牌为唯一测试品牌 `HTTP-BRAND-1774131261704406419`。库存基准单位和零售默认单位均为非业务可选科学单位 `Wavelength In Megametres`，批发默认单位为 `Box`，换算为旧单位 `1`、`Box=24`；无条码。
+- 四条正式价格全部错误绑定旧科学单位：Retail 9.9、Standard Buying 50、Standard Selling 52、Wholesale 99 CNY。现有字段和默认单位可提示“Retail 可能按瓶、Wholesale 可能按箱”，但不能证明 Standard Buying/Selling 或金额的真实业务口径，未经用户确认不得自动映射。
+- `Stores - RD` 当前实际库存 240500 个旧基准单位，无预留、在途、计划或请购。两条历史 SLE 均来自已提交 Material Receipt：2026-08-26 增加 240000、2026-08-31 增加 500，成本/估值均为 0；没有销售、采购、发货、收货或发票行引用。该数量明显具有测试特征，但系统仍将其视为真实账面库存，不能直接改字段或删除流水。
+- 正式迁移评估返回 `can_execute=false / recommended_strategy=null`：非零库存是唯一 blocker；已有 2 条 SLE 使原地修改永久不可用。正确流程应先在受控作业窗口确认物理库存并用库存转换/Repack 或明确的库存清零动作处理旧商品，再使用 `replacement` 创建继任商品，保留旧流水、建立正式替代关系并停用源商品。
+- 建议的真实继任主数据待用户确认：编码优先 `可口可乐-500ML`，名称“可口可乐 500ml”，库存基准单位 `Bottle`，`1 Box = 24 Bottle`，批发默认 `Box`、零售默认 `Bottle`，分类“饮料”，品牌“可口可乐/Coca-Cola”。还必须确认实际库存瓶数及 Retail/Wholesale/Standard Buying/Standard Selling 四条价格各自的真实单位和金额，不能用现有抽象值猜测。
+
+## 2026-09-09 staging 离线切换与 Web 部署完成
+
+- 用户明确授权继续部署到既有 staging `vivy@192.168.31.229:22`。因上一轮 GHCR token/EOF 发生在 Backend/AI 镜像已经完整缓存之后，本次先只读确认缓存 RepoDigest 与成功构建完全一致，再显式使用 `PULL_POLICY=never` 离线启动，没有重建或覆盖标签，也没有再次访问 Registry、prune、删除 volume、备份或服务器既有源码状态。
+- Backend/AI 已切换为共同不可变标签 `staging-20260909-55db6d02`：Parent image revision `55db6d02bcc8af0503c945c4332adc8d3271d8b3`，Backend `myapp` revision `f917b62b12bc771afc8304f9948afc9372a29886`，AI revision `6700dccb23e973df9b7fff8494c5a8834cfef566`。Backend digest `sha256:a5dd49d902ffa336cdcaaee9683efbbb121921540f3d3621d189197553e551d7`，AI digest `sha256:dedbe14f27c07c8c0ed8a2a3131a6720bc7dbc1ec9783162fbcf722e185dbcdf`。
+- 数据库授权修复和 `bench --site staging.example.com migrate` 成功；本次执行登记 `create_ai_model_check_job` 与 `create_product_lifecycle_plan` 两个 patch，随后同步 DocType、fixture、customization、语言、应用版本及 `after_migrate`，并排队重建搜索索引。切换前使用的最新完整备份仍为 `/srv/frappe_docker/backups/staging/staging-backup-staging.example.com-20260909-112509.tar.gz`。
+- 完整 `check-staging.sh` 通过：Backend→AI Router 内部认证、Runtime protocol、单副本身份、Prompt/Schema/Tool manifest、有效 Runtime Policy、首页和 Ping 均通过；`gpt-5.6-luna` 同时为 tool-ready 与 vision-ready。真实 AI canary 报告 `artifacts/staging/ai-canary/staging-20260909-55db6d02-20260909T102548Z.json` 为 4/4 passed，发布对已登记到 `artifacts/staging/ai-releases/staging-20260909-55db6d02.json`。
+- SLO 报告 `artifacts/staging/ai-slo/staging-20260909-55db6d02-20260909T102614Z.json` 为 warning，不是确定性失败：3/3 成功、success rate 1.0、contract mismatch 0、p95 12723.68ms、violations=[]；唯一告警为 `AI_SLO_INSUFFICIENT_SAMPLE`，当前 3 个样本低于决策门槛 20。
+- Web 镜像此前未缓存，本次只执行一次有界 GHCR 拉取并成功；已切换为 `staging-web-20260909-1a722cc`，revision `1a722cc65111b1638d7b34cee7f25af82aab9052`，digest `sha256:f5996e919f81bd9b67ebfc67d579bd66ee3e2368413ea6ae6ef5c155414ec8be`。启动早期出现两次短暂 connection reset，随后 `/healthz`、`/user/login` 和 `/api/method/ping` 全部通过，未触发旧镜像回退。
+- 最终所有 Backend、ERP Frontend、Websocket、三类 Queue、Scheduler、AI Orchestrator 和 Web 容器均运行目标标签，RestartCount=0；AI 与 Web Docker health 均 healthy。通过内网 IP 实测 `http://192.168.31.229:28080/`、`:28080/api/method/ping`、`:30080/healthz`、`:30080/user/login`、`:30080/api/method/ping`、`:30080/ai/workspace` 全部 HTTP 200。部署后根盘 98GB、已用 69GB、可用 25GB、使用率 74%。
+- 用户随后授权清理目标服务器空间。清理前再次核对所有 staging 业务容器仍运行上述 2026-09-09 目标标签、OCI revision/digest 正确且 RestartCount=0；随后只删除未被任何运行或停止容器引用的三组更旧 Backend/AI 标签（`staging-20260831-9c008222`、`staging-20260829-a0402358`、`staging-20260825-ea64c9c6`）和两个更旧 Web 标签（`staging-20260824-a786d94c`、`staging-20260820-27c4dbf`）。当前版本及最近回滚基线 Backend/AI `staging-20260906-b467498c`、Web `staging-web-20260831-148878d` 均保留。
+- 定向清理后根盘为 98GB、已用 65GB、可用 28GB、使用率 70%，约释放 4GB；业务镜像现只剩当前三镜像和上述三镜像回滚基线。没有运行全局 prune，没有删除其他项目镜像、任何 volume、数据库、sites、Qdrant、Redis、治理/发布报告、`backups/`、`tmp/` 或服务器既有源码状态。清理后目标容器标签、RestartCount=0、AI/Web health 及六个本机 HTTP 路径再次通过。
+- 本次没有 production 操作，没有登录态浏览器业务写入验收，也没有创建或修改正式商品/价格。仍建议用户登录 staging 后重点验证 Prompt v8 商品建档/修改：逐单位零售/批发/进价、包装换算、默认标准售价同步、缺换算阻断、恢复历史版本和未确认前不写正式 Item/Item Price。
+
 ## 2026-09-09 部署续作：门禁已解除，GHCR 连接中断阻止服务切换
 
 - 本节覆盖下方旧阻断状态：父仓 `2d5eafb0` 固定 shfmt v3.13.1 与两空格参数，完整本地 pre-commit、部署契约 31 tests 及远端 CI `34307023320` 通过。正式重新检测现有主模型 gpt-5.6-luna 后 available/tools/vision/structured 均通过，已持久化检测审计并失效缓存；未手改能力标志、换模型或绕过治理策略。切换前 check-staging.sh 通过。
