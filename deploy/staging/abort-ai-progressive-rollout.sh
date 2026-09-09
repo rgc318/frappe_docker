@@ -98,7 +98,7 @@ if [[ "${ready_count:-0}" -ne "${expected_stable_replicas}" ]]; then
   exit 1
 fi
 
-stable_report="$(${ROOT_DIR}/deploy/staging/verify-ai-replica-set.sh \
+stable_report="$("${ROOT_DIR}/deploy/staging/verify-ai-replica-set.sh" \
   "${backend_container}" "http://ai-orchestrator:4010/readyz" \
   "${expected_stable_replicas}" "${stable_container_ids[@]}")"
 stable_runtime_release="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["identity"]["release_id"] or "")' <<<"${stable_report}")"

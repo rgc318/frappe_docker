@@ -51,7 +51,7 @@ print(state.get("candidate_release_id") or "")
 print(state.get("candidate_replicas") or 1)
 PY
   )
-  if [[ "${rollout_values[0]}" =~ ^(active|draining|promoting)$ ]] && \
+  if [[ "${rollout_values[0]}" =~ ^(active|draining|promoting)$ ]] &&
     [[ "${rollout_values[1]}" != "0" || "${rollout_values[0]}" != "active" ]]; then
     export MYAPP_AI_STABLE_TAG="${rollout_values[2]}"
     export MYAPP_AI_CANDIDATE_TAG="${rollout_values[3]}"

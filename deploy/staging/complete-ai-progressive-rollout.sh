@@ -79,14 +79,13 @@ if [[ "$(get_env CUSTOM_TAG)" != "${expected_active_release}" || "$(get_env MYAP
   exit 1
 fi
 if [[ "${FORCE_COMPLETE}" != "1" ]]; then
-  if ! python3 - "${drain_deadline}" <<'PY'
+  if ! python3 - "${drain_deadline}" <<'PY'; then
 from datetime import UTC, datetime
 import sys
 
 deadline = datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))
 raise SystemExit(0 if datetime.now(UTC) >= deadline else 1)
 PY
-  then
     echo "AI release drain is still active until ${drain_deadline}." >&2
     echo "Use AI_ROLLOUT_FORCE_COMPLETE=1 only for documented emergency retirement." >&2
     exit 2
@@ -129,7 +128,7 @@ if [[ "${drain_action}" == "retire_candidate" ]]; then
   expected_stable_replicas="$(get_env MYAPP_AI_ORCHESTRATOR_REPLICAS)"
   expected_stable_replicas="${expected_stable_replicas:-1}"
   mapfile -t stable_container_ids < <(compose ps -q ai-orchestrator)
-  stable_report="$(${ROOT_DIR}/deploy/staging/verify-ai-replica-set.sh \
+  stable_report="$("${ROOT_DIR}/deploy/staging/verify-ai-replica-set.sh" \
     "${backend_container}" "http://ai-orchestrator:4010/readyz" \
     "${expected_stable_replicas}" "${stable_container_ids[@]}")"
   stable_runtime_release="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["identity"]["release_id"] or "")' <<<"${stable_report}")"
@@ -155,7 +154,7 @@ if [[ "${drain_action}" == "retire_candidate" ]]; then
   exit 0
 fi
 
-candidate_report="$(${ROOT_DIR}/deploy/staging/verify-ai-replica-set.sh \
+candidate_report="$("${ROOT_DIR}/deploy/staging/verify-ai-replica-set.sh" \
   "${backend_container}" "http://ai-orchestrator-candidate:4010/readyz" \
   "${candidate_replicas}" "${candidate_container_ids[@]}")"
 candidate_runtime_release="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["identity"]["release_id"] or "")' <<<"${candidate_report}")"
@@ -205,7 +204,7 @@ if [[ "${ready_count:-0}" -ne "${expected_stable_replicas}" ]]; then
   exit 1
 fi
 
-stable_report="$(${ROOT_DIR}/deploy/staging/verify-ai-replica-set.sh \
+stable_report="$("${ROOT_DIR}/deploy/staging/verify-ai-replica-set.sh" \
   "${backend_container}" "http://ai-orchestrator:4010/readyz" \
   "${expected_stable_replicas}" "${stable_container_ids[@]}")"
 stable_runtime_release="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["identity"]["release_id"] or "")' <<<"${stable_report}")"

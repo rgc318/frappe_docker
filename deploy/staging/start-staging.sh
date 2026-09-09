@@ -58,7 +58,7 @@ print(state.get("candidate_release_id") or "")
 print(state.get("candidate_replicas") or 1)
 PY
   )
-  if [[ "${rollout_values[0]}" =~ ^(active|draining|promoting)$ ]] && \
+  if [[ "${rollout_values[0]}" =~ ^(active|draining|promoting)$ ]] &&
     [[ "${rollout_values[1]}" != "0" || "${rollout_values[0]}" != "active" ]]; then
     ROLLOUT_ACTIVE=1
     ROLLOUT_PERCENT="${rollout_values[1]}"

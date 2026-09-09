@@ -10,15 +10,15 @@
 
 后续新增版本化 `ai-action-contract-v1`，与现有场景分类并行，不直接破坏旧 Schema：
 
-| 字段 | 用途 |
-| --- | --- |
-| request_mode | execute_request / inquire / negate / clarify，区分命令、咨询、否定和待澄清 |
-| actions[] | 原始动作、对象类型、明确目标、保留目标、修改字段、依赖关系 |
-| support_status | supported / unsupported / clarification_required / partially_supported |
-| constraints | 公司、范围、数量、保留条件与禁止操作 |
-| query_field_operations | 各查询字段的 keep / set / clear，不能以 null 或 all 猜测省略 |
-| evidence | 原文证据片段与来源；不得把模型推断伪装为用户明确值 |
-| resolution_id / hash | 服务端绑定用户、公司、会话版本、原文和附件，短期有效且可审计 |
+| 字段                   | 用途                                                                       |
+| ---------------------- | -------------------------------------------------------------------------- |
+| request_mode           | execute_request / inquire / negate / clarify，区分命令、咨询、否定和待澄清 |
+| actions[]              | 原始动作、对象类型、明确目标、保留目标、修改字段、依赖关系                 |
+| support_status         | supported / unsupported / clarification_required / partially_supported     |
+| constraints            | 公司、范围、数量、保留条件与禁止操作                                       |
+| query_field_operations | 各查询字段的 keep / set / clear，不能以 null 或 all 猜测省略               |
+| evidence               | 原文证据片段与来源；不得把模型推断伪装为用户明确值                         |
+| resolution_id / hash   | 服务端绑定用户、公司、会话版本、原文和附件，短期有效且可审计               |
 
 服务端能力目录声明操作、对象类型、目标基数、所需权限、确认等级、是否支持部分执行及正式业务执行器。模型负责理解，不负责宣称自己能执行什么。未知动作失败关闭；删除不等于停用，取消单据不等于删除订单行，合并商品不等于编辑名称。
 

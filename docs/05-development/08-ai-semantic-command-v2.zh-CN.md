@@ -92,8 +92,8 @@
   "line_changes": [
     {
       "operation": "update",
-      "target": {"row_id": null, "item_query": "可口可乐"},
-      "patch": {"qty": 5, "uom": "箱"}
+      "target": { "row_id": null, "item_query": "可口可乐" },
+      "patch": { "qty": 5, "uom": "箱" }
     }
   ]
 }
@@ -163,7 +163,7 @@ Backend 草稿校验项统一为：
   "code": "PRODUCT_TARGET_AMBIGUOUS",
   "field": "target.item_code",
   "message": "商品目标无法唯一匹配。",
-  "meta": {"candidate_count": 2}
+  "meta": { "candidate_count": 2 }
 }
 ```
 

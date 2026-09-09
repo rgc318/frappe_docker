@@ -27,13 +27,13 @@
 
 ## 2. 当前仓库功能基线
 
-| 仓库 | 分支 | 当前提交 | 状态 |
-| --- | --- | --- | --- |
-| Parent | `develop` | `baeb2d82 fix(ai): enforce runtime state consistency`；本文档提交可能位于其后 | 保留用户已有文档和未跟踪本地状态 |
-| Backend `apps/myapp` | `develop` | `46f5d48 fix(ai): converge durable run state` | clean |
-| AI Orchestrator `services/myapp-ai` | `develop` | `25e55e7 fix: refresh stale model health policy cache` | clean |
-| Web `frontend/myapp-web` | `main` | `b4112fe fix(ai): restore durable run state` | clean |
-| Mobile | 未核对 | 本阶段未修改 | 不在本阶段提交范围 |
+| 仓库                                | 分支      | 当前提交                                                                      | 状态                             |
+| ----------------------------------- | --------- | ----------------------------------------------------------------------------- | -------------------------------- |
+| Parent                              | `develop` | `baeb2d82 fix(ai): enforce runtime state consistency`；本文档提交可能位于其后 | 保留用户已有文档和未跟踪本地状态 |
+| Backend `apps/myapp`                | `develop` | `46f5d48 fix(ai): converge durable run state`                                 | clean                            |
+| AI Orchestrator `services/myapp-ai` | `develop` | `25e55e7 fix: refresh stale model health policy cache`                        | clean                            |
+| Web `frontend/myapp-web`            | `main`    | `b4112fe fix(ai): restore durable run state`                                  | clean                            |
+| Mobile                              | 未核对    | 本阶段未修改                                                                  | 不在本阶段提交范围               |
 
 Parent 不得顺带提交或清理的状态：
 

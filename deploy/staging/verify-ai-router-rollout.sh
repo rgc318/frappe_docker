@@ -11,7 +11,7 @@ AFFINITY_MAP_PATH="${5:-${ROOT_DIR}/artifacts/staging/ai-router/release-affinity
 SAMPLE_COUNT="${6:-500}"
 
 if [[ -z "${BACKEND_CONTAINER}" || ! -f "${MAP_PATH}" || ! -f "${STATE_PATH}" || ! -f "${AFFINITY_MAP_PATH}" ]]; then
-	echo "Usage: $0 <backend-container> <router-readiness-url> <map-path> <state-path> <affinity-map-path> [samples]" >&2
+  echo "Usage: $0 <backend-container> <router-readiness-url> <map-path> <state-path> <affinity-map-path> [samples]" >&2
   exit 2
 fi
 if ! [[ "${SAMPLE_COUNT}" =~ ^[0-9]+$ ]] || ((SAMPLE_COUNT < 100)); then
