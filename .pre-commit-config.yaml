@@ -47,9 +47,9 @@ repos:
       - id: shfmt
         name: shfmt
         language: golang
-        additional_dependencies: [mvdan.cc/sh/v3/cmd/shfmt@latest]
+        additional_dependencies: [mvdan.cc/sh/v3/cmd/shfmt@v3.13.1]
         entry: shfmt
-        args: [-w]
+        args: [-w, -i, "2"]
         files: ^(deploy/staging/.*\.sh|(start-dev|start-prod|stop|install_x11_deps|validate-secret-env-files|sync-ai-gateway-env|sync-langfuse-runtime-env|setup-ai-observability)\.sh)$
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
