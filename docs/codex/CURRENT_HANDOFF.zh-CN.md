@@ -2,6 +2,17 @@
 
 更新时间：2026-09-09 CST
 
+## 2026-09-09 部署续作：门禁已解除，GHCR 连接中断阻止服务切换
+
+- 本节覆盖下方旧阻断状态：父仓 `2d5eafb0` 固定 shfmt v3.13.1 与两空格参数，完整本地 pre-commit、部署契约 31 tests 及远端 CI `34307023320` 通过。正式重新检测现有主模型 gpt-5.6-luna 后 available/tools/vision/structured 均通过，已持久化检测审计并失效缓存；未手改能力标志、换模型或绕过治理策略。切换前 check-staging.sh 通过。
+- 制品保持 Backend/AI `staging-20260909-55db6d02`，业务源分别 `f917b62`/`6700dcc`；Web 候选 `staging-web-20260909-1a722cc`。部署脚本来源 `2d5eafb0`，与镜像构建父仓 `55db6d02` 的业务 gitlink 相同；未重建/覆盖不可变标签。
+- 最新完整备份：`/srv/frappe_docker/backups/staging/staging-backup-staging.example.com-20260909-112509.tar.gz`，含数据库、public/private 文件和站点配置，保留早前备份。
+- [Deploy 34307161125](https://github.com/rgc318/frappe_docker/actions/runs/34307161125) 两次 attempt 均失败：第一次拉取完成后 compose up 再访问 GHCR token 时 EOF；按 staging 规则唯一一次有界重试，pull 再次成功，但 up 访问 `https://ghcr.io/v2/` 时仍 EOF。失败 jobs 为 `102326137341`、`102423480247`。这是外部 Registry 连接失败，不是迁移或业务测试失败；不得写为部署成功，也不再自动重复拉取/部署。
+- 后端和 AI 旧容器仍运行 `staging-20260906-b467498c`，未发生容器替换或 migrate；Web 部署尚未发起。服务器父仓已同步 `2d5eafb0`，新 Backend/AI 镜像已缓存；环境候选标签已更新但不等于运行版本。需保留服务器既有 AI 子模块源码状态及 backups/tmp，不做 reset/prune。
+- 新版本 staging 健康、canary、真实价格事务和 Web 验证仍未执行。下一步需用户确认改用已缓存且摘要匹配的镜像离线启动（不再访问 Registry），仍执行完整迁移、治理/健康/canary，再部署 Web；或等待仓库网络恢复后由用户重新授权部署。不能用旧版本检查结果替代新版本验收。未部署 production。
+- 本地用户 AGENTS、开发规则、已知问题、交接模板、.codex、旧总结及 Web loading.js 改动均保留，本次只更新交接文档。
+- 失败后只读复核：缓存 Backend digest `sha256:a5dd49d902ffa336cdcaaee9683efbbb121921540f3d3621d189197553e551d7`、AI digest `sha256:dedbe14f27c07c8c0ed8a2a3131a6720bc7dbc1ec9783162fbcf722e185dbcdf` 均与成功构建一致。旧 Web `staging-web-20260831-148878d` healthy；磁盘可用 25GB、使用率 74%。未清理旧镜像，保留回退条件。
+
 ## 2026-09-09 staging 部署准备完成，发布策略门禁阻断（未切换服务）
 
 - 用户授权部署，目标为既有 staging，不是 production。Backend `f917b62`、AI `6700dcc`、Web `1a722cc` 保持同一业务候选。父仓新增 `55db6d02` 并已推送：只修复渐进发布脚本路径引号及既有 Black/isort/Prettier/shfmt 格式门禁；隔离工作区 `/tmp/myapp-staging-release.10gMvS`，完整 pre-commit 和部署脚本 31 tests 本地通过，未修改业务代码或用户本地文件。当前工作区已快进同步。
