@@ -5,13 +5,13 @@
 ## 2026-09-09 staging 部署准备完成，发布策略门禁阻断（未切换服务）
 
 - 用户授权部署，目标为既有 staging，不是 production。Backend `f917b62`、AI `6700dcc`、Web `1a722cc` 保持同一业务候选。父仓新增 `55db6d02` 并已推送：只修复渐进发布脚本路径引号及既有 Black/isort/Prettier/shfmt 格式门禁；隔离工作区 `/tmp/myapp-staging-release.10gMvS`，完整 pre-commit 和部署脚本 31 tests 本地通过，未修改业务代码或用户本地文件。当前工作区已快进同步。
-- 原父仓 CI `34257360327` 的确定性格式/ShellCheck 错误已修复。新 CI `34305651904` 在安装检查工具依赖时遇到 pip/truststore 异常；按规则只重试一次，最终仍失败，不能记为远端 Lint PASS，也不继续重试或绕过门禁。
+- 原父仓 CI `34257360327` 的格式/ShellCheck 问题已在本地修正并通过检查。新 CI `34305651904` 首次在安装检查工具依赖时遇到 pip/truststore 异常；按规则重试一次后依赖安装通过，但最新日志显示 shfmt 会修改文件，其余检查通过。因此最终失败不是仍然只有网络异常：还存在本地缓存与 CI 格式化结果不一致的确定性门禁，需核对并固定 shfmt 版本、收敛输出后再发布，不能记为远端 Lint PASS。
 - 构建成功：Backend/AI [Build 34305663654](https://github.com/rgc318/frappe_docker/actions/runs/34305663654)，共同标签 `staging-20260909-55db6d02`，Parent `55db6d02`；Backend manifest digest `sha256:a5dd49d902ffa336cdcaaee9683efbbb121921540f3d3621d189197553e551d7`，AI manifest digest `sha256:dedbe14f27c07c8c0ed8a2a3131a6720bc7dbc1ec9783162fbcf722e185dbcdf`。Web [Build 34257764628](https://github.com/rgc318/myapp-web/actions/runs/34257764628) SUCCESS，固定完整 SHA `1a722cc65111b1638d7b34cee7f25af82aab9052`，标签 `staging-web-20260909-1a722cc`。均未发布 latest，未执行 Deploy workflow。
 - 服务器只读预检：`vivy@39.104.204.79:10022`，实际主机 `vivy-OMEN-by-HP-Laptop-15-dc0xxx`，目录 `/srv/frappe_docker`。磁盘 98GB、已用 67GB、可用 26GB（73%）；Docker images14.84GB、可回收 5.778GB。未清理镜像/卷/其他项目。服务器既有 services/myapp-ai 指针为 3233f6b9，与父仓不同；该源码状态、backups/、tmp/全部保留，不重置。
 - 已成功执行既有 backup-staging.sh：站点 `staging.example.com` 数据库、public/private 文件及配置；服务器归档 `/srv/frappe_docker/backups/staging/staging-backup-staging.example.com-20260909-110347.tar.gz`。此次未运行 migrate、未切换 Backend/AI/Web 镜像。备份脚本运行旧版 configurator，不代表部署新业务版本。
 - 阻断证据：切换前运行既有 check-staging.sh，容器、Backend→Router 认证、旧版 Runtime 兼容和单副本集均通过，Runtime Policy 检查失败：`Effective staging Runtime Policies have no tool-ready model`。只读策略快照确认生效策略 primary=`gpt-5.6-luna`、fallback=[]，该模型 available、vision/structured=true，但 supports_tools=false。`gpt-5.5`注册表三项能力均 true/available，却不在生效策略中；不能因为可用就绕过资格评测/审批直接换主模型。
 - 当前服务仍为 Backend/AI `staging-20260906-b467498c`、Web `staging-web-20260831-148878d`，未部署 production。新版本的 staging 迁移、价格 HTTP/事务与浏览器验收均尚未执行，不得将镜像构建 SUCCESS 写成部署 SUCCESS。
-- 需要用户方向：授权继续处理 staging 模型能力与发布策略资格（重新验证现有主模型，或完成替代模型的区域/评测/审批后发布）。不得手改 supports_tools、禁用 Agent、关闭 policy gate 或伪造评测报告。解除阻断后复用上述同一镜像标签，先同步 Backend/AI 并 migrate，再部署 Web（端口 30080、网络 staging_default、upstream=http://frontend:8080），执行 canary 与定向价格验收。若备份已过时，切换前重新备份。外部 CI 已用一次重试，不无限重跑。
+- 需要用户方向：授权继续处理 staging 模型能力与发布策略资格（重新验证现有主模型，或完成替代模型的区域/评测/审批后发布）。不得手改 supports_tools、禁用 Agent、关闭 policy gate 或伪造评测报告。还需先收敛上述 shfmt 门禁；不覆盖已发布镜像标签，若发布脚本 revision 变化须记录新的脚本 provenance。解除阻断后先同步 Backend/AI 并 migrate，再部署 Web（端口 30080、网络 staging_default、upstream=http://frontend:8080），执行 canary 与定向价格验收。若备份已过时，切换前重新备份。外部 CI 已用一次重试，不无限重跑。
 
 ## 2026-09-09 分仓提交与推送交接
 
