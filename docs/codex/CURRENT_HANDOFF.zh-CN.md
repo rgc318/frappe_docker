@@ -2,35 +2,46 @@
 
 更新时间：2026-09-09 CST
 
+## 2026-09-09 staging 部署准备完成，发布策略门禁阻断（未切换服务）
+
+- 用户授权部署，目标为既有 staging，不是 production。Backend `f917b62`、AI `6700dcc`、Web `1a722cc` 保持同一业务候选。父仓新增 `55db6d02` 并已推送：只修复渐进发布脚本路径引号及既有 Black/isort/Prettier/shfmt 格式门禁；隔离工作区 `/tmp/myapp-staging-release.10gMvS`，完整 pre-commit 和部署脚本 31 tests 本地通过，未修改业务代码或用户本地文件。当前工作区已快进同步。
+- 原父仓 CI `34257360327` 的确定性格式/ShellCheck 错误已修复。新 CI `34305651904` 在安装检查工具依赖时遇到 pip/truststore 异常；按规则只重试一次，最终仍失败，不能记为远端 Lint PASS，也不继续重试或绕过门禁。
+- 构建成功：Backend/AI [Build 34305663654](https://github.com/rgc318/frappe_docker/actions/runs/34305663654)，共同标签 `staging-20260909-55db6d02`，Parent `55db6d02`；Backend manifest digest `sha256:a5dd49d902ffa336cdcaaee9683efbbb121921540f3d3621d189197553e551d7`，AI manifest digest `sha256:dedbe14f27c07c8c0ed8a2a3131a6720bc7dbc1ec9783162fbcf722e185dbcdf`。Web [Build 34257764628](https://github.com/rgc318/myapp-web/actions/runs/34257764628) SUCCESS，固定完整 SHA `1a722cc65111b1638d7b34cee7f25af82aab9052`，标签 `staging-web-20260909-1a722cc`。均未发布 latest，未执行 Deploy workflow。
+- 服务器只读预检：`vivy@39.104.204.79:10022`，实际主机 `vivy-OMEN-by-HP-Laptop-15-dc0xxx`，目录 `/srv/frappe_docker`。磁盘 98GB、已用 67GB、可用 26GB（73%）；Docker images14.84GB、可回收 5.778GB。未清理镜像/卷/其他项目。服务器既有 services/myapp-ai 指针为 3233f6b9，与父仓不同；该源码状态、backups/、tmp/全部保留，不重置。
+- 已成功执行既有 backup-staging.sh：站点 `staging.example.com` 数据库、public/private 文件及配置；服务器归档 `/srv/frappe_docker/backups/staging/staging-backup-staging.example.com-20260909-110347.tar.gz`。此次未运行 migrate、未切换 Backend/AI/Web 镜像。备份脚本运行旧版 configurator，不代表部署新业务版本。
+- 阻断证据：切换前运行既有 check-staging.sh，容器、Backend→Router 认证、旧版 Runtime 兼容和单副本集均通过，Runtime Policy 检查失败：`Effective staging Runtime Policies have no tool-ready model`。只读策略快照确认生效策略 primary=`gpt-5.6-luna`、fallback=[]，该模型 available、vision/structured=true，但 supports_tools=false。`gpt-5.5`注册表三项能力均 true/available，却不在生效策略中；不能因为可用就绕过资格评测/审批直接换主模型。
+- 当前服务仍为 Backend/AI `staging-20260906-b467498c`、Web `staging-web-20260831-148878d`，未部署 production。新版本的 staging 迁移、价格 HTTP/事务与浏览器验收均尚未执行，不得将镜像构建 SUCCESS 写成部署 SUCCESS。
+- 需要用户方向：授权继续处理 staging 模型能力与发布策略资格（重新验证现有主模型，或完成替代模型的区域/评测/审批后发布）。不得手改 supports_tools、禁用 Agent、关闭 policy gate 或伪造评测报告。解除阻断后复用上述同一镜像标签，先同步 Backend/AI 并 migrate，再部署 Web（端口 30080、网络 staging_default、upstream=http://frontend:8080），执行 canary 与定向价格验收。若备份已过时，切换前重新备份。外部 CI 已用一次重试，不无限重跑。
+
 ## 2026-09-09 分仓提交与推送交接
 
-- 本节覆盖下方“未提交”历史状态。AI `6700dcc`（origin/develop）、Backend `f917b62`（origin/develop）与Web `1a722cc`（origin/main）均已提交并推送。父仓本次只提交上述 Backend/AI gitlink、方案15/16和本交接，随后推送origin/develop；父仓提交由包含本节的提交确定，避免在文档中自引用哈希。
-- 交付内容：逐单位商品价格 Schema/Prompt v8、共享数量关系推导、默认标准价及用户明确价保护、编辑/恢复/执行贯通、币种与旧契约防降级校验；同时提交前轮无凭据成功回答防护、订单精确单位参考价，以及Web生命周期阻断红色提示。没有扩大为阶梯定价、客户专价或通用删除价格能力。
-- 本次提交前重新验证：Backend容器bench Python全量1053 tests及Ruff；AI pytest226 tests /25 subtests及Ruff；Web tsc/Biome/全量61 suites、411 tests；四仓diff check均通过。上轮已通过的Docker test226 tests、runtime构建、隔离真实创建/修改事务、真实模型HTTP生成→编辑→恢复旁证详见下一节，本轮不重复付费模型测试。Web提交钩子正常运行，提交后另作定向复验。既有ResourceWarning、Starlette弃用、Jest open-handle仍如实保留，退出码0。
-- 推送包含此前同分支已经提交但未推送的相关生命周期、动作契约和异步检测历史，不重写历史、不force push。AI先推送，再固定父仓gitlink；Web独立仓不写入父仓索引。
-- 本地运行未因本次提交重新构建/重启：AI仍为上一轮已验证开发镜像 `local-product-pricing-v8-wip` / `unversioned`，不是以新提交哈希标记的不可变发布制品。Backend使用bind mount源码，Web本地开发源码；本次未手动触发staging/production部署，也不把git push当成部署验收。
-- 保留未提交用户状态：父仓 `AGENTS.md`、`docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`、`KNOWN_ISSUES.zh-CN.md`、`HANDOFF_TEMPLATE.zh-CN.md`、`.codex`及旧多模态总结；Web `public/scripts/loading.js`（已知npmnpm前缀问题，未修复/提交）。Backend/AI任务提交后干净。
-- 下一步：如需部署，固定同步Backend/AI商品Prompt v8/Web版本并按已有部署流程验证；此前生命周期等patch部署仍需migrate，本次价格增量未新增迁移。优先补真实浏览器含图片/OCR、更多模型/多轮纠正验收；旧带价模型草稿重新生成，缺包装数量必须人工补齐。任何后续浏览器问题须区分用户loading.js遗留改动与本次功能，不自动撤销用户文件。
+- 本节覆盖下方“未提交”历史状态。AI `6700dcc`（origin/develop）、Backend `f917b62`（origin/develop）与 Web `1a722cc`（origin/main）均已提交并推送。父仓本次只提交上述 Backend/AI gitlink、方案 15/16 和本交接，随后推送 origin/develop；父仓提交由包含本节的提交确定，避免在文档中自引用哈希。
+- 交付内容：逐单位商品价格 Schema/Prompt v8、共享数量关系推导、默认标准价及用户明确价保护、编辑/恢复/执行贯通、币种与旧契约防降级校验；同时提交前轮无凭据成功回答防护、订单精确单位参考价，以及 Web 生命周期阻断红色提示。没有扩大为阶梯定价、客户专价或通用删除价格能力。
+- 本次提交前重新验证：Backend 容器 bench Python 全量 1053 tests 及 Ruff；AI pytest226 tests /25 subtests 及 Ruff；Web tsc/Biome/全量 61 suites、411 tests；四仓 diff check 均通过。上轮已通过的 Docker test226 tests、runtime 构建、隔离真实创建/修改事务、真实模型 HTTP 生成 → 编辑 → 恢复旁证详见下一节，本轮不重复付费模型测试。Web 提交钩子正常运行，提交后另作定向复验。既有 ResourceWarning、Starlette 弃用、Jest open-handle 仍如实保留，退出码 0。
+- 推送包含此前同分支已经提交但未推送的相关生命周期、动作契约和异步检测历史，不重写历史、不 force push。AI 先推送，再固定父仓 gitlink；Web 独立仓不写入父仓索引。
+- 本地运行未因本次提交重新构建/重启：AI 仍为上一轮已验证开发镜像 `local-product-pricing-v8-wip` / `unversioned`，不是以新提交哈希标记的不可变发布制品。Backend 使用 bind mount 源码，Web 本地开发源码；本次未手动触发 staging/production 部署，也不把 git push 当成部署验收。
+- 保留未提交用户状态：父仓 `AGENTS.md`、`docs/codex/DEVELOPMENT_GUIDE.zh-CN.md`、`KNOWN_ISSUES.zh-CN.md`、`HANDOFF_TEMPLATE.zh-CN.md`、`.codex`及旧多模态总结；Web `public/scripts/loading.js`（已知 npmnpm 前缀问题，未修复/提交）。Backend/AI 任务提交后干净。
+- 下一步：如需部署，固定同步 Backend/AI 商品 Prompt v8/Web 版本并按已有部署流程验证；此前生命周期等 patch 部署仍需 migrate，本次价格增量未新增迁移。优先补真实浏览器含图片/OCR、更多模型/多轮纠正验收；旧带价模型草稿重新生成，缺包装数量必须人工补齐。任何后续浏览器问题须区分用户 loading.js 遗留改动与本次功能，不自动撤销用户文件。
 
 ## 2026-09-09 AI 商品逐单位价格贯通与本地验证（未提交）
 
-- 本轮从安全阻断推进到实际 typed 明细：AI 商品 Prompt v8 / prices[] / uom_relations[] / pricing_unresolved；Backend product-pricing-v1，Web 价格/计价单位/包装等式编辑器、摘要/详情、版本冲突字段。示例Retail3.5/Bottle、Wholesale30/Box、Buying25/Box，默认Standard Selling30/Box；12瓶=1箱须明确填写，绝不按售价比推算。服务端默认标准价随批发价刷新，用户明确价保护，恢复版本来源从服务端历史快照恢复。
-- 正式执行传完整各单位价格、换算和批零默认单位；新建移除冗余旧 standard_rate 写入。真实事务进一步发现公司币种/正式价格表币种不一致会导致ERPNext改币种和重复校验，现 typed 生成/执行提前拒绝，不重标货币。修改只upsert价格，删除正式价格不能通过移除草稿行假装完成；初次模型局部价格补丁合并已有价格。缺单位、矛盾/未连接/缺数量关系、重复行、非法金额、旧标量模型返回等阻断。新 typed 草稿隐藏并拒绝旧标量商品交接页，使用 AI 编辑器复核执行。
-- 验证已通过：Backend全量1053 tests及全仓Ruff；AI pytest226 tests /25 subtests、Ruff、pre-commit、Docker test226 tests、runtime镜像构建；Web tsc/Biome，全量61 suites/409 tests，随后新增UI两用例及最后展示调整定向6 suites/64 tests通过。真实站点隔离事务1 test覆盖创建/修改四条Item Price、Bottle=1/12Box及rollback后Item不存在；首次外币夹具触发重复错误后补币种校验，最终同币种完整事务通过。不隐去首次失败。
-- 真实 gpt-5.6-luna 公共HTTP：首次基础流程1 test（约33秒）通过；最终扩展流程1 test（29.6秒）通过：自动resolve→生成→缺包装阻断→补12瓶=1箱→编辑/读取→通过校验→Wholesale改32/默认SS同步32→恢复历史版本回30且保留default。扩展首轮入口收到非JSON响应，复测遇到未登记品牌的正常业务阻断；夹具随后显式清空可选品牌以隔离定价验收，并非代码绕过品牌验证，最终通过。所有测试草稿放弃/会话归档，无正式ERP写入。没有浏览器端到端、图片/OCR或所有模型语义验收，不能宣称任意输入零缺陷。
-- 本地AI已构建替换并Backend重启，readyz=true、product-setup-draft-v8、release=local-product-pricing-v8-wip、revision=unversioned（未提交开发镜像）；不用用户自行重启后端。Web开发进程未替换，刷新读取源码；未做staging/production部署、未提交/推送。
-- 文档：方案16新增当前实际契约及限制，Backend API/测试、AI API、Web设计同步。三个子仓及父仓任务文档仍脏；上轮响应安全和生命周期红色样式继续保留，用户public/scripts/loading.js与父仓AGENTS/开发规则/已知问题/模板/.codex等原样保留，不纳入本轮归属。
+- 本轮从安全阻断推进到实际 typed 明细：AI 商品 Prompt v8 / prices[] / uom_relations[] / pricing_unresolved；Backend product-pricing-v1，Web 价格/计价单位/包装等式编辑器、摘要/详情、版本冲突字段。示例 Retail3.5/Bottle、Wholesale30/Box、Buying25/Box，默认 Standard Selling30/Box；12 瓶=1 箱须明确填写，绝不按售价比推算。服务端默认标准价随批发价刷新，用户明确价保护，恢复版本来源从服务端历史快照恢复。
+- 正式执行传完整各单位价格、换算和批零默认单位；新建移除冗余旧 standard_rate 写入。真实事务进一步发现公司币种/正式价格表币种不一致会导致 ERPNext 改币种和重复校验，现 typed 生成/执行提前拒绝，不重标货币。修改只 upsert 价格，删除正式价格不能通过移除草稿行假装完成；初次模型局部价格补丁合并已有价格。缺单位、矛盾/未连接/缺数量关系、重复行、非法金额、旧标量模型返回等阻断。新 typed 草稿隐藏并拒绝旧标量商品交接页，使用 AI 编辑器复核执行。
+- 验证已通过：Backend 全量 1053 tests 及全仓 Ruff；AI pytest226 tests /25 subtests、Ruff、pre-commit、Docker test226 tests、runtime 镜像构建；Web tsc/Biome，全量 61 suites/409 tests，随后新增 UI 两用例及最后展示调整定向 6 suites/64 tests 通过。真实站点隔离事务 1 test 覆盖创建/修改四条 Item Price、Bottle=1/12Box 及 rollback 后 Item 不存在；首次外币夹具触发重复错误后补币种校验，最终同币种完整事务通过。不隐去首次失败。
+- 真实 gpt-5.6-luna 公共 HTTP：首次基础流程 1 test（约 33 秒）通过；最终扩展流程 1 test（29.6 秒）通过：自动 resolve→ 生成 → 缺包装阻断 → 补 12 瓶=1 箱 → 编辑/读取 → 通过校验 →Wholesale 改 32/默认 SS 同步 32→ 恢复历史版本回 30 且保留 default。扩展首轮入口收到非 JSON 响应，复测遇到未登记品牌的正常业务阻断；夹具随后显式清空可选品牌以隔离定价验收，并非代码绕过品牌验证，最终通过。所有测试草稿放弃/会话归档，无正式 ERP 写入。没有浏览器端到端、图片/OCR 或所有模型语义验收，不能宣称任意输入零缺陷。
+- 本地 AI 已构建替换并 Backend 重启，readyz=true、product-setup-draft-v8、release=local-product-pricing-v8-wip、revision=unversioned（未提交开发镜像）；不用用户自行重启后端。Web 开发进程未替换，刷新读取源码；未做 staging/production 部署、未提交/推送。
+- 文档：方案 16 新增当前实际契约及限制，Backend API/测试、AI API、Web 设计同步。三个子仓及父仓任务文档仍脏；上轮响应安全和生命周期红色样式继续保留，用户 public/scripts/loading.js 与父仓 AGENTS/开发规则/已知问题/模板/.codex 等原样保留，不纳入本轮归属。
 - 边界：仅四个标准价格表及单币种；阶梯/客户专价/有效期条件明确阻断，旧模型价格草稿需重新生成。旧商品交接表单尚未扩成多明细，图片证据/更多真实多轮与浏览器测试仍待后续。不批量修改用户商品。
 
 ## 2026-09-08 商品/订单价格单位审查与安全修复（未提交，完整多单位 AI 建档仍待实现）
 
-- 用户截图新增商品：3.5 元每瓶、30 元每箱、库存单位箱、进价25元每箱；原草稿 standard_selling_rate=3.5、standard_buying_rate=25，丢失30元。确认不仅模型/Prompt：AI Schema 只有四个价格标量，无逐价格单位及换算，执行不传这些能力；正式商品领域已有多单位/逐单位价格能力。完整目标与分期验收见新增方案16 `docs/05-development/16-ai-price-uom-contract.zh-CN.md`。
+- 用户截图新增商品：3.5 元每瓶、30 元每箱、库存单位箱、进价 25 元每箱；原草稿 standard_selling_rate=3.5、standard_buying_rate=25，丢失 30 元。确认不仅模型/Prompt：AI Schema 只有四个价格标量，无逐价格单位及换算，执行不传这些能力；正式商品领域已有多单位/逐单位价格能力。完整目标与分期验收见新增方案 16 `docs/05-development/16-ai-price-uom-contract.zh-CN.md`。
 - 新增 Backend `ai_price_safety.py`：服务端动作契约保存有限语法原文单价证据；生成检测金额遗漏，生成/编辑/恢复/交接/执行阻断当前标量草稿无法表达的非基准单位报价。数据库锁定版本重新校验，删除客户端证据/伪造通过无效；有价格的旧模型商品草稿缺少价格证据需重新生成，未修改历史数据。证据语法检查是保守防丢失层，不是模型替代品，无法覆盖全部中文、图片或跨轮省略。
 - 跨模块确认并修复：销售/采购参考价原先按价格表取第一条，现按当前计价单位唯一匹配，缺失/多候选不自动当作当前单位价格；已有商品 baseline 同步按批零默认单位选择。生成、编辑及执行重建五条路径共用单位/价格错误汇总。订单编辑更换单位且单价数字未变时清除旧价、重取匹配参考价或要求输入并提示核对；价格 \_state 不再信任浏览器，仅继承同身份同单位的服务端旧行。
 - 库存核查已有 resolve_item_quantity_to_stock、估值输入单位/stock_unit_rate/来源选择，未发现本次相同的无单位价格结构；不表示整个库存或模型语义无缺陷。销售/采购模型首次提取中数量单位与计价单位分离仍需后续结构化契约，不能声称所有原文价格问题已解决。
 - 验证：新增价格安全套件 **12 tests PASS**（包含子用例矩阵、真实商品构建器和锁定版本保存验证）；最终 Backend 全量 **1044 tests PASS**；Backend 全仓 Ruff PASS，四仓 diff check PASS。既有模拟 HTTPError ResourceWarning / 无站点日志提示仍存在。没有真实 Provider、HTTP、浏览器或 ERP 写入验收。
 - 本次只改 Backend（ai_service/ai_repository、新价格安全模块/测试、API/测试文档）及父仓方案/交接。上轮响应安全模块和 Web 红色样式继续未提交；用户 loading.js 与父仓用户改动保留。未改 AI Prompt/Schema，无数据库迁移，未重启、提交、推送或部署。
-- 未完成项明确保留：Orchestrator prices[]/uoms[] 契约和 Prompt/runtime 同步、Web 多价格单位表、每箱瓶数澄清、默认标准价推断确认策略、正式创建/修改的多价格单位透传以及 HTTP/Web/真实模型验收。当前是安全阻断阶段，不能描述为已经自动正确填好截图中的零售/批发/默认价；下一步应按方案16贯穿这一整条链路，不再仅增加词法规则。
+- 未完成项明确保留：Orchestrator prices[]/uoms[] 契约和 Prompt/runtime 同步、Web 多价格单位表、每箱瓶数澄清、默认标准价推断确认策略、正式创建/修改的多价格单位透传以及 HTTP/Web/真实模型验收。当前是安全阻断阶段，不能描述为已经自动正确填好截图中的零售/批发/默认价；下一步应按方案 16 贯穿这一整条链路，不再仅增加词法规则。
 
 ## 2026-09-08 无执行凭据成功回答：审查与第一阶段加固（未提交）
 
@@ -40,7 +51,7 @@
 - 取舍/限制：解析故障时只读聊天也必须重试；SSE 正文不再逐 Token 即时展示，first_token_ms 仍是上游首 Token 耗时。输出词法规则是纵深防护，不能证明任意措辞无幻觉；独立 Orchestrator 内部出口、统一执行 receipt 展示、可恢复澄清/封面赋值与重绘选项、独立解析审计仍属后续。未新增生成图片工具，未保证模型一定将封面原句正确路由为商品草稿。
 - 验证：Backend 容器 bench Python 全量 `unittest discover -s apps/myapp/myapp/tests/unit -t apps/myapp -q` 最终 **1032 tests PASS**；新增安全套件 13 tests，包含多场景/Agent 开关、带图超时三个入口、任意 SSE 切片与恢复、伪回执、正常查询/历史/否定及长度限制。Backend 全仓 Ruff（使用 AI venv 内 Ruff、Backend 自身配置）PASS，四仓 diff check PASS。旧测试里预期降级继续的断言已改为拒绝，Agent/会话测试显式隔离意图 Provider。测试存在既有模拟 HTTPError ResourceWarning / 日志无站点提示；没有真实 Provider、HTTP、浏览器或跨资源事务验收，不冒充上线通过。
 - 本轮 Backend 6 个新增/修改文件及父仓方案/交接未提交；Backend API/测试说明已同步。没有更改 AI 源码、Prompt、数据库结构，没有重启/推送/部署。Web 红色预检样式的上轮未提交改动及用户 loading.js、父仓用户既有改动继续保留。
-- 下一步：用 Web 实际自动识别→草稿或 SSE 顺序做隔离 HTTP/浏览器验收，验证中止原因可见及正常图片草稿仍可确认；随后按方案推进服务端回执驱动结果块、澄清和独立解析记录。不要把本轮第一阶段称为全方案已完成。
+- 下一步：用 Web 实际自动识别 → 草稿或 SSE 顺序做隔离 HTTP/浏览器验收，验证中止原因可见及正常图片草稿仍可确认；随后按方案推进服务端回执驱动结果块、澄清和独立解析记录。不要把本轮第一阶段称为全方案已完成。
 
 ## 2026-09-08 生命周期预检阻断红色高亮（未提交）
 
@@ -50,7 +61,7 @@
 ## 2026-09-08 生命周期功能已提交与跨模块回归
 
 - AI `ab94491` 已提交并按子模块规则推送 origin/develop；Backend 功能 `e824a66`、独立价格校验修复 `49e4ca3`；Web `74a3a78`。Backend/Web 仅本地提交，未推送；没有 staging/production 部署。父仓本次记录 Backend/AI gitlink、方案 13、本节及新增分层验证报告 14。
-- 后端全量 1019 tests PASS；真实站点生命周期事务 8 tests PASS（新增跨用户计划读取/执行隔离）；真实模型生命周期+旧编辑 HTTP 4 tests PASS。只读自动路由/公司会话→SSE 两用例最终均通过；公司会话用例首次连接中断，一次独立复测成功，不隐去初始失败。
+- 后端全量 1019 tests PASS；真实站点生命周期事务 8 tests PASS（新增跨用户计划读取/执行隔离）；真实模型生命周期+旧编辑 HTTP 4 tests PASS。只读自动路由/公司会话 →SSE 两用例最终均通过；公司会话用例首次连接中断，一次独立复测成功，不隐去初始失败。
 - Web tsc、Biome、全量 60 suites / 404 tests、生产构建 PASS；提交钩子仅格式化本次文件，提交后再次运行 tsc/全量 404 tests PASS。AI test 镜像 223 tests PASS，Ruff/pre-commit PASS；独立 Redis/Qdrant/合成 Provider 容器集成的健康、Chat、向量 upsert/search/delete PASS。
 - 独立集成使用项目 myapp-ai-lifecycle-verify、14010 端口；容器、网络和两个本次自建测试卷已按测试流程清理，未触碰现有 ERP/AI 数据。生命周期数据库夹具均 rollback，HTTP 只生成后放弃计划/草稿并归档会话，没有启停或删除用户商品。
 - 跨模块检查发现并独立修复了原有 terminate*product_price_v1 局部 `*` 遮蔽翻译函数：错误商品/过期版本曾稳定抛 UnboundLocalError，新增回归验证修复后业务校验拒绝且无价格写入。Backend 全仓 Ruff 现通过。
@@ -66,8 +77,8 @@
 - 删除保守阻断：任何库存历史、Bin（含零库存）、价格、变体、附件、封面或静态/动态引用。原生 on_trash 前锁定读取可级联依赖；Item 最新锁定 modified 与计划比较。执行异常全事务回滚及 after_commit 回调清空；生成/候选解析异常也在 Gateway 包络转换之前回滚。没有忽略权限/引用、force 删除或修改框架源码。
 - AI：Intent v8 新增 product_targets/preserve_product_targets 的 query+原文 evidence，同步/异步预算上限 4096。完整动作/数量/保留/证据及置信度校验；唯一精确目标可自动绑定，单个模糊候选仍须选择，候选超量不截断执行。复用原一次性解析凭据、模型及会话版本；生成计划更新实体上下文，未决/多个含保留对象不得沿用旧单目标。计划仅表示待确认，不声明执行成功。
 - Web：独立 product-lifecycle 领域 service、计划 Modal/卡片/最近 50 条历史入口。删除三个显式勾选，启停两个；展示共享范围、原文/目标/保留/阻断/过期；每次打开读取服务器，替换/刷新清空确认，写操作单飞；稳定计划幂等键和回执恢复。自动路由删除不走 Chat 或编辑草稿。既有草稿范围锁、SSE 引用保持及逐轮切换模型改动均保留。
-- 本地真实 HTTP：以现有百事可乐-2做仅预检/非法确认拒绝，2 tests PASS（含固定 gpt-5.6-luna 的 resolve→generate）。生成测试计划已放弃、会话已归档，没有执行该商品启停/删除。真实删除只对事务内自建 LIFECYCLE-TEST-\* 夹具，全部 rollback。
-- Backend 定向 420 tests PASS；最终补充原生引用错误脱敏回归后计划服务 13 tests PASS（使用本版 Frappe clear_last_message，不调用不存在的 clear_messages）。站点隔离事务 7 tests PASS，覆盖 Gateway→adapter→原生删除、Deleted Document、成功重放、启停、版本变化、新增价格阻断、第二项 save/delete 失败及回调清空。Backend 新增文件 Ruff PASS。既有模拟错误日志/ResourceWarning 和 job_name 弃用提示不影响退出码。
+- 本地真实 HTTP：以现有百事可乐-2 做仅预检/非法确认拒绝，2 tests PASS（含固定 gpt-5.6-luna 的 resolve→generate）。生成测试计划已放弃、会话已归档，没有执行该商品启停/删除。真实删除只对事务内自建 LIFECYCLE-TEST-\* 夹具，全部 rollback。
+- Backend 定向 420 tests PASS；最终补充原生引用错误脱敏回归后计划服务 13 tests PASS（使用本版 Frappe clear_last_message，不调用不存在的 clear_messages）。站点隔离事务 7 tests PASS，覆盖 Gateway→adapter→ 原生删除、Deleted Document、成功重放、启停、版本变化、新增价格阻断、第二项 save/delete 失败及回调清空。Backend 新增文件 Ruff PASS。既有模拟错误日志/ResourceWarning 和 job_name 弃用提示不影响退出码。
 - AI Ruff/pre-commit PASS；Docker test target 223 tests PASS；runtime 构建成功。本地 AI 容器已重建/重启为 `local-lifecycle-v8-wip`、revision=unversioned（未提交开发镜像），health/readyz 正常且 intent=v8。Backend 热重载后的真实 HTTP 已通过；没有重启用户 Web 服务。
 - Web 最终全量 60 suites / 404 tests PASS，新增 service/页面路由定向 3 suites / 41 tests PASS；最终 tsc、Biome PASS。曾遇到 Umi Jest 的 imported type/JSX 转换限制及测试 mock 缺少 idempotencyKey，已修正，没有修改依赖或全局测试配置。保留既有 Jest open-handle 提示，退出码 0。四仓 diff --check PASS。
 - 文档已更新方案 13、Backend API/测试、AI API、Web AI 设计；未 commit/push/staging/production。父仓用户 AGENTS/长期规则/KNOWN_ISSUES/模板/.codex/历史总结和 Web public/scripts/loading.js 均保留。Backend/AI/Web 所有本阶段改动仍在各自工作树，父仓 gitlink 尚未更新。
@@ -137,7 +148,7 @@
 - AI erp-intent-v7 增加 action_contract（原动作、命令/咨询/否定、对象数量和保留标记）与 query_context_operations（reset/clear_fields），同步 Backend 期望 Prompt，意图 completion 预算 500→900。Schema 新字段可空便于旧响应读取，但自动写入口缺少契约时明确拒绝。
 - Backend 新增 ai_action_contract.py 纯函数能力目录；自动入口拒绝删除/取消/合并/启停等未支持动作、咨询/否定、多目标待确认，返回明确 ValidationError，不签发进入写草稿的 resolution_id。明确查询清除覆盖旧条件继承，全部重置保留当前明确新条件。
 - 验证：Backend 动作/AI service/Gateway 372 tests PASS；AI 221 tests / 19 subtests、pre-commit PASS；Docker test 221 tests PASS，Compose runtime build PASS；相关 diff check PASS。新增动作契约 Schema 与后端清除/多目标/否定测试。
-- 本地 AI 与 Backend 已更新并重启，release=local-action-contract-wip / revision=unversioned。真实 HTTP 使用 gpt-5.6-luna 对“删除百事可乐2和3，只保留一个百事可乐”回归 PASS（约 9 秒），自动解析入口返回 VALIDATION_ERROR 和明确不支持说明；没有调用草稿生成或正式删除。该测试在 test_ai_model_check_http 中，通过 MYAPP_HTTP_ACTION_TEST_MODEL 显式启用计费解析。
+- 本地 AI 与 Backend 已更新并重启，release=local-action-contract-wip / revision=unversioned。真实 HTTP 使用 gpt-5.6-luna 对“删除百事可乐 2 和 3，只保留一个百事可乐”回归 PASS（约 9 秒），自动解析入口返回 VALIDATION_ERROR 和明确不支持说明；没有调用草稿生成或正式删除。该测试在 test_ai_model_check_http 中，通过 MYAPP_HTTP_ACTION_TEST_MODEL 显式启用计费解析。
 - 边界：本次不是全链路动作契约完成。四类草稿直调和执行前 resolution_id/动作一致性校验仍待接入，完整目标清单、keep/set/clear、新 Web 澄清交互与能力证据状态机仍待实现。未携带查询清除控制字段的旧响应仍走兼容逻辑。不能宣称所有入口已覆盖。
 - 查询清除定向旁证通过：真实 gpt-5.6-luna 将“取消所有筛选，查看全部时间的订单，不限制金额”解析为 reset=true / clear_fields=[date_preset,min_amount]；随后以模拟旧条件（上月、金额至少两万、前三条）调用实际合并函数，结果 all / min_amount=null / latest / limit=10。此项是实际意图服务加模拟旧状态的服务层验证，不冒充浏览器多轮端到端。
 - 未提交、未推送、未部署 staging/production；上轮异步检查、P0 和用户既有改动继续保留。
@@ -191,16 +202,16 @@
 
 ## 2026-09-06 商品草稿确定性目标衔接修复：已提交、推送并部署 staging
 
-- 真实故障“修改可口可乐的规格为500ml”不是模型理解失败：Run 使用 `gpt-5.6-luna / product-setup-draft-v7 / runtime 9c4668c` 正常完成，但 Backend 商品草稿适配层丢弃了共享解析器的确定性 `selected`，随后误报“未找到唯一商品”。Backend `90230e4 fix(ai): bind resolved product draft targets` 已修复该衔接：显式商品编码继续作为权威目标；名称和条码统一进入共享解析器；确定性选择自动绑定正式 Item；单一模糊候选仍需人工确认。
+- 真实故障“修改可口可乐的规格为 500ml”不是模型理解失败：Run 使用 `gpt-5.6-luna / product-setup-draft-v7 / runtime 9c4668c` 正常完成，但 Backend 商品草稿适配层丢弃了共享解析器的确定性 `selected`，随后误报“未找到唯一商品”。Backend `90230e4 fix(ai): bind resolved product draft targets` 已修复该衔接：显式商品编码继续作为权威目标；名称和条码统一进入共享解析器；确定性选择自动绑定正式 Item；单一模糊候选仍需人工确认。
 - 商品目标验证现区分 `PRODUCT_TARGET_CONFIRMATION_REQUIRED / PRODUCT_TARGET_AMBIGUOUS / PRODUCT_TARGET_NOT_FOUND`，字段统一为 `target.item_code`；“找到一个可能商品”不再显示为“未找到”。Backend API/AI 技术设计和父仓语义命令 V2 文档已同步。
 - 本地验证：新增 4 组目标解析/安全边界回归；定向 7 tests PASS；完整 `test_ai_service` 196 tests PASS；`test_ai_repository + test_gateway_wrappers` 202 tests PASS；Python compile、Ruff 和 Backend/Parent diff check PASS。localhost 只读调用中，简称 `可口可乐` 与完整名称 `可口可乐 5000ml` 均解析到唯一启用商品 `可口可乐-5000ML-2`，草稿构建为 `operation=update / specification=500ml / ready_for_handoff=true / issues=[]`。
 - 提交与推送已完成：Backend `90230e4` → `origin/develop`；AI Orchestrator `9c4668c` → `origin/main`；Web `d40ec7d` → `origin/main`；父仓 `b467498c fix: release deterministic AI product resolution` → `origin/develop`。父仓固定 Backend gitlink `90230e4` 和 AI gitlink `9c4668c`。
 - staging 使用唯一不可变标签 `staging-20260906-b467498c`。Build run [`34018255596`](https://github.com/rgc318/frappe_docker/actions/runs/34018255596) SUCCESS；构建日志确认 Backend 镜像固定 `90230e4a741c67ebf739d80e2e94b5a17703cbba`，Backend manifest digest `sha256:bef2014f3f112373dda49053bc6c762cc5446b023c5359464ffdef65e11a637a`；AI 镜像固定 `9c4668cbd8d0d5361fab30a09208048c7c35b457`，manifest digest `sha256:9c74ae26e23f98ddd00124ac35ea35c3e04e603ee74afadd407c90d5ab32fa58`。
 - 首次 Deploy run [`34018478946`](https://github.com/rgc318/frappe_docker/actions/runs/34018478946) 因 GHCR 拉取 token/manifest 时单次 `EOF` 失败，未进入 migrate 或健康检查；按 staging 策略对同一不可变候选执行一次有界重试。Deploy run [`34018533459`](https://github.com/rgc318/frappe_docker/actions/runs/34018533459) SUCCESS：`staging.example.com` migrate 成功，Homepage/Ping HTTP 200，Backend→AI Router 认证通过，Runtime 契约为 `ai-runtime-contract-v1 / release staging-20260906-b467498c / runtime 9c4668c / 7 schemas / 9 scenarios`，AI 单副本集健康且身份一致。
-- 部署后通过 SSH 只读取证：staging 父仓 HEAD 为 `b467498c`；运行 Backend 容器标签为 `tag=staging-20260906-b467498c / parent=b467498c / backend=90230e4`。对 staging 数据执行目标验证时，模型对“修改可口可乐的规格为500ml”返回 `operation=update / target.query=可口可乐 / patch.specification=500ml`；已部署 Backend 将其唯一绑定到启用商品 `可口可乐-5000ML`，草稿构建结果为 `ready_for_handoff=true / issues=[]`。验证只调用 Orchestrator、实体解析器与内存草稿构建函数，没有保存 AI Draft、没有执行正式 Item 修改。
+- 部署后通过 SSH 只读取证：staging 父仓 HEAD 为 `b467498c`；运行 Backend 容器标签为 `tag=staging-20260906-b467498c / parent=b467498c / backend=90230e4`。对 staging 数据执行目标验证时，模型对“修改可口可乐的规格为 500ml”返回 `operation=update / target.query=可口可乐 / patch.specification=500ml`；已部署 Backend 将其唯一绑定到启用商品 `可口可乐-5000ML`，草稿构建结果为 `ready_for_handoff=true / issues=[]`。验证只调用 Orchestrator、实体解析器与内存草稿构建函数，没有保存 AI Draft、没有执行正式 Item 修改。
 - 本候选自动 Canary 不能记为 PASS：报告 `/srv/frappe_docker/artifacts/staging/ai-canary/staging-20260906-b467498c-20260906T071604Z.json` 为 `partial`，4 个场景中 readiness/chat 通过，intent/product setup 因注册表迁移后的 `supports_structured_output=false` 返回 `AI_SCENARIO_MODEL_UNAVAILABLE`；SLO 报告 `/srv/frappe_docker/artifacts/staging/ai-slo/staging-20260906-b467498c-20260906T071614Z.json` 为 `warning`，同时记录 `AI_SLO_TRANSIENT_PARTIAL` 与样本不足。该候选没有登记为新的 rollback target。
 - 后续定向刷新确认：`gpt-5.6-luna` 基础、原生 JSON Schema、结构化输出和视觉通过，但工具探测返回 `PROVIDER_HTTP_400`；`gpt-5.5` 基础、工具、原生 JSON Schema、结构化输出和视觉全部通过。尝试按正式治理链将 staging Agent 策略切到 `gpt-5.5` 时，因缺少绑定当前 `9c4668c` Runtime/Prompt/模型的 offline/live full-gate 且数据区域尚未复核，被策略校验正确拒绝；没有绕过门禁。随后通过正式 rollback 接口恢复原 version 31 快照，当前发布为审计 version 34、`status=active / primary=gpt-5.6-luna / fallback=[]`，并已显式失效 Orchestrator 策略缓存。
-- 当前结论：目标商品修改场景已在 staging 完成不落库验收；容器、迁移、HTTP、Runtime 契约和目标实体绑定正常。整个 AI 发布候选仍不能宣称完整 Canary PASS 或取得新 rollback qualification；staging 只读 Agent 的工具路径也不能宣称完全就绪。下一步应为 `gpt-5.5` 补齐数据区域复核和当前 Runtime 的 offline/live full-gate，再按草稿→校验→审批→发布切换策略；同时修正 Canary 将 `AI_SCENARIO_MODEL_UNAVAILABLE` 这类确定性资格错误错误归为 transient partial、并让 staging policy gate 显式检查结构化输出资格。
+- 当前结论：目标商品修改场景已在 staging 完成不落库验收；容器、迁移、HTTP、Runtime 契约和目标实体绑定正常。整个 AI 发布候选仍不能宣称完整 Canary PASS 或取得新 rollback qualification；staging 只读 Agent 的工具路径也不能宣称完全就绪。下一步应为 `gpt-5.5` 补齐数据区域复核和当前 Runtime 的 offline/live full-gate，再按草稿 → 校验 → 审批 → 发布切换策略；同时修正 Canary 将 `AI_SCENARIO_MODEL_UNAVAILABLE` 这类确定性资格错误错误归为 transient partial、并让 staging policy gate 显式检查结构化输出资格。
 - production 未操作。父仓仍只保留用户既有的 `AGENTS.md`、长期开发规则/模板/已知问题、`.codex` 和多模态总结等未提交状态，后续不得混入或覆盖。
 
 ## 2026-09-06 AI 运行健壮性与渐进发布治理：本地提交已收口
@@ -212,7 +223,7 @@
 - 本次收口补齐新增 Shell 运维脚本的 Git executable mode，并再次执行 Shell syntax 与父仓 whitespace 检查。`.codex`、`AGENTS.md`、长期开发规则/模板/已知问题及多模态总结继续作为用户既有未提交状态保留。
 - 后续推送顺序必须为：先推送 AI Orchestrator，再推送 Backend 与 Web；随后在父仓提交 AI Orchestrator gitlink，最后推送父仓。推送和 staging 部署均需用户另行授权。
 
-## 2026-09-05 AI 运行契约与就绪治理：Phase 0～2 与 Phase 3 三项治理已提交
+## 2026-09-05 AI 运行契约与就绪治理：Phase 0 ～ 2 与 Phase 3 三项治理已提交
 
 - 设计文档 `docs/05-development/09-ai-runtime-contract-and-readiness.zh-CN.md` 已更新为当前实现：进程存活、运行就绪、场景就绪、模型健康、模型能力和策略资格分层；fresh request 使用协议/Schema 协商，Prompt revision 只作为运行审计事实，legacy 请求和 Agent resume 保留精确 Prompt 匹配。
 - AI Orchestrator 现支持 `ai-runtime-contract-v1`、7 个 Schema family、9 场景兼容矩阵和完整运行 Manifest。Chat、意图、Agent、SSE 与四类草稿响应返回实际 `protocol_version / schema_version / prompt_version / runtime_revision / release_id`；不兼容协议/Schema 返回结构化 `AI_RUNTIME_CONTRACT_MISMATCH` / `AI_SCHEMA_VERSION_MISMATCH`。`MYAPP_AI_RELEASE_ID` 已进入配置、Docker build arg 和 standalone Compose。
@@ -223,7 +234,7 @@
 - 真实协议验证：携带故意过期 Prompt 的 fresh Chat 仍按 `chat-v1` 成功，响应返回实际 `erp-readonly-v11`。当前 Compose 容器的 Backend 兼容门禁 PASS：`protocol=ai-runtime-contract-v1`、`schemas=7`、`scenarios=9`；Backend 真实调用确认请求不含 `prompt_version`，Run 在事务内保存 `chat-v1 / erp-readonly-v11 / runtime revision / release ID / completed`，随后 rollback，示例 Run 未落库。
 - 新镜像初次构建受 Registry 瞬时缺包影响失败。进一步定位到 Dockerfile 把每次变化的 Release/Revision ARG 放在依赖安装前，导致版本变化无条件击穿依赖缓存；现已把制品元数据移到依赖与应用安装层之后。修复后依赖层直接命中缓存，runtime 镜像约 12 秒构建完成并切换成功。`frappe_docker-ai-orchestrator-1` 当前 Healthy，镜像 `sha256:aa4911ce21a5...`，`/readyz` 与真实 Backend 门禁均为 Phase 2 PASS。
 - Phase 2 已分别提交：AI Orchestrator `be07390 feat: version AI runtime schemas independently`、Backend `b583d60 feat: negotiate AI runtime contract schemas`、Web `b32f927 fix: surface AI runtime schema mismatches`；均未推送。父仓相关编排、兼容脚本和设计文档现已随 `b7fe1a16` 提交；AI 仓按项目规则必须先推送，因此父仓仍未固定新的 AI gitlink。
-- Phase 3 首轮已完成代码实现：Backend 健康快照新增 `health_expires_at / health_failure_count / last_health_trigger`，默认 TTL 30 小时并限制为 5 分钟～7 天；统一派生 `effective_health_status`，从未探测为 `unknown`，过期成功/降级为 `stale`，过期失败为 `half_open`。固定模型只阻断新鲜 `unavailable`；Runtime Policy 和 Web 都消费派生状态，同时保留原始状态审计。
+- Phase 3 首轮已完成代码实现：Backend 健康快照新增 `health_expires_at / health_failure_count / last_health_trigger`，默认 TTL 30 小时并限制为 5 分钟～ 7 天；统一派生 `effective_health_status`，从未探测为 `unknown`，过期成功/降级为 `stale`，过期失败为 `half_open`。固定模型只阻断新鲜 `unavailable`；Runtime Policy 和 Web 都消费派生状态，同时保留原始状态审计。
 - Orchestrator 对 `half_open` 使用 Redis `SET NX EX 15` 分布式恢复探测租约；冲突时自动链继续 fallback，固定模型返回 `AI_MODEL_HEALTH_HALF_OPEN_BUSY`。`stale / unknown` 不再被旧健康快照硬阻断。Web 模型选择器和治理表已补充“状态已过期、恢复探测中、尚未检测”、过期时间和连续失败次数。
 - Phase 3 健康租约已提交：Backend `56a45a5 feat(ai): expire stale model health snapshots`、AI Orchestrator `61635fa feat: coordinate half-open model recovery`、Web `294fcf2 feat(ai): display effective model health`。场景资格与 fallback 首轮也已提交：Backend `6e6b1e5 feat(ai): resolve scenario-eligible model chains`、AI Orchestrator `5c7646b feat: enforce scenario model eligibility`。均未推送。
 - Agent 就绪预检现在按有序候选逐个计算生命周期、策略能力、工具能力和有效健康资格；主模型漂移但 fallback 合格时继续进入 Agent，并返回 `selected_model_alias / eligible_model_aliases / ineligible_models`。Orchestrator 在健康、熔断、预算和并发门禁前执行相同防御性过滤，提升首个合格 fallback 并记录 `primary_model_ineligible_for_scenario`；固定模型不合格时返回稳定 `AI_SELECTED_MODEL_INELIGIBLE`，自动链无合格模型返回 `AI_SCENARIO_MODEL_UNAVAILABLE`。
@@ -232,7 +243,7 @@
 - 本轮结构化资格验证：Orchestrator 宿主机与 Docker test 镜像均为全量 216 tests PASS，Ruff、pre-commit PASS；Backend 全量 unit 931 tests、Python compile PASS；Web TypeScript、Biome 274 files、全量 58 suites / 381 tests PASS；三个代码仓 `diff --check` PASS。`bench --site localhost migrate` 成功并确认 `supports_structured_output / last_structured_error_code` 列存在。当前 Orchestrator 镜像 `sha256:910859ba4ec6...`，精确 revision/release 为 `9c4668cbd8d0d5361fab30a09208048c7c35b457`，容器 Healthy，7 Schema/9 场景兼容门禁 PASS。真实 Provider 检测确认 `gpt-5.6-luna` 基础、工具、原生 JSON Schema、结构化输出和视觉均通过，数据库写入 `supports_json_schema=1 / supports_structured_output=1`；随后 Backend 固定该模型执行真实结构化意图识别成功并返回 `resolution_mode=structured_intent`。
 - Phase 3 staging 发布闭环已实现并随父仓 `b7fe1a16` 提交：新增机器可读 `passed / partial / failed` canary，默认覆盖 readiness、意图、普通只读 Chat 和商品草稿，只生成候选不执行；瞬时 Provider/network 错误对同一制品最多重试一次，确定性契约/认证/Schema/能力/Provider 4xx 自动阻断。只有 `passed` 才把 Backend/AI 精确 revision、镜像 ID/digest、共同 release ID 和报告哈希登记为回滚发布对，`rollback-staging.sh` 在修改 tag 前失败关闭验证，另保留显式 break-glass 开关。构建同时校验实际 myapp clone HEAD，防止移动分支在解析与 clone 之间漂移。
 - 本地真实 canary 4/4 PASS，约 13 秒：readiness、intent、chat、product setup draft 均返回完整运行元数据；意图/草稿按场景资格提升到 `gpt-5.6-luna`，Chat 在 Provider circuit fallback 后由 `gpt-5.5` 成功完成。父仓 Python 门禁 6 tests、Shell syntax、Python compile 和 `git diff --check` PASS。当前旧本地 Backend 镜像没有新增 release/revision label，因此未伪造或登记本地回滚发布对。
-- Phase 3 多副本与 SLO 首轮已实现并随父仓 `b7fe1a16` 提交：staging Backend/Worker 默认经内部 `ai-router` 访问 Orchestrator，副本数可配置 1～10，HAProxy 使用固定 digest、Docker DNS、`leastconn` 和 `/readyz` 主动摘流。启动/验收逐副本核对 Docker health、直接 readiness、同一 image ID、release/runtime/protocol 和三个 Manifest hash，再核对 Router 身份。隔离网络实测两个副本均收到流量；一个副本 `/readyz` 503 后 20/20 请求全部进入健康副本，恢复后自动重新加入。HAProxy 配置校验 PASS，真实现有容器的副本集门禁 PASS。
+- Phase 3 多副本与 SLO 首轮已实现并随父仓 `b7fe1a16` 提交：staging Backend/Worker 默认经内部 `ai-router` 访问 Orchestrator，副本数可配置 1 ～ 10，HAProxy 使用固定 digest、Docker DNS、`leastconn` 和 `/readyz` 主动摘流。启动/验收逐副本核对 Docker health、直接 readiness、同一 image ID、release/runtime/protocol 和三个 Manifest hash，再核对 Router 身份。隔离网络实测两个副本均收到流量；一个副本 `/readyz` 503 后 20/20 请求全部进入健康副本，恢复后自动重新加入。HAProxy 配置校验 PASS，真实现有容器的副本集门禁 PASS。
 - `evaluate-ai-slo.py` / `run-ai-slo-gate.sh` 已提供 `passed / warning / failed` 判定、机器告警、状态落盘、可选 Webhook 和严格模式。契约错误始终 critical；小于最小样本数返回 `AI_SLO_INSUFFICIENT_SAMPLE`，不伪装 PASS。Webhook 未配置时不会产生外部调用。
 - Phase 3 stable/candidate 渐进发布已完成实现：持久 `rollout.map` 管理 fresh request bucket，持久 `release-affinity.map` 将 Agent resume 精确路由到 Run 创建时的 release；未知 release 返回 503。HAProxy Runtime API 使用事务批量更新两张 map，阶段门禁同时检查状态、持久 map、真实流量分布、canary 和 SLO。隔离 Runtime API 实测 100% 双 map 切换约 2 秒并通过最终状态核对。
 - Backend resume 同步和 SSE 均发送 `X-MyApp-AI-Release-Affinity`；repository 在 Run 行锁内读取 `release_id`，缺失时失败关闭，避免旧 Run 随机落入另一 Prompt/runtime revision。`test_ai_service + test_ai_repository` 当前 240 tests PASS，含请求头和审批恢复断言。
@@ -244,7 +255,7 @@
 ## 2026-09-04 AI 语义命令 V2：已提交，未推送/未部署
 
 - 新增 `docs/05-development/08-ai-semantic-command-v2.zh-CN.md`，统一 `Intent → Target → Patch → Line Changes → Constraints → Evidence`，明确模型负责语义理解，Backend 只做实体解析、权限、业务校验、换算、状态机、幂等和执行。
-- 商品 Prompt 升级 `product-setup-draft-v7`：目标商品与新规格/新名称/新品牌彻底分离；支持 `patch.new_item_code`、`clear_fields` 和 `active_product`。关键案例“把可口可乐规格改为500ml”只搜索“可口可乐”。
+- 商品 Prompt 升级 `product-setup-draft-v7`：目标商品与新规格/新名称/新品牌彻底分离；支持 `patch.new_item_code`、`clear_fields` 和 `active_product`。关键案例“把可口可乐规格改为 500ml”只搜索“可口可乐”。
 - 销售/采购 Prompt 升级 v5：新增 `target + header_patch + line_update_mode + line_changes`；Backend 在完整订单快照上合并局部行变更，未提及行保留，只改表头不执行明细替换，重复商品行无 row ID 时失败关闭。
 - 库存 Prompt 升级 v3：模型无法判断调整方式时返回 null，不再默认 `set_target`。库存 validation 已输出稳定 `issues.code/field`；其他草稿迁移期至少返回结构化通用 issue 并保留旧 errors。
 - 自动场景正常路径始终调用结构化意图模型；本地关键词仅在模型不可用、低置信度或非法输出时作为 `degraded_local_rules`。已删除简单问候 local fast path 和 Runtime“带某字”正则参数覆盖。
@@ -431,7 +442,7 @@ Parent 当前不应提交或覆盖：`AGENTS.md`、`STAGING_DEPLOYMENT.zh-CN.md`
 ### 当前完成度
 
 - AI Run 状态恢复、轮询收敛、僵尸 Run/过期审批回收和五服务 AI Gateway 配置一致性检查：本地代码与验证已完成并提交。
-- AI 模型健康瞬时失败治理、商品候选续接、商品完善与库存调整入口、单位与库存 P0～P4：均已完成本地代码阶段并分别提交。
+- AI 模型健康瞬时失败治理、商品候选续接、商品完善与库存调整入口、单位与库存 P0 ～ P4：均已完成本地代码阶段并分别提交。
 - 当前尚未推送本轮 2026-09-01 本地提交，尚未部署新的 staging 候选；production 未操作。
 - 仍需在 staging 验收运行中刷新、切换会话后返回、审批后网络中断、终态后 Sender 恢复、商品候选续接、库存调整，以及配置不一致失败关闭。
 - 真实异常商品 `可口可乐-5000ML` 仍未执行替代迁移；必须由用户确认新商品编码、库存基准单位、完整换算和四条历史价格的迁移决定，不能自动猜测。
