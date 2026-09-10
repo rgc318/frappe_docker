@@ -2,7 +2,7 @@
 
 更新时间：2026-09-10 CST
 
-## 2026-09-10 商品单位纠正增加原子库存 Repack（已提交并构建，部署受 Registry 阻塞）
+## 2026-09-10 商品单位纠正增加原子库存 Repack（已提交、构建并部署）
 
 - 修复了商品单位纠正的流程死路：旧商品只有正库存、没有占用/未完订单等其他 blocker 时，评估仍保持 `can_execute=false`，但新增 `can_execute_with_inventory_conversion=true`，允许继任商品策略继续。
 - Web 向导新增逐仓正式 Repack 区域。旧库存只读，用户必须按实际盘点填写继任商品数量并显式确认；错误旧单位没有可信关系时不自动换算。预览展示每仓旧商品转出和继任商品转入数量。
@@ -14,6 +14,12 @@
 - Backend Deploy run `34444485742` 首次在并行拉取未变更 Docker Hub 基础镜像时遇到 `registry-1.docker.io EOF`；同一 run 唯一一次重试在 `docker login ghcr.io` token 请求处遇到 `EOF`。两次均发生在容器重建和 migrate 前。Web Deploy run `34444664411` 同样在 `docker login ghcr.io` token 请求处遇到 `EOF`，发生在删除旧 Web 容器前。按 staging 有界重试策略停止继续追逐 Registry，不伪装成部署成功。
 - 三个新镜像均未完整缓存到目标服务器，不能离线切换。为避免意外重启引用未拉取标签，已把服务器 `staging.env` 恢复为实际运行配对标签 `staging-20260909-55db6d02`。当前 Backend/ERP/Workers 仍运行该标签，Web 仍运行 `staging-web-20260910-89495c8`，AI Orchestrator 仍运行旧配对标签并 healthy；无业务数据修改、无 migrate、无容器切换。
 - 目标服务器与当前工作机复核 `:28080/`、`:28080/api/method/ping`、`:30080/healthz`、`:30080/user/login`、`:30080/api/method/ping` 均 HTTP 200。根盘 98GB、已用 65GB、可用 29GB、使用率 70%；Docker 可回收镜像约 3.727GB。本轮未清理服务器空间。后续只允许在 Registry 恢复后对上述同一不可变标签重新启动一个新的受控部署任务，不得重建或换候选。
+- 用户随后明确要求检查网络并重试。服务器 DNS、直连 HTTPS 和 TLS 当时均正常：GHCR/Docker Registry 返回预期 401、Docker auth 返回 200，但 Docker daemon 对 Docker Hub/GHCR 的 manifest 请求仍间歇 `EOF`。新 Deploy run `34455789034` 再次被未变更 Docker Hub 基础镜像的并行 pull 中断，确认不是业务镜像缺陷。
+- 采用不改变候选的受控绕行：服务器串行拉取 Backend 成功；AI/Web 在当前工作机按已发布 digest 拉取成功后，通过内网 `docker save | ssh docker load` 导入服务器。随后以 `PULL_POLICY=never` 启动配对栈，避免重新访问 Registry。镜像 provenance 核对通过：Backend revision=`8ccb8c4c113e55ad53cbca982bef3c699114b560`，AI runtime revision=`6700dccb23e973df9b7fff8494c5a8834cfef566`，Web revision=`b556b9fd0169463e4e56e5558d984b91fed5b73d`。
+- 部署卷的真实站点是 `staging.example.com`，不是 `localhost`。已对真实站点完成 DB grant reconciliation 和 `bench --site staging.example.com migrate`；首次对不存在的 `localhost` 调用只返回 404，没有执行数据库变更。正式 migrate 成功完成 DocType、fixtures、customizations、jobs 和 after_migrate。
+- 最终 Backend/ERP/全部 Worker/Websocket 运行 `staging-20260910-8ccb8c4`；AI Orchestrator 同标签且 healthy；Web 运行 `staging-web-20260910-b556b9f` 且 healthy、RestartCount=0。AI runtime compatibility、replica-set、effective Policy 检查通过，AI canary=`passed`，SLO=`warning`（日常 staging 非阻断），配对制品已登记为合格回滚候选。
+- 服务器本机与当前工作机经内网复核 `:28080/`、`:28080/api/method/ping`、`:30080/healthz`、`:30080/user/login`、`:30080/api/method/ping`、`:30080/master-data/products` 全部 HTTP 200。新 Backend 对 `可口可乐-5000ML` 的只读评估返回唯一 blocker=`NON_ZERO_STOCK`、`can_execute=false`、`can_execute_with_inventory_conversion=true`、推荐 `replacement`，并读取 `Stores - RD = 240500`，证明新原子 Repack 入口已在 staging 生效；未修改该商品。
+- 部署后根盘 98GB、已用 66GB、可用 27GB、使用率 72%；Docker 可回收镜像约 4.768GB。当前保留上一个运行版本作为即时回滚，不在本次网络恢复任务中清理。
 
 ## 2026-09-10 商品单位重复行被锁死修复与轻量部署完成
 
