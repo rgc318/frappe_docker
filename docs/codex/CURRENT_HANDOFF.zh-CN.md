@@ -1,6 +1,17 @@
 # 当前交接状态
 
-更新时间：2026-09-09 CST
+更新时间：2026-09-10 CST
+
+## 2026-09-10 商品单位重复行被锁死修复与轻量部署完成
+
+- 用户在 staging 单位错误纠正向导中将库存基准单位选为 `Box` 后，多个既有换算行也选成 `Box`，界面把所有相同单位行都灰化，导致重复校验出现后无法修改或删除。
+- 根因位于 Web 共享 `ProductUomFields`：行锁定条件按“行单位值等于库存基准单位”判断，重复值因此全部被误判为正式基准行。现改为只锁定换算表中第一条匹配库存基准单位的规范行，其余重复行继续显示“同一单位不能重复配置”，但单位、系数和删除操作保持可用。
+- 同组件移除重复 `Form.Item` key，并将本次触达的 Ant Design `Space direction`、`Alert message` 迁移到 `orientation`、`title`。新增回归测试覆盖三行均为 `Box` 时仅第一条换算行锁定，后两行可编辑、可删除且可改成 `Bottle`；Web 开发文档补充该交互约束。
+- 验证通过：`npm run tsc`、全仓 `npm run biome:lint`、全量 `npm test -- --runInBand`（62 suites / 414 tests）和 `git diff --check`。保留既有 Jest open-handle 提示。Web 提交 `89495c842887bf361d401c70e2a5e1fc84a6694b`（`fix(products): keep duplicate unit rows editable`）已推送 `origin/main`；用户既有 `public/scripts/loading.js` 改动未触碰、未纳入提交。
+- GitHub Actions Build run `34421678604` 成功，完整执行远端源码验证并推送唯一镜像 `staging-web-20260910-89495c8`，没有覆盖 `latest`。首次误用错误完整 SHA 触发的 queued run `34421652045` 已在构建前取消，没有产出制品。
+- Deploy run `34422093299` 在 SSH 内执行 `docker login ghcr.io` 时遇到外部 Registry `EOF`，失败发生在 `docker pull` 与 `docker rm` 之前，旧 Web `staging-web-20260909-4249d30` 持续 healthy。按 staging 策略对同一不可变镜像执行唯一一次有界人工拉取/切换重试，不重建、不换标签。
+- 有界重试成功：Web 已切换为 `staging-web-20260910-89495c8`，OCI revision=`89495c842887bf361d401c70e2a5e1fc84a6694b`，RepoDigest=`sha256:9e638f209262a758e9bbe10c84182ff711ddc0c5fc824eba0c157a43ccc5d9e0`，image ID=`sha256:2b2a48476645347b0062ccaedbc82162576e293fca97b2d550bfea1957e8bc64`，Docker health=`healthy`、RestartCount=0，未触发回退。启动窗口短暂 connection reset 后恢复正常。
+- 本次为 Web-only 轻量部署：未构建、重启或修改 Backend/AI，未执行 migrate，未修改业务数据。从当前工作机经内网 IP 验证 `:30080/healthz`、`/user/login`、`/api/method/ping`、`/ai/workspace` 以及 `:28080/`、`/api/method/ping` 全部 HTTP 200；根盘 98GB、已用 65GB、可用 29GB、使用率 70%。
 
 ## 2026-09-09 库存草稿单位治理跳转入口
 
