@@ -2,6 +2,16 @@
 
 更新时间：2026-09-10 CST
 
+## 2026-09-10 零估值库存单位 Repack 修复并部署
+
+- 用户在 staging 对 `可口可乐-5000ML` 执行单位纠正时，ERPNext 拒绝提交 `Stock Entry MAT-STE-2026-00828`，提示继任商品 `可口可乐-5000ML-2` 缺少成本价。根因不是 Web 表单，而是源商品在 `Stores - RD` 的 240500 库存数量、估值单价和总库存价值分别为 `240500 / 0 / 0`；Repack 计算出的继任商品成本同样为零，而目标行此前没有按条件允许零估值。
+- Backend 现在在锁定源商品 Item/Bin 后读取各仓实时 `valuation_rate` 和 `stock_value` 并带入库存转换映射。仅当源仓库存总价值在容差内确实为零时，继任商品 finished-item 行才设置 `allow_zero_valuation_rate=1`；非零价值库存不设置，继续由 ERPNext 按转出价值和新数量计算估值，避免无条件允许零估值导致库存价值被清零。该判断及源估值信息进入纠正审计的 Repack 明细。
+- 新增单元测试验证零价值/非零价值分支互斥；真实回滚式集成测试同时覆盖：24 个、总价值 48 转为 240 个后总价值仍为 48；以及 24 个、总价值 0 转为 240 个后数量迁移成功且总价值仍为 0。相关单元/契约测试 208 tests PASS，本地真实事务 2 tests PASS，Python 编译和 Backend diff check 通过。容器首次通过 `uvx` 下载 Ruff wheel 时网络长期无进展，按有界策略终止；Parent Lint run `34458187800` 随后成功补齐远端静态门禁。
+- Backend 提交并推送 `b7edd99cd335bd58da8441ef45119a25a6c3b3c7`（`fix(products): allow zero-value unit repacks`）；父仓子模块指针提交并推送 `def6142165dfd10d06950c13439bd1deb280a0dc`（`fix(products): ship zero-value repack handling`）。Backend 技术设计已补充按实时库存价值控制零估值的约束。首次 Build run `34458277586` 因误把完整 SHA 传给只解析分支/标签的输入，在 resolve 阶段立即失败，没有登录 Registry、构建或发布制品；改用 `develop` 后 Build run `34458372024` 成功发布唯一配对标签 `staging-20260910-b7edd99`，未覆盖 `latest`。
+- Deploy run `34458717338` 在服务器 `docker compose pull` 阶段停留约 9 分钟：AI 镜像已拉取，Backend 大镜像无进展，旧服务始终在线；按 staging 有界策略取消该 run。当前工作机从同一已发布标签拉取 Backend 成功，digest=`sha256:7e948079810e983bf942ae3be3c4081ace75866ce8189b1165f320c11446e674`，通过内网 `docker save | ssh docker load` 导入服务器，再以 `PULL_POLICY=never` 启动同一候选并对真实站点 `staging.example.com` migrate 成功。
+- 部署 provenance 核对：Backend revision=`b7edd99cd335bd58da8441ef45119a25a6c3b3c7`、release=`staging-20260910-b7edd99`、image ID=`sha256:5a961495088a4f7f45930e8cbb98880e83fd8da0943e6482fa38abea9eac2cf3`；Backend/Frontend/全部 Worker/Websocket 和 AI Orchestrator 均运行新标签，RestartCount=0，AI healthy。完整 `check-staging.sh` 通过，AI canary=`passed`，SLO=`warning`（样本量日常 staging 非阻断），发布对已登记。
+- 已部署容器针对 `staging.example.com` 再跑真实回滚式 Repack 2 tests PASS，临时 `UOM-REPACK-*` Item 数量为 0。失败的 `MAT-STE-2026-00828` 和 `可口可乐-5000ML-2` 均不存在；真实 `可口可乐-5000ML` 仍保持旧单位、启用状态和 `Stores - RD=240500 / stock_value=0`，本轮没有替用户执行正式迁移。内网 `:28080/`、Backend ping、Web health 和商品页均 HTTP 200。根盘 98GB、已用 68GB、可用 26GB、使用率 73%；Docker 可回收镜像约 6.053GB，本轮未清理。
+
 ## 2026-09-10 商品单位纠正增加原子库存 Repack（已提交、构建并部署）
 
 - 修复了商品单位纠正的流程死路：旧商品只有正库存、没有占用/未完订单等其他 blocker 时，评估仍保持 `can_execute=false`，但新增 `can_execute_with_inventory_conversion=true`，允许继任商品策略继续。
