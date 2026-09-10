@@ -2,14 +2,18 @@
 
 更新时间：2026-09-10 CST
 
-## 2026-09-10 商品单位纠正增加原子库存 Repack（已提交，待部署）
+## 2026-09-10 商品单位纠正增加原子库存 Repack（已提交并构建，部署受 Registry 阻塞）
 
 - 修复了商品单位纠正的流程死路：旧商品只有正库存、没有占用/未完订单等其他 blocker 时，评估仍保持 `can_execute=false`，但新增 `can_execute_with_inventory_conversion=true`，允许继任商品策略继续。
 - Web 向导新增逐仓正式 Repack 区域。旧库存只读，用户必须按实际盘点填写继任商品数量并显式确认；错误旧单位没有可信关系时不自动换算。预览展示每仓旧商品转出和继任商品转入数量。
 - Backend 在同一事务内创建继任 Item、逐仓提交正式 ERPNext `Stock Entry / Repack`、确认源商品所有 Bin 归零，再迁移价格/条码、创建 Item Alternative、停用源商品并记录纠正审计；任一步失败整体回滚。负库存、库存承诺、未完销售/采购订单、变体和固定资产仍阻断。
 - 真实本地回滚式集成验证已确认：24 个旧库存、总价值 48，经 Repack 转为 240 个新库存后，旧库存为 0，新库存估值单价为 0.2、总价值仍为 48，两边 Stock Ledger Entry 的价值差合计为 0。测试结束后临时 Item、Bin、Stock Entry 和 SLE 均回滚。
 - 新增 opt-in 集成测试 `myapp.tests.integration.test_product_uom_migration_repack`；需设置 `MYAPP_UOM_REPACK_TEST_SITE=localhost`。最终验证：Backend 214 个相关单元/契约测试通过，真实回滚式 Repack 1 test 通过，Ruff 通过；Web TypeScript、全仓 Biome、全量 Jest 62 suites / 415 tests 通过，保留既有 Jest open-handle 提示；Parent、Backend、Web diff check 通过。回滚后临时 Item 和 Bin 数量均为 0。
-- Backend 已提交 `8ccb8c4`（`feat(products): migrate corrected units with atomic repack`）；Web 已提交 `b556b9f`（`feat(products): confirm stock quantities during unit repair`）。父仓将只提交 Backend 子模块指针与本条交接记录。当前尚未推送、构建或部署；Web 既有 `public/scripts/loading.js` 改动属于用户，不得纳入本次提交。
+- Backend 已提交并推送 `8ccb8c4`（`feat(products): migrate corrected units with atomic repack`）；Web 已提交并推送 `b556b9f`（`feat(products): confirm stock quantities during unit repair`）；父仓提交并推送 `93c76b38`（`feat(products): ship atomic unit repair workflow`）。Web 既有 `public/scripts/loading.js` 改动属于用户，未纳入提交。
+- Parent Lint run `34443905362` 成功。Backend/AI Build run `34443968484` 成功，发布唯一配对标签 `staging-20260910-8ccb8c4`，Backend digest=`sha256:096fb72064ccb09286cfa7394330446d10a9de35ce6b50aa5a03261e494d173a`，AI digest=`sha256:a72c2b6a3591dda61ebf57f3f792b6b7a9ac75f91c548985ec422e2eb8d4a3ff`，未覆盖 `latest`。Web Build run `34444048922` 成功，发布 `staging-web-20260910-b556b9f`，digest=`sha256:20adaa201974895b3abf2c5d6f38404b1b371014a84c40ba24d761692727682e`，未覆盖 `latest`。首次 Web build 因人工填写错误完整 SHA 在 checkout 阶段失败，未验证、未构建、未发布制品；随后使用正确 SHA 对同一标签构建成功。
+- Backend Deploy run `34444485742` 首次在并行拉取未变更 Docker Hub 基础镜像时遇到 `registry-1.docker.io EOF`；同一 run 唯一一次重试在 `docker login ghcr.io` token 请求处遇到 `EOF`。两次均发生在容器重建和 migrate 前。Web Deploy run `34444664411` 同样在 `docker login ghcr.io` token 请求处遇到 `EOF`，发生在删除旧 Web 容器前。按 staging 有界重试策略停止继续追逐 Registry，不伪装成部署成功。
+- 三个新镜像均未完整缓存到目标服务器，不能离线切换。为避免意外重启引用未拉取标签，已把服务器 `staging.env` 恢复为实际运行配对标签 `staging-20260909-55db6d02`。当前 Backend/ERP/Workers 仍运行该标签，Web 仍运行 `staging-web-20260910-89495c8`，AI Orchestrator 仍运行旧配对标签并 healthy；无业务数据修改、无 migrate、无容器切换。
+- 目标服务器与当前工作机复核 `:28080/`、`:28080/api/method/ping`、`:30080/healthz`、`:30080/user/login`、`:30080/api/method/ping` 均 HTTP 200。根盘 98GB、已用 65GB、可用 29GB、使用率 70%；Docker 可回收镜像约 3.727GB。本轮未清理服务器空间。后续只允许在 Registry 恢复后对上述同一不可变标签重新启动一个新的受控部署任务，不得重建或换候选。
 
 ## 2026-09-10 商品单位重复行被锁死修复与轻量部署完成
 
