@@ -14,13 +14,13 @@
 
 ## 检查基线与范围
 
-| 仓库 | 当前提交 | 开始检查时的工作树 |
-| --- | --- | --- |
-| Parent | `93339eca` | AGENTS、开发规范、模板、已知问题已有修改；`.codex` 和多模态总结未跟踪 |
-| Backend | `b7edd99` | 干净 |
-| AI Orchestrator | `6700dcc` | 干净 |
-| Web | `b556b9f` | `public/scripts/loading.js` 已有修改 |
-| Mobile | `ebb242e` | 商品搜索、sales-mode、gateway、products、sales 共 5 个文件已有修改 |
+| 仓库            | 当前提交   | 开始检查时的工作树                                                    |
+| --------------- | ---------- | --------------------------------------------------------------------- |
+| Parent          | `93339eca` | AGENTS、开发规范、模板、已知问题已有修改；`.codex` 和多模态总结未跟踪 |
+| Backend         | `b7edd99`  | 干净                                                                  |
+| AI Orchestrator | `6700dcc`  | 干净                                                                  |
+| Web             | `b556b9f`  | `public/scripts/loading.js` 已有修改                                  |
+| Mobile          | `ebb242e`  | 商品搜索、sales-mode、gateway、products、sales 共 5 个文件已有修改    |
 
 覆盖四个应用仓库与父仓的核心代码、认证/权限、事务/幂等、商品单位/生命周期、AI 契约、前端认证、CI、生产启动、备份跟踪和依赖审计。没有修改应用源码、提交、推送或部署，也没有调用计费模型。真实数据库测试仅使用临时夹具并回滚；专门的失败探针还拦截了所有 commit。
 
@@ -95,10 +95,10 @@
 
 本次 `npm audit --omit=dev` 的受影响依赖统计：
 
-| 项目 | Low | Moderate | High | Critical | 合计 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Web | 1 | 3 | 0 | 0 | 4 |
-| Mobile | 90 | 36 | 69 | 3 | 198 |
+| 项目   | Low | Moderate | High | Critical | 合计 |
+| ------ | --: | -------: | ---: | -------: | ---: |
+| Web    |   1 |        3 |    0 |        0 |    4 |
+| Mobile |  90 |       36 |   69 |        3 |  198 |
 
 - Web 涉及 DOMPurify/Mermaid 及依赖传播，当前 lockfile 的自动修复结果为 `fixAvailable=false`。实际攻击可达性取决于 Markdown/图表使用方式，本轮未声称已复现浏览器 XSS。
 - Mobile 的 critical 根公告涉及 `shell-quote` 与 `tar`；npm 提示它们有可用修复，但其他 Expo/React Native 依赖链不能一律自动升级。
@@ -107,23 +107,23 @@
 
 ## 实际验证结果
 
-| 验证 | 结果 |
-| --- | --- |
-| Backend 容器 bench Python 全量 unit | **1057 tests PASS** |
-| Backend 运行环境 `pip check` | PASS |
-| 商品 Repack 真实回滚集成 | **2 tests PASS**，覆盖零估值和非零估值价值守恒 |
-| 商品生命周期真实回滚集成 | **8 tests PASS**，包括跨用户拒绝、第二项失败回滚、执行前新增引用阻断 |
-| AI `pytest` | **226 tests PASS + 25 subtests PASS** |
-| AI Ruff | PASS |
-| Web TypeScript / Biome | PASS；Biome 检查 278 files |
-| Web Jest | **62 suites / 415 tests PASS** |
-| Mobile lint | PASS |
-| Mobile TypeScript | **FAIL：371 errors / 27 files** |
-| Parent AI 发布治理测试 | **31 tests PASS** |
-| 五仓 `git diff --check` | PASS |
-| 本地 Backend ping / AI `/readyz` | HTTP 200 |
-| 本地 Backend → AI 运行契约 | PASS：7 schemas / 9 scenarios |
-| 新增失败/隔离探针 | R1/R2/R3/R4/R7 均观察到报告所述问题 |
+| 验证                                | 结果                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| Backend 容器 bench Python 全量 unit | **1057 tests PASS**                                                  |
+| Backend 运行环境 `pip check`        | PASS                                                                 |
+| 商品 Repack 真实回滚集成            | **2 tests PASS**，覆盖零估值和非零估值价值守恒                       |
+| 商品生命周期真实回滚集成            | **8 tests PASS**，包括跨用户拒绝、第二项失败回滚、执行前新增引用阻断 |
+| AI `pytest`                         | **226 tests PASS + 25 subtests PASS**                                |
+| AI Ruff                             | PASS                                                                 |
+| Web TypeScript / Biome              | PASS；Biome 检查 278 files                                           |
+| Web Jest                            | **62 suites / 415 tests PASS**                                       |
+| Mobile lint                         | PASS                                                                 |
+| Mobile TypeScript                   | **FAIL：371 errors / 27 files**                                      |
+| Parent AI 发布治理测试              | **31 tests PASS**                                                    |
+| 五仓 `git diff --check`             | PASS                                                                 |
+| 本地 Backend ping / AI `/readyz`    | HTTP 200                                                             |
+| 本地 Backend → AI 运行契约          | PASS：7 schemas / 9 scenarios                                        |
+| 新增失败/隔离探针                   | R1/R2/R3/R4/R7 均观察到报告所述问题                                  |
 
 主要验证命令：
 
