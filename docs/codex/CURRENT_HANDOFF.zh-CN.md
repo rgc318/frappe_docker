@@ -1,6 +1,28 @@
 # 当前交接状态
 
-更新时间：2026-09-10 CST
+更新时间：2026-09-13 CST
+
+## 2026-09-13 开始优化：第一批事务、隔离及 Web 刷新修复
+
+- 用户随后要求“提交然后继续优化”。第一批 Backend 已提交 `1a2f082`，Web 已提交 `c4334a0`，均未推送。Web 提交钩子因 Biome 排除 services 目录而报 unmatched，已增加 `--no-errors-on-unmatched` 保持既有排除范围与正常检查失败行为；未禁用钩子。父仓本次固定 Backend gitlink 并提交审查报告/交接，不纳入用户既有规范改动。
+- 用户已明确要求“开始优化”。已修改 Backend Gateway 异常分支，在错误包络前 rollback；嵌套幂等共享外层事务/回执，子失败被捕获也不能提交部分成功；持久回执读取校验 owner，缓存按用户升级 v2 key。保留旧持久唯一键以避免升级重放重复写入，跨用户 key 冲突返回 409。
+- Web 已对同 token 的并发刷新共享 Promise，并在成功/失败落地前校验存储 token，保护新登录及已退出会话。未实现跨标签页互斥。
+- 验证：Backend 全量 1065 tests PASS；真实 Gateway→adapter→service 商品失败事务 1 test PASS（负初始库存返回 422 后 Item 不存在、after_commit 队列清空，全部 commit 被拦截）；公开 HTTP 无效商品输入 1 test PASS（无业务夹具）；Web tsc/Biome PASS、全量 Jest 63 suites / 420 tests PASS，仍有既有 open-handle 提示。嵌套订单/发货/发票原子性使用真实幂等工具配模拟数据库边界验证，尚未完成真实整单 HTTP 验收。
+- 新增 Backend 单元、集成及 HTTP 测试，更新 API/测试文档；Web 新增 auth-refresh 测试与开发说明。所有改动未提交、未推送、未部署；保留既有用户改动。审查阶段的旧基线见下节，不代表修复后工作树仍干净。
+- 尚未修复：R4 登录账号/IP/OTP 防护、R5 历史凭据治理、R6 生产启动组合、R8 Mobile 类型/CI、R9 依赖欠账。还需审查 AI 等复合回调内绕过幂等工具的显式 commit，以及缺少持久表时 filelock 降级路径；不要宣称整体原子性和发布门禁全部完成。
+- 下一步优先补登录保护及生产配置，再处理移动端/依赖；真实密码轮换、历史清理及部署需单独明确目标和授权，不输出归档中的密码。
+
+## 2026-09-12～13 全局审查：功能较完整，正式上线仍有隐患
+
+- 用户要求全局检查并查找隐患。本轮完成代码/配置审查、跨仓测试、依赖审计和隔离复现，没有修改应用源码、提交、推送或部署。完整报告：`docs/codex/GLOBAL_REVIEW_2026-09-12.zh-CN.md`。
+- 确认 6 项 P1：Gateway 返回错误后未 rollback 导致 POST 后处理仍提交；多层 `run_idempotent` 提前 commit 破坏快捷开单原子性；幂等成功结果未按用户隔离；JWT 登录未接入框架账号/IP 失败跟踪；Git 跟踪的 `sites-backup.tar.gz` 含历史非空数据库密码；`start-prod.sh` 同时启用两个竞争 HTTP 宿主端口的代理并继承开发服务器/源码挂载/端口暴露。
+- 确认 3 项 P2：Web 并发刷新 token 的迟到失败会清空先前成功的新 token；Mobile 类型检查/CI/Node 版本契约欠账；Web/Mobile 依赖维护欠账。未输出归档内密码，也未确认历史密码是否仍有效，不得将其描述为已经发生外部入侵。
+- 本轮通过：Backend unit 1057 tests、真实回滚式 Repack 2 tests、生命周期 8 tests、容器 pip check；AI pytest 226 tests + 25 subtests、Ruff；Web tsc/Biome/62 suites 415 tests；Mobile lint；Parent AI 发布门禁 31 tests；五仓 diff check。Mobile tsc FAIL：371 errors / 27 files；仅在内存中将 5 个用户改动文件替换为 HEAD 后仍为 365 errors / 27 files，没有修改用户工作树。
+- `npm audit --omit=dev`：Web 1 low / 3 moderate；Mobile 90 low / 36 moderate / 69 high / 3 critical。这是受影响依赖包和传递链统计，不是独立漏洞数；尚未证明所有公告在实际 APK/浏览器路径可利用。
+- 本地 Backend ping 与 AI readyz HTTP 200；Backend→AI 契约 7 schemas / 9 scenarios PASS，但运行镜像声明 `release=local-product-pricing-v8-wip / runtime=unversioned`。Web `:8001` 未监听，未执行浏览器验收；本轮没有远程 staging/production 验收或真实 Provider 调用。
+- 真实商品失败探针贯通 Gateway/adapter/service/数据库：不传幂等键、初始库存为负时，返回 422 后 Item 仍在事务中，框架后处理尝试 commit；探针拦截所有 commit 并最终 rollback，临时 Item 已确认不存在。其他探针使用内存事务/缓存/HTTP 边界，未创建真实交易单据。材料暂存 `/tmp/myapp-global-audit-zqfMiV/`。
+- 当前提交保持：Parent `93339eca`、Backend `b7edd99`、AI `6700dcc`、Web `b556b9f`、Mobile `ebb242e`。本轮仅新增审查报告并更新本交接；父仓既有 AGENTS/开发规范/模板/已知问题/`.codex`/多模态总结、Web loading.js 和 Mobile 5 个既有改动全部保留。
+- 下一步建议优先修复事务边界、用户隔离、登录防护、历史凭据治理及生产启动组合，之后收敛前端与依赖，再补真实多角色业务和生产发布验收。当前任务是审查，修复与部署尚未执行。
 
 ## 2026-09-10 零估值库存单位 Repack 修复并部署
 
