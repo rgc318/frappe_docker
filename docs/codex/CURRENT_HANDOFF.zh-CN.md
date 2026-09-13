@@ -2,6 +2,34 @@
 
 更新时间：2026-09-13 CST
 
+## 2026-09-13 非移动端完善提交收口
+
+- 用户要求“继续并提交”。Backend 已提交 `f497573`（草稿执行事务行锁及测试），Web 已提交 `5685206`（认证并发、依赖补丁、services 静态检查、CI 与测试稳定性）；父仓本次提交固定 Backend gitlink 并更新本交接。下两节“未提交”为过程记录，当前提交状态以本节为准。未推送或部署。
+- 新增收敛：Web `.nvmrc` 使用 Node 22，manifest/lock engines 同步 >=22，与已采用 Node 22 的 CI / Docker 一致；更高主版本未单独验收。提交前全量复测捕获商品审计测试竞态：静态标题出现不等于异步历史已返回，改为 findByText 等待真实记录；不增加 sleep、不放宽业务断言。
+- 验证：Backend 全量 1078 tests 和真实双数据库连接行锁 1 test PASS；Web 商品工作区 7 tests、tsc、Biome 324 files、全量 63 suites / 428 tests PASS。首次全量为 427 PASS / 1 FAIL，修正测试等待后全量通过。Jest 仍偶发未及时退出提示、最终 exit 0；Backend 单测也有模拟 HTTPError 的 ResourceWarning，不标为已定位修复。
+- Web 提交钩子正常运行，Biome 对新纳入的服务文件追加格式化；提交后 tsc、Biome 324 files、production build、Jest 63 suites / 428 tests 及四仓 diff check 均通过，Jest exit 0 但仍提示退出延迟，build 仍提示 caniuse-lite 数据过期。未禁用 Husky、lint-staged 或 commitlint。
+- 保留用户既有 Parent AGENTS/开发规范/模板/已知问题、.codex/多模态笔记及 Web public/scripts/loading.js；Backend/AI 独立仓无未提交修改，Mobile 未修改。尚待旧开发工具链漏洞治理、测试异步资源定位、真实浏览器多标签页认证验收；历史凭据与生产环境验收边界仍见前文记录。
+
+## 2026-09-13 非移动端续批：认证边界与 CI 一致性（未提交）
+
+- 延续下节未提交工作，未修改 Mobile、AI 独立仓库或框架；未提交、推送、部署。Backend 保留上一批已验证的草稿行锁改动，本续批没有追加 Backend 源码修改。
+- Web 认证：刷新 HTTP 200 但缺失 token 对时抛出暂时性 502，不误清会话；logout 捕获旧凭据后立即清本地状态，迟到成功/失败不清除新登录；缺失、非有限、零及负数过期时间返回 null。新增不完整响应、退出竞态、Web Lock 等待超时、时间戳回归，认证专项 14 tests PASS。
+- CI：coverage 从 Node 20/Bun 改为 Node 22/npm ci 锁文件安装、显式 max setup、npm coverage；主 CI 新增生产依赖 audit 门禁。两份 YAML 解析通过，未触发远程 workflow。
+- 依赖：在上节运行依赖升级基础上，将 Umi/axios 链 form-data 4.0.5 升至 4.0.6，连带 hasown 2.0.4；package.json 不变、未加 override。旧 request 明确约束 form-data ~2.3.2，pngjs-image 固定 underscore 1.7.0，dva-immer 要求 immer ^8.0.4；这些不是一次兼容补丁更新就能消除的风险，需单独治理上游 CLI/工具链。
+- 验证：更新依赖后普通全量带 detectOpenHandles 的 Jest 63 suites / 428 tests PASS、exit 0，未输出句柄定位；coverage 也为 63 suites / 428 tests PASS、exit 0（全仓行覆盖率 61.26%），但再次提示未及时退出，因此该偶发问题尚未定位。未添加 forceExit、全局清理 timer 或压制警告。生产 npm audit 0 vulnerabilities；完整 dev 审计不得引用安装时的 150 与下节 270 直接比较。
+- 未提交范围额外增加 Web auth-storage、认证回归、ci.yml/coverage.yml 与文档；用户既有 Web public/scripts/loading.js、父仓规范/AGENTS/模板/笔记均保留。下一步优先处理旧 CLI 依赖链、测试异步资源定位及真实浏览器跨标签页认证验收。
+- 最终验证补充：form-data 更新后 tsc、Biome 324 files、production build 及四仓 diff check PASS；build 仍提示 caniuse-lite 数据过期。完整 npm audit 最终为 270 个受影响包/传递链条目（37 low / 100 moderate / 126 high / 7 critical），不是独立漏洞数；form-data 告警现仅指向 request 内嵌 2.3.3，4.0.6 不在受影响节点中。
+
+## 2026-09-13 非移动端代码完善（本批未提交）
+
+- 最新用户要求“移动端暂时先不优化，把代码方面的完善”。本轮没有修改 Mobile、AI Orchestrator 独立仓库或框架代码；未推送、部署。起点仍为 Parent `3726ef84`、Backend `3072b99`、Web `c4334a0`，本节改动尚未提交，前几节“已提交”仅指各自批次。
+- Web：从 Biome 恢复 `src/services` 检查，新增覆盖 46 个文件、全仓 324 files；修正表达式赋值、非空断言、无效 ts-ignore 和冗余布尔等现存告警，未放宽规则。模板 services 仍保留，非业务路径。
+- Web 刷新：支持 Web Locks 的安全上下文中同源跨标签页串行刷新，获得锁后重读 token；同页 Promise 合并/迟到状态保护保留。锁等待及 HTTP 共用 30 秒 AbortSignal，finally 清理 timeout；401/403 才清除匹配的无效会话，网络/5xx/超时拒绝 Promise 而不清空 token。旧浏览器/非安全上下文仍仅单页合并，不宣称跨页互斥。测试模拟两套独立模块共享锁，不冒充真实多标签页浏览器验收。
+- Web 依赖：`npm update dompurify mermaid --ignore-scripts` 在允许范围更新 DOMPurify 3.4.15、Mermaid 11.17.2及必要传递依赖（包括 dayjs 1.11.23），只修改 lock，未加大版本 override。`npm audit --omit=dev` 0 vulnerabilities；完整含 dev 审计最后快照仍有 270 个受影响包/传递链（37 low/100 moderate/126 high/7 critical），涉及 Umi/CLI 等工具链，不是浏览器生产漏洞数，不得称全依赖零风险。未执行 audit fix --force。
+- Backend：AI 草稿执行仅文件锁保护时，回调返回后到外层事务提交前存在窗口；现在 `get_draft(for_update=True)` 按 owner 锁行并读当前状态，持有到外层事务结束，普通查询默认无锁。Service/Repository 单测验证锁读及 owner；真实双数据库连接只读测试验证函数返回后锁仍有效、rollback 后解锁。未改业务前版本刷新和失败 rollback 后审计的显式 commit。
+- 验证：Web tsc、Biome 324 files、Jest 63 suites / 423 tests、生产 build PASS；锁/超时专项 8 tests PASS。全量 detectOpenHandles 与随后普通 Jest 均 exit 0，本轮没有未关闭句柄提示；未添加 forceExit/全局清 timers/屏蔽警告，旧偶发提示根因仍未证实。Build 仍有 caniuse-lite 过期提示。Backend 1078 unit tests、真实双连接行锁 1 test、相关 Ruff 和三仓 diff check PASS。
+- 未提交文件：Backend 的 ai_repository/ai_service、对应 unit、`test_ai_draft_lock.py`、API/测试文档；Web biome.json、package-lock、auth/新增回归、若干服务及模板告警清理、WEB_DEVELOPMENT；父仓本交接。既有 Parent AGENTS/规范/模板/已知问题、本地笔记及 Web loading.js 未纳入本轮更改。下一步可按仓提交本批，再规划开发工具链依赖治理与真实跨标签页/双请求验收；不擅自扩大到 Mobile。
+
 ## 2026-09-13 第三批：真实整单回滚、幂等存储失败关闭及归档停止跟踪
 
 - 用户再次要求“先提交然后优化”，随后要求继续。开工时第二批已全部提交（Parent `c44521bc`、Backend `a9f4ee6`、Web `c4334a0`），仅剩既有用户改动，因此没有重复提交或把它们纳入提交。本批 Backend 已提交 `3072b99`，父仓本次固定该 gitlink 并提交安全门禁/归档停止跟踪/文档。仍未推送或部署。
