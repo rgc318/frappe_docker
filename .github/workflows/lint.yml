@@ -31,6 +31,11 @@ jobs:
       - name: Install pre-commit
         run: pip install -U pre-commit
 
+      - name: Reject tracked Frappe runtime configs and credential archives
+        run: |
+          python -m unittest discover -s deploy/security -p 'test_*.py'
+          python deploy/security/check_tracked_secrets.py
+
       - name: Lint
         run: pre-commit run --color=always --all-files
         env:

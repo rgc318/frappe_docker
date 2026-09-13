@@ -2,6 +2,16 @@
 
 更新时间：2026-09-13 CST
 
+## 2026-09-13 第三批：真实整单回滚、幂等存储失败关闭及归档停止跟踪
+
+- 用户再次要求“先提交然后优化”，随后要求继续。开工时第二批已全部提交（Parent `c44521bc`、Backend `a9f4ee6`、Web `c4334a0`），仅剩既有用户改动，因此没有重复提交或把它们纳入提交。本批 Backend 已提交 `3072b99`，父仓本次固定该 gitlink 并提交安全门禁/归档停止跟踪/文档。仍未推送或部署。
+- R2 追加真实数据库证据：新 `test_quick_order_atomicity` 贯通 Gateway/adapter/service，实际提交 SO、DN、SI；正常只生成外层幂等回执且库存 10→9；在发票已生成 GL Entry 后注入异常，主单/库存/账务全部回滚。所有 commit 和幂等缓存写入被拦截，临时商品最终确认不存在。它不是网络 HTTP 并发/进程崩溃/真实 commit 耐久性测试。
+- 修复新的降级隐患：带键请求在已绑定站点遇到幂等表缺失或查询失败时，HTTP 503 / `IDEMPOTENCY_STORE_UNAVAILABLE`，不访问缓存重放、不执行业务回调、不退回文件锁。无 key 行为不变；未绑定站点的单元测试兼容路径保留。缺表需正常迁移，不能绕过门禁。
+- R5 部分治理：内存比对历史归档密码与本地 Backend 的 1 个站点当前配置，匹配 0 个，未输出秘密值或尝试密码登录；未检查远程环境。`sites-backup.tar.gz` 仅从 Git 跟踪移除，磁盘原件保留且前后 SHA-256 一致，根目录同类归档加入 ignore。未删除备份、轮换密码或改写历史。新安全检查在移除前确定性失败，移除后通过；CI 检查当前检出快照的 Frappe 配置文件/归档成员，不扫描历史/嵌套压缩包/其他仓库。治理剩余边界详见 `CREDENTIAL_ARCHIVE_REMEDIATION.zh-CN.md`。
+- 验证：Backend 全量 1076 tests PASS；真实快捷开单 3 tests PASS（含缺幂等表拒绝）；Gateway 错误包络 + JWT HTTP 合计 4 tests PASS；安全检查 5 tests、Production 5 tests、staging 31 tests PASS。相关 Ruff、diff check 通过；父仓本轮新安全脚本/前批生产校验脚本/YAML/安全文档的 pre-commit 通过，初跑只发生 Black/isort 格式修正，复跑全过。生产两个脚本仅格式整理，无行为变化。
+- 核查的销售 order_service 本身没有直接 `frappe.db.commit()`。AI 草稿执行中主数据刷新后的 commit 位于正式业务执行前，失败审计 commit 位于 rollback 后；不能将这些审计/版本边界机械删除。本轮未修改 AI 编排，全部显式提交链路仍不应宣称已完成系统级形式验证。
+- 尚待：远程/历史凭据有效性及复用范围、轮换和历史治理授权；真实整单 HTTP 故障/耐久性验收；生产真实部署/迁移/TLS/恢复；Mobile 类型/CI、依赖升级、Web 跨标签页互斥。旧 Git 历史仍含归档且尚未推送，本轮移除跟踪不等于泄露事件已关闭。父仓原 AGENTS/规范/模板/已知问题及本地未跟踪笔记、Web loading.js、Mobile 五文件继续保留。
+
 ## 2026-09-13 第二批优化：登录防护及生产启动静态门禁
 
 - 用户要求“提交然后继续优化”。第一批已完成：Backend `1a2f082`、Web `c4334a0`、Parent `85ad4dc8`。继续修复的 Backend 已提交 `bcf6a0a` 与 `a9f4ee6`（最新）；本次父仓固定最新 Backend gitlink，并提交生产配置及文档。所有提交仅在本地，没有推送或部署。

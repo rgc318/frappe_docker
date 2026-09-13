@@ -1,22 +1,37 @@
 import copy
 import json
 import os
-from pathlib import Path
 import subprocess
 import unittest
+from pathlib import Path
 
 from validate_compose import ERP_SERVICES, validate
 
 
 class ProductionComposeTests(unittest.TestCase):
     def setUp(self):
-        self.config = {"services": {name: {"image": "registry.example/erp:release-20260913"} for name in ERP_SERVICES}}
-        self.config["services"].update({
-            "proxy": {},
-            "backend": {"image": "registry.example/erp:release-20260913", "command": ["gunicorn"], "environment": {"ENABLE_PYCHARM_DEBUG": "0"}},
-            "ai-orchestrator": {"image": "registry.example/ai:release-20260913"},
-            "db": {"environment": {"MYSQL_ROOT_PASSWORD": "synthetic-test-password-only"}},
-        })
+        self.config = {
+            "services": {
+                name: {"image": "registry.example/erp:release-20260913"}
+                for name in ERP_SERVICES
+            }
+        }
+        self.config["services"].update(
+            {
+                "proxy": {},
+                "backend": {
+                    "image": "registry.example/erp:release-20260913",
+                    "command": ["gunicorn"],
+                    "environment": {"ENABLE_PYCHARM_DEBUG": "0"},
+                },
+                "ai-orchestrator": {"image": "registry.example/ai:release-20260913"},
+                "db": {
+                    "environment": {
+                        "MYSQL_ROOT_PASSWORD": "synthetic-test-password-only"
+                    }
+                },
+            }
+        )
 
     def test_valid_configuration(self):
         self.assertEqual(validate(self.config), [])
@@ -26,7 +41,10 @@ class ProductionComposeTests(unittest.TestCase):
         for filename in ("start-prod.sh", "stop.sh"):
             source = (root / filename).read_text()
             self.assertNotIn("compose.traefik.yaml", source)
-            self.assertGreater(source.index("compose.production.yaml"), source.index("compose.langfuse.yaml"))
+            self.assertGreater(
+                source.index("compose.production.yaml"),
+                source.index("compose.langfuse.yaml"),
+            )
         source = (root / "start-prod.sh").read_text()
         self.assertLess(source.index("validate_compose.py"), source.index("up -d"))
         self.assertIn("--no-build", source)
@@ -38,7 +56,10 @@ class ProductionComposeTests(unittest.TestCase):
             ("command", ["bench serve"]),
             ("command", ["pip install -e apps/myapp"]),
             ("image", "registry.example/erp:latest"),
-            ("volumes", [{"type": "bind", "target": "/home/frappe/frappe-bench/apps/myapp"}]),
+            (
+                "volumes",
+                [{"type": "bind", "target": "/home/frappe/frappe-bench/apps/myapp"}],
+            ),
             ("environment", {"ENABLE_PYCHARM_DEBUG": "1"}),
             ("build", {"context": "."}),
         ):
@@ -54,21 +75,57 @@ class ProductionComposeTests(unittest.TestCase):
 
     def test_rendered_real_compose_has_no_development_inheritance(self):
         root = Path(__file__).resolve().parents[2]
-        env = {**os.environ, "ERPNEXT_VERSION": "v16", "MYAPP_PRODUCTION_ERP_IMAGE": "registry.example/erp:release-20260913",
-               "MYAPP_PRODUCTION_AI_IMAGE": "registry.example/ai:release-20260913", "DB_PASSWORD": "synthetic-test-password-only",
-               "SITES_RULE": "Host(`test.invalid`)", "LETSENCRYPT_EMAIL": "test@example.invalid"}
+        env = {
+            **os.environ,
+            "ERPNEXT_VERSION": "v16",
+            "MYAPP_PRODUCTION_ERP_IMAGE": "registry.example/erp:release-20260913",
+            "MYAPP_PRODUCTION_AI_IMAGE": "registry.example/ai:release-20260913",
+            "DB_PASSWORD": "synthetic-test-password-only",
+            "SITES_RULE": "Host(`test.invalid`)",
+            "LETSENCRYPT_EMAIL": "test@example.invalid",
+        }
         for observability in (False, True):
             with self.subTest(observability=observability):
-                args = ["docker", "compose", "--env-file", "/dev/null", "-f", "compose.yaml", "-f", "overrides/compose.redis.yaml",
-                        "-f", "overrides/compose.mariadb.yaml", "-f", "overrides/compose.https.yaml"]
+                args = [
+                    "docker",
+                    "compose",
+                    "--env-file",
+                    "/dev/null",
+                    "-f",
+                    "compose.yaml",
+                    "-f",
+                    "overrides/compose.redis.yaml",
+                    "-f",
+                    "overrides/compose.mariadb.yaml",
+                    "-f",
+                    "overrides/compose.https.yaml",
+                ]
                 if observability:
                     args.extend(["-f", "overrides/compose.langfuse.yaml"])
-                args.extend(["-f", "overrides/compose.production.yaml", "config", "--no-env-resolution", "--format", "json"])
-                result = subprocess.run(args, cwd=root, env=env, capture_output=True, text=True, timeout=30)
-                self.assertEqual(result.returncode, 0, "Compose render failed; check Docker Compose >= 2.24.4 and required files")
+                args.extend(
+                    [
+                        "-f",
+                        "overrides/compose.production.yaml",
+                        "config",
+                        "--no-env-resolution",
+                        "--format",
+                        "json",
+                    ]
+                )
+                result = subprocess.run(
+                    args, cwd=root, env=env, capture_output=True, text=True, timeout=30
+                )
+                self.assertEqual(
+                    result.returncode,
+                    0,
+                    "Compose render failed; check Docker Compose >= 2.24.4 and required files",
+                )
                 config = json.loads(result.stdout)
                 self.assertEqual(validate(config), [])
-                self.assertEqual({p["target"] for p in config["services"]["proxy"]["ports"]}, {80, 443})
+                self.assertEqual(
+                    {p["target"] for p in config["services"]["proxy"]["ports"]},
+                    {80, 443},
+                )
 
 
 if __name__ == "__main__":

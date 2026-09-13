@@ -14,6 +14,10 @@
 # mounted volume
 sites
 
+# Local site archives can contain database credentials; never version backups.
+/sites-backup*.tar*
+/sites-backup*.zip
+
 development/*
 !development/README.md
 !development/installer.py

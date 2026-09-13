@@ -2,6 +2,8 @@
 
 检查开始于 2026-09-12，报告于 2026-09-13 收尾；以下测试结果来自本轮检查。
 
+第三批进展（2026-09-13）：Backend `3072b99` 增加已绑定站点幂等存储不可用时失败关闭；真实快捷开单 3 tests 覆盖正式单据/库存/账务回滚、外层唯一回执和缺表拒绝，全量 Backend 1076 tests、HTTP 4 tests 通过。R5 归档停止跟踪但磁盘原件完整保留，新增当前快照配置/归档 CI 检查；历史密码与本地唯一站点当前配置不匹配，未验证远程或旧凭据失效。旧 Git 历史仍有归档，未轮换/改写历史/推送，详见 `CREDENTIAL_ARCHIVE_REMEDIATION.zh-CN.md`。不能将这一部分治理当作 R5 全部关闭。
+
 第二批进展（2026-09-13）：第一批已按仓提交。R4 已接入账号/IP/OTP 失败跟踪及锁定 HTTP 429；R6 已加入最终生产 override 和启动前静态校验，取消双代理与开发继承。Backend 1073 单测、JWT HTTP 3 tests、真实 Redis tracker 2 tests、Production 5 tests（含两种实际 Compose 渲染）、Parent staging 31 tests 通过。未推送、部署或轮换密码；生产镜像、迁移、TLS/恢复仍需真实验收。R5/R8/R9 尚未修复；历史审查证据保留如下。
 
 修复进展（2026-09-13）：用户已授权开始优化。R1/R2/R3/R7 已有第一批源码修复及回归，尚未提交部署；Backend 1065 单测、真实失败商品回滚 1 test、公共 HTTP 错误包络 1 test、Web tsc/Biome/63 suites 420 tests 通过。R2 尚缺真实整单 HTTP 原子性验收，显式 commit 编排仍需继续排查；R7 尚未实现跨标签页互斥。其余问题未关闭。以下正文保留审查时证据，最新工作树状态以 CURRENT_HANDOFF 为准。
