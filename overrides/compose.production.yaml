@@ -1,0 +1,75 @@
+# Requires Docker Compose >= 2.24.4 (!override). Apply after HTTPS and optional observability.
+x-production-image: &production_image
+  image: ${MYAPP_PRODUCTION_ERP_IMAGE:?Set an approved ERP image with immutable tag or digest}
+
+x-production-backend: &production_backend
+  <<: *production_image
+  volumes: !override
+    - sites:/home/frappe/frappe-bench/sites
+
+services:
+  configurator:
+    <<: *production_backend
+    command:
+      - >
+        set -e;
+        ./env/bin/pip check;
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host $$DB_HOST;
+        bench set-config -gp db_port $$DB_PORT;
+        bench set-config -g redis_cache "redis://$$REDIS_CACHE";
+        bench set-config -g redis_queue "redis://$$REDIS_QUEUE";
+        bench set-config -g redis_socketio "redis://$$REDIS_QUEUE";
+        bench set-config -g workers '{"ai-vector":{"timeout":900}}' --parse;
+        bench set-config -gp socketio_port $$SOCKETIO_PORT;
+        bench set-config -g chromium_path /usr/bin/chromium-headless-shell;
+
+  backend:
+    <<: *production_backend
+    ports: !reset []
+    environment:
+      ENABLE_PYCHARM_DEBUG: "0"
+    entrypoint: !reset []
+    command:
+      - /home/frappe/frappe-bench/env/bin/gunicorn
+      - --chdir=/home/frappe/frappe-bench/sites
+      - --bind=0.0.0.0:8000
+      - --threads=4
+      - --workers=2
+      - --worker-class=gthread
+      - --worker-tmp-dir=/dev/shm
+      - --timeout=120
+      - --preload
+      - frappe.app:application
+
+  frontend:
+    <<: *production_image
+
+  websocket:
+    <<: *production_backend
+
+  queue-short:
+    <<: *production_backend
+    command: ["exec bench worker --queue short,default"]
+
+  queue-long:
+    <<: *production_backend
+    command: ["exec bench worker --queue long,default,short"]
+
+  queue-ai-vector:
+    <<: *production_backend
+    command: ["exec bench worker --queue ai-vector"]
+
+  scheduler:
+    <<: *production_backend
+    command: ["exec bench schedule"]
+
+  ai-orchestrator:
+    image: ${MYAPP_PRODUCTION_AI_IMAGE:?Set an approved AI image with immutable tag or digest}
+    build: !reset null
+    ports: !reset []
+
+  db:
+    ports: !reset []
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Production DB_PASSWORD must be explicitly configured}

@@ -58,7 +58,6 @@ fi
 case "${MODE}" in
 prod)
   COMPOSE_ARGS+=(
-    -f "${ROOT_DIR}/overrides/compose.traefik.yaml"
     -f "${ROOT_DIR}/overrides/compose.https.yaml"
   )
   ;;
@@ -83,6 +82,10 @@ if [[ "${WITH_OBSERVABILITY}" == yes || ("${WITH_OBSERVABILITY}" == auto && -f "
     --env-file "${ROOT_DIR}/.env.langfuse.local"
     -f "${ROOT_DIR}/overrides/compose.langfuse.yaml"
   )
+fi
+
+if [[ "${MODE}" == prod ]]; then
+  COMPOSE_ARGS+=(-f "${ROOT_DIR}/overrides/compose.production.yaml")
 fi
 
 CMD=(docker compose "${COMPOSE_ARGS[@]}" down)

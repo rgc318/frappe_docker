@@ -56,6 +56,8 @@
 
 用途：正式业务流量和受审计观测。
 
+- 2026-09-13 起，`start-prod.sh` 只加载 HTTPS proxy，不叠加 dashboard Traefik；最后加载 `overrides/compose.production.yaml`，要求 `MYAPP_PRODUCTION_ERP_IMAGE` / `MYAPP_PRODUCTION_AI_IMAGE` 指向已批准预构建版本，禁止启动时 build/pip install/源码挂载和 Backend/DB/AI 直接宿主端口。Backend 使用 Gunicorn。Compose >= 2.24.4；启动前解析结果交给 `deploy/production/validate_compose.py` 校验，不输出 Secret 值。镜像标签是否不可变及 revision/digest 是否与发布记录匹配仍由正式发布门禁核对。
+- `--with-observability` 在校验前仅生成分服务配置，不再提前 `--reconcile` 重建 Orchestrator；通过配置门禁后由统一 Compose up 更新服务。详见 `deploy/production/README.zh-CN.md`。
 - `start-prod.sh` 默认不启动 bundled Langfuse。`--with-observability` 只用于明确接受单节点风险的受控小规模环境，不作为企业生产推荐方案。
 - 推荐外部受控 Langfuse，Web/Worker 多副本；PostgreSQL、ClickHouse、Redis 和 S3 对象存储使用托管或等价 HA 服务，并跨故障域部署。
 - Orchestrator 至少两个副本，由负载均衡执行 readiness、优雅摘流和超时控制；Redis 分布式限流/预算/熔断和策略快照不得退化为进程内状态。

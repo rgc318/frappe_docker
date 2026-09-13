@@ -15,7 +15,7 @@ This repository handles the containerization of the Frappe stack, including the 
 frappe_docker/
 ├── docs/                 # Complete documentation
 ├── overrides/            # Docker Compose configurations for different scenarios
-├── compose.yaml          # Base Compose File for production setups
+├── compose.yaml          # Project development base; production needs its override
 ├── pwd.yml               # Single Compose File for quick disposable demo
 ├── images/               # Dockerfiles for building Frappe images
 ├── development/          # Development environment configurations
@@ -29,7 +29,7 @@ frappe_docker/
 
 - `docs/` - Canonical documentation for all deployment and operational workflows
 - `overrides/` - Opinionated Compose overrides for common deployment patterns
-- `compose.yaml` - Base compose file for production setups (production)
+- `compose.yaml` - Project development base; use the production override and safety checks for production
 - `pwd.yml` - Disposable demo environment (non-production)
 
 ### Local myapp Development
@@ -89,6 +89,10 @@ docker compose \
 `compose.yaml` bind-mounts `apps/myapp` and runs `./env/bin/pip install -e apps/myapp` for the backend, workers, scheduler, and configurator. This means Python dependencies declared by `apps/myapp/pyproject.toml`, including `rgc-backend-kit>=0.1.1,<0.2.0`, are installed automatically from PyPI when the app services start. Do not install `rgc-backend-kit` manually from `/tmp` or a host-local source checkout.
 
 The local development compose file intentionally does not persist `/home/frappe/frappe-bench/env` as a Docker volume. Each container uses the virtualenv from its image and refreshes `myapp` dependencies on startup, which keeps dependency behavior closer to staging builds.
+
+### Production safety
+
+Production startup now requires approved prebuilt ERP/AI image references and applies `overrides/compose.production.yaml` last. It uses one HTTPS proxy, Gunicorn, no app-source mounts, no runtime dependency installs, and no direct Backend/DB/AI host ports. See [production requirements and verification](deploy/production/README.zh-CN.md). These static safeguards do not replace release approval, secret rotation, backup/restore or real deployment verification.
 
 ### VS Code Dev Container Notes
 

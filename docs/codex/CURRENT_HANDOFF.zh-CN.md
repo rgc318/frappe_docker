@@ -2,6 +2,17 @@
 
 更新时间：2026-09-13 CST
 
+## 2026-09-13 第二批优化：登录防护及生产启动静态门禁
+
+- 用户要求“提交然后继续优化”。第一批已完成：Backend `1a2f082`、Web `c4334a0`、Parent `85ad4dc8`。继续修复的 Backend 已提交 `bcf6a0a` 与 `a9f4ee6`（最新）；本次父仓固定最新 Backend gitlink，并提交生产配置及文档。所有提交仅在本地，没有推送或部署。
+- R4：JWT 登录接入 Frappe 规范 User.name / IP Redis 失败跟踪；错误密码、禁用账号、OTP 失败计数；challenge 或仅密码正确不重置，完整签发成功才重置；沿用框架密码长度限制和系统锁定设置。框架 SecurityException 默认没有 HTTP 状态，JWT 显式映射为 429，避免锁定误报 500。系统设置若关闭失败次数限制，本改动不擅自开启；正式部署需审核该设置及真实代理 IP 来源。
+- R6：新增 `overrides/compose.production.yaml`，最终覆盖开发配置：只启用 HTTPS proxy、Gunicorn、统一预构建 ERP 镜像及独立 AI 镜像，取消运行时 pip install / AI build / 源码挂载 / Backend、DB、AI 直出端口；要求明确配置强 DB 密码及版本化镜像。`start-prod.sh` 在 up 前执行仅输出安全错误描述的 JSON 校验，使用 `--no-build`；观测配置生成不再提前 reconcile 重建服务。`stop.sh --prod` 同步组合。具体配置要求和限制见 `deploy/production/README.zh-CN.md`。
+- 验证：Backend 全量 1073 tests PASS；JWT 生命周期 HTTP 3 tests PASS；真实 Redis tracker 2 tests PASS（随机账号/IP key、模拟身份/OTP，无真实账号或 System Settings 写入，计数已清除）；Production 5 tests PASS（含实际 Compose 两种观测组合渲染、多项安全拒绝、脚本顺序）；Parent staging 31 tests PASS；相关 Ruff、bash -n、Parent/Backend/Web diff check PASS。没有执行 start/stop/up/pull/build、数据库密码轮换或生产迁移。
+- Web 提交钩子修复只解决被既有 Biome 排除路径导致的 unmatched 失败，不表示 services 目录已有完整 Biome 覆盖；其第一批 Web tsc/420 tests 证据仍有效，源码未再改变。
+- 保留用户既有 Parent AGENTS/开发规范/模板/已知问题、`.codex`/多模态总结、Web loading.js、Mobile 五文件改动。没有修改 AI 源码或 Frappe/ERPNext 框架。
+- 未关闭：R5 历史归档凭据、R8 Mobile 类型/CI/Node、R9 依赖；R2 真实快捷开单 HTTP 原子性及编排显式 commit 深查；R7 跨标签页刷新互斥。生产本批仅为静态配置加固，缺实际镜像/迁移/TLS/DNS/恢复验收；版本化 tag 不等于已核实 Registry 不可变策略，仍需核对发布 digest。旧生产 dashboard proxy 可能成为 orphan，必须单独确认后处理，未自动删除。已有 DB 卷的密码不会随 env 自动轮换。
+- 下一步优先收敛 Mobile 类型/CI 和依赖可安全升级项；真实历史凭据轮换与归档历史清理需要明确目标/回滚方案，不输出密码、不直接改历史或删除备份。各阶段旧记录如下，最新状态以本节为准。
+
 ## 2026-09-13 开始优化：第一批事务、隔离及 Web 刷新修复
 
 - 用户随后要求“提交然后继续优化”。第一批 Backend 已提交 `1a2f082`，Web 已提交 `c4334a0`，均未推送。Web 提交钩子因 Biome 排除 services 目录而报 unmatched，已增加 `--no-errors-on-unmatched` 保持既有排除范围与正常检查失败行为；未禁用钩子。父仓本次固定 Backend gitlink 并提交审查报告/交接，不纳入用户既有规范改动。

@@ -5,18 +5,6 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WITH_OBSERVABILITY=no
 
-if [[ ! -f "${ROOT_DIR}/services/myapp-ai/Dockerfile" ]]; then
-  echo "Missing services/myapp-ai submodule; run: git submodule update --init --recursive" >&2
-  exit 1
-fi
-
-AI_RUNTIME_GIT_REVISION="$(git -C "${ROOT_DIR}/services/myapp-ai" rev-parse --verify HEAD)"
-if [[ -n "$(git -C "${ROOT_DIR}/services/myapp-ai" status --porcelain)" ]]; then
-  AI_RUNTIME_GIT_REVISION="${AI_RUNTIME_GIT_REVISION}-dirty"
-fi
-export MYAPP_AI_RUNTIME_REVISION="${MYAPP_AI_RUNTIME_REVISION:-${AI_RUNTIME_GIT_REVISION}}"
-export MYAPP_AI_RELEASE_ID="${MYAPP_AI_RELEASE_ID:-local-${MYAPP_AI_RUNTIME_REVISION}}"
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --with-observability)
@@ -54,17 +42,18 @@ COMPOSE_ARGS=(
   -f "${ROOT_DIR}/compose.yaml"
   -f "${ROOT_DIR}/overrides/compose.redis.yaml"
   -f "${ROOT_DIR}/overrides/compose.mariadb.yaml"
-  -f "${ROOT_DIR}/overrides/compose.traefik.yaml"
   -f "${ROOT_DIR}/overrides/compose.https.yaml"
 )
 
 if [[ "${WITH_OBSERVABILITY}" == yes ]]; then
-  "${ROOT_DIR}/sync-langfuse-runtime-env.sh" --reconcile
+  "${ROOT_DIR}/sync-langfuse-runtime-env.sh"
   COMPOSE_ARGS+=(
     --env-file "${ROOT_DIR}/.env.langfuse.local"
     -f "${ROOT_DIR}/overrides/compose.langfuse.yaml"
   )
 fi
+
+COMPOSE_ARGS+=(-f "${ROOT_DIR}/overrides/compose.production.yaml")
 
 SECRET_ENV_FILES=(
   "${ROOT_DIR}/.env"
@@ -85,7 +74,9 @@ if [[ "${WITH_OBSERVABILITY}" == yes ]]; then
 fi
 "${ROOT_DIR}/validate-secret-env-files.sh" "${SECRET_ENV_FILES[@]}"
 
-docker compose "${COMPOSE_ARGS[@]}" up -d --build --wait --wait-timeout 300
+docker compose "${COMPOSE_ARGS[@]}" config --format json |
+  python3 "${ROOT_DIR}/deploy/production/validate_compose.py"
+docker compose "${COMPOSE_ARGS[@]}" up -d --no-build --wait --wait-timeout 300
 
 AI_GATEWAY_CONTAINER_IDS=()
 for service in backend queue-short queue-long queue-ai-vector scheduler; do
