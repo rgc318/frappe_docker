@@ -2,6 +2,14 @@
 
 更新时间：2026-09-14 CST
 
+## 2026-09-14 商品昵称全链路补齐（已提交推送，待 staging 部署）
+
+- 用户确认商品昵称用于区分相似商品。根因是 Web 商品维护工作区改版时保留了 Backend `Item.custom_nickname`、详情 DTO 和选品结果映射，但通用保存载荷、主工作区、新增表单及列表显示遗漏接入；数据字段和既有搜索能力没有被取消。
+- Web 已补商品新增、全屏维护、显式清空、列表辅助显示、搜索提示及 CSV 导入导出；销售/采购/库存共用 `ProductSelect` 明确支持按昵称搜索并展示昵称。`RemoteProductSelect` 也在 AI 草稿目标选择和数据任务入口显示昵称，不再出现“能搜到但候选无法区分”。
+- AI 商品搜索原有链路已复核：Web `searchProducts` 固定提交 `nickname` 搜索字段，Backend `search_product_v2`、精确/标准化匹配、混合重排和向量文档均包含昵称；Item 更新 `on_update` 会在事务提交后排队刷新向量索引。AI 商品建档/完善草稿本次新增 `patch.nickname`、编辑/清空/冲突字段、现有基线和正式 create/update 执行贯通，Prompt 升级为 `product-setup-draft-v9`，Backend runtime 期望版本同步。
+- 验证：Web tsc、Biome 324 files、全量 63 suites / 434 tests PASS，昵称相关定向 10 suites / 149 tests PASS；Backend 商品/AI/向量 265 tests PASS；AI Orchestrator Schema/Prompt/Main/Client 63 tests PASS，定向 Ruff PASS；四仓 Python compile/diff check PASS。Jest 定向/全量仍可能提示既有延迟退出，但 exit 0。AI 复验首次因宿主机 uv cache 只读、随后因直接运行 unittest 未注入测试 Token 而未启动；改用 `/tmp` cache 并按仓库测试约定注入非生产测试 Token 后 63 tests PASS，不是代码失败。
+- 已提交并推送 AI `c04d7a6`（develop）、Backend `c7df002`（develop）、Web `50b97dd`（main）；Backend 与 Web 契约/设计文档已补商品昵称、清空、候选展示和搜索边界。父仓本节将固定 Backend/AI gitlink。保留用户既有 Parent AGENTS/规范/模板/已知问题/.codex/笔记及 Web `public/scripts/loading.js`，未修改 Mobile。尚未构建或部署；上线时 Backend 与 AI v9 必须成对发布，不能只部署其中一侧。
+
 ## 2026-09-14 AI 商品完善草稿价格误删误报修复
 
 - 已提交并推送 Backend `dd7cd77`、Web `a62b480`、Parent `1bcec435`。新版逐单位价格契约启用时，Web 不再提交隐藏的旧四档标量价格；Backend 不再把这些兼容投影作为用户清空输入，并会在下次保存时移除已有草稿中误存的 null patch。价格行缺失的 row_id/currency/source 会按价格用途与 UOM 从原草稿恢复，未改价格不再误标为用户编辑；商品变化摘要不再显示 `[object Object]`。用户既有 Web `public/scripts/loading.js` 未提交，Mobile 未修改。
