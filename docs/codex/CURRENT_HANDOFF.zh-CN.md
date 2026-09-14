@@ -2,6 +2,14 @@
 
 更新时间：2026-09-14 CST
 
+## 2026-09-14 AI 商品完善草稿价格误删误报修复
+
+- 已提交并推送 Backend `dd7cd77`、Web `a62b480`、Parent `1bcec435`。新版逐单位价格契约启用时，Web 不再提交隐藏的旧四档标量价格；Backend 不再把这些兼容投影作为用户清空输入，并会在下次保存时移除已有草稿中误存的 null patch。价格行缺失的 row_id/currency/source 会按价格用途与 UOM 从原草稿恢复，未改价格不再误标为用户编辑；商品变化摘要不再显示 `[object Object]`。用户既有 Web `public/scripts/loading.js` 未提交，Mobile 未修改。
+- 本地验证：Backend 全量 1079 tests PASS；价格/草稿安全定向 28 tests PASS；Web 全量 63 suites / 431 tests PASS，定向 3 suites / 46 tests PASS；tsc、Biome 324 files、Backend/Web diff check PASS。
+- Backend/AI Build `34821065182` PASS，候选标签 `staging-20260914-dd7cd77`；Web Build `34821065569` PASS，候选标签 `staging-web-20260914-a62b480`。未覆盖 latest。
+- Deploy `34830586123` 首次在 GHCR token endpoint EOF，发生于标签/容器切换前；按策略对同一 workflow 做一次有界 retry，登录成功后在读取 ERP 镜像 manifest 时再次 EOF。新 ERP/AI 镜像未完整缓存，容器未切换；Web 为避免前后端只部署一半未部署。服务器环境文件曾被 workflow 写入候选标签，已恢复 `CUSTOM_TAG/MYAPP_AI_TAG=staging-20260913-f497573`。
+- 恢复后 `check-staging.sh` PASS：旧 Backend/AI/Workers/Scheduler 继续健康，Scheduler active，Backend→AI 认证、runtime compatibility、replica/policy、首页与 Ping 200。当前 staging 仍是旧业务版本，不能宣称本修复已部署。下一步复用已构建的两个不可变标签做一次受控部署；不要重建新候选或无界重试 Registry。部署后保存草稿 `AI-DRAFT-b0d130c02b6148e4aaa5c83a1ce7d35f` 一次，确认旧标量 null patch 自动清除、4 条正式价格仍为 3/3/52/50，再运行完整 health/canary。
+
 ## 2026-09-14 staging Gunicorn 与 Scheduler 隐患修复
 
 - 用户要求解决部署检查发现的两项隐患。父仓提交并推送 `bf2933c3`：staging Backend 从带 debugger/reloader 的 `bench serve` 改为 Gunicorn 23（默认 2 workers × 4 threads、gthread、120 秒、preload，stdout/stderr 日志），显式 `ENABLE_PYCHARM_DEBUG=0`；参数通过 `STAGING_GUNICORN_*` 限界配置。没有重建或修改 Backend/Web/AI 业务源码镜像。
