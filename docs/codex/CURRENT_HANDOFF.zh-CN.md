@@ -1,6 +1,17 @@
 # 当前交接状态
 
-更新时间：2026-09-13 CST
+更新时间：2026-09-14 CST
+
+## 2026-09-14 非移动端加固已推送并部署 staging
+
+- 已推送 Backend `f497573`（develop）、Web `5685206`（main）、Parent `46ae1558`（develop）。Parent 后续 `85f99607` 仅修正全局审查报告 Markdown 表格格式；服务器部署骨架为该提交，构建 provenance 仍为 `46ae1558`，两者应用代码/构建配置/子模块完全一致。没有改动或部署 Mobile、没有 production 发布。
+- 构建：Backend/AI 配对 Build `34760340345` PASS，唯一标签 `staging-20260913-f497573`；Web Build `34760409486` PASS，标签 `staging-web-20260913-5685206`，未覆盖 latest。首次 Web Build `34760341850` 因传入短 SHA 被 checkout 视作分支而失败，未生成镜像；用同一提交完整 SHA 修正输入后成功。Web CI `34760315931`、coverage `34760315651` PASS。Parent Lint `34760331561` 仅报告审查文档格式失败，修正后 `34762397567` PASS。
+- Web Deploy `34762442768` PASS。Backend Deploy `34762516116` FAIL：已下载完整镜像，但 compose up 按 always 策略再次访问 GHCR 时遇到 token endpoint EOF，旧容器未替换。2026-09-14 核对缓存镜像 RepoDigest 与成功构建日志一致后，使用一次 `PULL_POLICY=never ./deploy/staging/start-staging.sh` 受控恢复，再执行站点 DB grants reconcile 和 `bench --site staging.example.com migrate`，全部成功。未重建、改标签或无界重试；自动 workflow 仍如实保留失败状态。
+- 备份：恢复部署前新备份位于持久 sites 卷 `staging.example.com/private/backups/20260914_125441-staging_example_com-*`，包括配置、数据库、公有及私有附件；前一天 `20260913_213752-*` 备份也保留。没有恢复覆盖业务数据、删除备份或改写历史。
+- 最终镜像：ERP `sha256:5f05cbf2fd846e4ecba1ffa68c9de20f8d561588e10a68762b76263827a635ad`，RepoDigest `sha256:10b2062cabf767ec16e09ec51d3da87b116ced539ca28fb0a93eea8e651acc64`，Backend revision `f4975735d490f4079072913fdfadd2e974886418`；AI RepoDigest `sha256:0ba9fb8033fdbb857e626685beb638d417aee32a6d646769d4ba46432f588628`、revision `6700dccb23e973df9b7fff8494c5a8834cfef566`（源码未变化）；Web RepoDigest `sha256:68328bd20787337a2f9a277abd54b8af7734f7705c76b54584fda2af8e270c10`、revision `5685206975ab8ed14335b51154ba2212b5757f57`。Backend/Frontend/Worker/Scheduler/Websocket 全部同一 ERP 镜像，相关新容器 RestartCount=0，AI/Web healthy。
+- 验收：完整 `RUN_AI_STAGING_CANARY=1 ./deploy/staging/check-staging.sh` PASS；7 schemas / 9 scenarios 契约、内部认证、副本一致性及已有有效 Policy 检查通过。Canary `artifacts/staging/ai-canary/staging-20260913-f497573-20260914T045621Z.json` passed；SLO `artifacts/staging/ai-slo/staging-20260913-f497573-20260914T045650Z.json` warning，仅因 3 样本不足 20（3/3 成功、0 契约错误、p95 11813.93 ms），不宣称 SLO 达标。发布对已登记 `artifacts/staging/ai-releases/staging-20260913-f497573.json`，未重新发布治理 Policy。
+- 新版本容器内真实双数据库行锁 1 test、真实 Redis 登录失败 tracker 2 tests PASS；使用既有草稿只读锁及随机模拟身份，未创建业务单据/真实账号，测试计数已清理。Web 内网入口 `http://192.168.31.229:30080` 的 healthz、登录页、代理 Ping 正常；Frappe `28080` 首页/Ping 200。未执行完整认证 HTTP 交易回归或真实浏览器多标签页验收，不以 canary/单测冒充这些入口。
+- 资源与现场：根盘 98GB，已用 68GB、剩余 26GB（73%）；Docker images 16.24GB，可回收 7.094GB。本次新增约 1GB，保留上一版回滚镜像，未清理其他项目镜像或卷。服务器原有 AI 子模块检出 `3233f6b9` 与骨架 gitlink 不同，但子模块内无文件修改，staging 使用烘焙镜像而非源码挂载，未改该现场状态；backups/tmp 保留。本地用户既有 Parent 文档/AGENTS/.codex/笔记和 Web loading.js 继续保留。
 
 ## 2026-09-13 非移动端完善提交收口
 
