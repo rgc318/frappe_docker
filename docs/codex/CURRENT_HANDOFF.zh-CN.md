@@ -2,6 +2,15 @@
 
 更新时间：2026-09-14 CST
 
+## 2026-09-14 staging Gunicorn 与 Scheduler 隐患修复
+
+- 用户要求解决部署检查发现的两项隐患。父仓提交并推送 `bf2933c3`：staging Backend 从带 debugger/reloader 的 `bench serve` 改为 Gunicorn 23（默认 2 workers × 4 threads、gthread、120 秒、preload，stdout/stderr 日志），显式 `ENABLE_PYCHARM_DEBUG=0`；参数通过 `STAGING_GUNICORN_*` 限界配置。没有重建或修改 Backend/Web/AI 业务源码镜像。
+- 正常 `deploy-staging.sh` 在 migrate 后按默认 `STAGING_ENABLE_SITE_SCHEDULER=1` 执行 `enable-scheduler`；环境校验限制布尔值和 Gunicorn 参数范围，`check-staging.sh` 新增 Scheduler active 失败关闭。只有明确维护窗口可将开关设为 0。新增渲染/脚本回归，staging 33 tests、production 5 tests、ShellCheck、shfmt、Black/isort、Prettier、Compose 实际渲染和 diff check PASS；远端 Lint `34811453154` PASS。
+- 部署前生成站点完整备份 `sites/staging.example.com/private/backups/20260914_135824-staging_example_com-*`（数据库、公有/私有附件、配置）。自动 Deploy `34811591410` 在切换前因 Docker Hub 拉取已缓存 Qdrant 镜像返回 EOF 而失败，旧服务未改变；保留 workflow failure 事实。随后复用相同父仓提交和服务器已验证缓存镜像，执行一次 `PULL_POLICY=never start-staging`、migrate、enable-scheduler 和完整检查，没有新标签、重建或无界重试。
+- 最终运行：Backend 仍使用不可变业务镜像 `staging-20260913-f497573` / Backend revision `f4975735d490f4079072913fdfadd2e974886418`，Config.Cmd 已为 `/env/bin/gunicorn ... frappe.app:application`，2 个 worker 正常启动，RestartCount=0，日志不再出现 development server/debugger；`ENABLE_PYCHARM_DEBUG=0`。站点 `System Settings.enable_scheduler=1`，`bench doctor` 显示 3 workers online，Scheduler 健康门禁 active。
+- 完整健康检查通过：Web health/login/proxy Ping 与 Frappe 首页/Ping 200；Backend→AI 内部认证、7 schemas / 9 scenarios、单副本一致性和 Runtime Policy 均通过。新 canary `staging-20260913-f497573-20260914T060124Z.json` passed；SLO `...060147Z.json` warning 仍仅因 3 样本少于 20，3/3 成功、0 契约错误、p95 8321.76 ms，不宣称 SLO 达标。修复时间点后的 Error Log 为 0。
+- 根盘 98GB、已用 68GB、剩余 26GB（74%），未清理任何镜像、卷、备份或其他项目。用户既有 Parent AGENTS/开发规范/模板/已知问题/.codex/笔记和 Web loading.js 继续保留；未修改 Mobile、未部署 production。
+
 ## 2026-09-14 非移动端加固已推送并部署 staging
 
 - 已推送 Backend `f497573`（develop）、Web `5685206`（main）、Parent `46ae1558`（develop）。Parent 后续 `85f99607` 仅修正全局审查报告 Markdown 表格格式；服务器部署骨架为该提交，构建 provenance 仍为 `46ae1558`，两者应用代码/构建配置/子模块完全一致。没有改动或部署 Mobile、没有 production 发布。
