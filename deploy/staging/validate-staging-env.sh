@@ -47,6 +47,28 @@ missing = [key for key in required if not values.get(key)]
 if missing:
     raise SystemExit(f"Missing required staging variables: {', '.join(missing)}")
 
+if values.get("STAGING_ENABLE_SITE_SCHEDULER", "1").lower() not in {
+    "0",
+    "1",
+    "false",
+    "no",
+    "true",
+    "yes",
+}:
+    raise SystemExit("STAGING_ENABLE_SITE_SCHEDULER must be a boolean value")
+
+for key, default, minimum, maximum in (
+    ("STAGING_GUNICORN_WORKERS", "2", 1, 16),
+    ("STAGING_GUNICORN_THREADS", "4", 1, 32),
+    ("STAGING_GUNICORN_TIMEOUT", "120", 30, 600),
+):
+    try:
+        value = int(values.get(key, default))
+    except ValueError as error:
+        raise SystemExit(f"{key} must be an integer") from error
+    if not minimum <= value <= maximum:
+        raise SystemExit(f"{key} must be between {minimum} and {maximum}")
+
 require_release_pair = os.environ.get(
     "STAGING_REQUIRE_PAIRED_RELEASE",
     values.get("STAGING_REQUIRE_PAIRED_RELEASE", "0"),

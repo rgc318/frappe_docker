@@ -51,6 +51,8 @@
 - `myapp` 的 Python 依赖由 `apps/myapp/pyproject.toml` 管理，镜像构建阶段会刷新 `apps/frappe` 与 `apps/myapp` 的 editable 安装并执行 `pip check`
 - `rgc-backend-kit` 已发布到公共 PyPI，staging 镜像会通过 `myapp` 依赖自动安装，不需要在服务器或容器中手动安装 JWT 工具包
 - 第一次部署时允许“容器已起来但站点尚未初始化”
+- staging Backend 使用 Gunicorn，不运行带 debugger/reloader 的 `bench serve`；Worker 数、线程数和超时由 `STAGING_GUNICORN_*` 显式控制。
+- 正常部署在 migrate 后按 `STAGING_ENABLE_SITE_SCHEDULER=1` 启用站点 Scheduler，健康检查要求其状态为 active；只有明确的维护窗口才允许设为 `0`。
 
 ### 1.1 分支与发布流程
 

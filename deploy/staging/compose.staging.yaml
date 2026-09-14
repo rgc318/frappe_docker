@@ -107,9 +107,23 @@ services:
       - bash
       - -c
     command:
-      - exec bench serve --port 8000
+      - >
+        exec /home/frappe/frappe-bench/env/bin/gunicorn
+        --chdir=/home/frappe/frappe-bench/sites
+        --bind=0.0.0.0:8000
+        --threads=${STAGING_GUNICORN_THREADS:-4}
+        --workers=${STAGING_GUNICORN_WORKERS:-2}
+        --worker-class=gthread
+        --worker-tmp-dir=/dev/shm
+        --timeout=${STAGING_GUNICORN_TIMEOUT:-120}
+        --access-logfile=-
+        --error-logfile=-
+        --capture-output
+        --preload
+        frappe.app:application
     environment:
       <<: *ai_gateway_environment
+      ENABLE_PYCHARM_DEBUG: "0"
 
   ai-orchestrator:
     image: ${MYAPP_AI_IMAGE:-myapp-ai}:${MYAPP_AI_STABLE_TAG:-${MYAPP_AI_TAG:-staging-latest}}

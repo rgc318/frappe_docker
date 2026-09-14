@@ -36,6 +36,11 @@ compose() {
     "$@"
 }
 
+get_env() {
+  local key="$1"
+  grep -E "^${key}=" "${ENV_FILE}" | tail -n 1 | cut -d= -f2- || true
+}
+
 "${ROOT_DIR}/deploy/staging/ensure-ai-router-state.sh"
 if [[ -f "${ROLLOUT_STATE_PATH}" ]]; then
   readarray -t rollout_values < <(
@@ -89,6 +94,14 @@ if [[ -n "${SITE_NAME}" && "${SKIP_MIGRATE}" != "1" ]]; then
   if compose exec backend bash -lc "bench --site ${SITE_NAME} list-apps >/dev/null 2>&1"; then
     echo "Running bench migrate for site: ${SITE_NAME}"
     compose exec backend bash -lc "bench --site ${SITE_NAME} migrate"
+    ENABLE_SITE_SCHEDULER="$(get_env STAGING_ENABLE_SITE_SCHEDULER)"
+    ENABLE_SITE_SCHEDULER="${ENABLE_SITE_SCHEDULER:-1}"
+    if [[ "${ENABLE_SITE_SCHEDULER,,}" =~ ^(1|true|yes)$ ]]; then
+      echo "Ensuring scheduler is enabled for site: ${SITE_NAME}"
+      compose exec backend bash -lc "bench --site ${SITE_NAME} enable-scheduler"
+    else
+      echo "Scheduler enablement explicitly disabled for site: ${SITE_NAME}"
+    fi
   else
     echo "Skipping migrate because site does not exist yet: ${SITE_NAME}"
     echo "Initialize the site first by following deploy/staging/INIT_SITE.zh-CN.md"

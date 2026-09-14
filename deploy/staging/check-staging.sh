@@ -36,6 +36,10 @@ get_env() {
   grep -E "^${key}=" "${ENV_FILE}" | tail -n 1 | cut -d= -f2- || true
 }
 
+SITE_NAME="$(get_env MYAPP_AI_FRAPPE_SITE_HOST)"
+ENABLE_SITE_SCHEDULER="$(get_env STAGING_ENABLE_SITE_SCHEDULER)"
+ENABLE_SITE_SCHEDULER="${ENABLE_SITE_SCHEDULER:-1}"
+
 "${ROOT_DIR}/deploy/staging/ensure-ai-router-state.sh"
 if [[ -f "${ROLLOUT_STATE_PATH}" ]]; then
   readarray -t rollout_values < <(
@@ -90,6 +94,18 @@ fi
 
 echo "== Docker services =="
 compose ps
+
+if [[ "${ENABLE_SITE_SCHEDULER,,}" =~ ^(1|true|yes)$ ]]; then
+  scheduler_status="$(
+    compose exec -T backend bash -lc \
+      "bench --site ${SITE_NAME} execute frappe.utils.scheduler.get_scheduler_status"
+  )"
+  if ! grep -q '"status": "active"' <<<"${scheduler_status}"; then
+    echo "Scheduler is not active for ${SITE_NAME}: ${scheduler_status}" >&2
+    exit 1
+  fi
+  echo "Scheduler is active for ${SITE_NAME}."
+fi
 
 echo
 echo "== AI service checks =="
