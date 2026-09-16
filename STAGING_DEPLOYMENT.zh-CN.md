@@ -39,6 +39,8 @@
    - 继续通过 `Deploy staging stack`
    - 若站点已存在，则自动执行 `bench migrate`
 
+部署脚本以显式 `docker compose pull` 作为唯一 Registry 边界；拉取成功后，`compose up` 强制复用刚验证的本地镜像，不再重复请求 manifest。这样单次 GHCR 波动不会在镜像已经完整缓存后阻断容器切换和迁移。
+
 核心原则：
 
 - 测试服务器只保留 `frappe_docker` 部署骨架

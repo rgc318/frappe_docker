@@ -2,14 +2,17 @@
 
 更新时间：2026-09-16 CST
 
-## 2026-09-16 AI 模型友好名称治理（已提交，待部署）
+## 2026-09-16 AI 模型友好名称治理（已提交，部署进行中）
 
 - 已在 Backend 模型注册表新增可空人工字段 `display_name`：完整 `model_alias` 继续作为策略、Run、审计和 Provider 调用的稳定技术主键；人工名称只影响展示。LiteLLM 同步 SQL 不读写该字段，健康检查也不会覆盖它；管理员提交空名称时清除覆盖并恢复自动命名。
 - 新增共享模型名称工具：通配符发现的 `siliconflow/deepseek-ai/DeepSeek-R1` 自动展示为 `DeepSeek R1`，并返回 `provider_label=硅基流动`；搜索同时支持人工名称、长 alias、空格/连字符形式和中文 Provider 标签。注册表、可选模型、AI 工作台、历史 Run/消息恢复均优先显示人工或自动友好名称，技术 alias 仍仅作为治理辅助信息和提交值。
 - Web 模型治理列表改为友好名称主标题、Provider/命名来源和可省略显示的技术 alias；编辑弹窗可设置或清除人工名称；策略下拉和 AI 工作台使用友好名称 + Provider，但 value 不变。Mobile 未修改，AI Orchestrator 未修改。
 - 已更新 Backend 治理/API 设计和 Web AI 设计；新增数据库 patch `myapp.patches.add_ai_model_display_name`，fresh install 建表也包含该列。
 - 验证：Backend 治理/Repository/AI Service 定向 302 tests PASS，随后 Backend 全量 1085 tests PASS；新增同步不覆盖人工名称测试后治理定向 39 tests PASS。Web `npm run tsc`、Biome 324 files、治理 Service 定向 18 tests、全量 63 suites / 435 tests PASS；Jest 仍有既有延迟退出提示但 exit 0。Python compile 与 Backend/Web diff check PASS。
-- 已提交并推送 Backend `35c2bd5`（develop）与 Web `491e44f`（main）；Parent 正在固定 Backend 子模块指针。尚未构建或部署 staging。Web 用户既有 `public/scripts/loading.js` 未提交；Parent 继续保留用户既有 AGENTS/规范/模板/已知问题/.codex/笔记。
+- 已提交并推送 Backend `35c2bd5`（develop）、Web `491e44f`（main）和 Parent `213da6de`（develop）。Backend/AI Build `35080949998` PASS，标签 `staging-20260916-213da6de`；Web 首次因误传短 SHA 在 checkout 阶段失败、未产出镜像，改用完整 SHA 后 Build `35081072097` PASS，标签 `staging-web-20260916-491e44f`。均未覆盖 `latest`。
+- Web 首次 Deploy `35081643774` 在删除旧容器前遇到 GHCR EOF；同一不可变标签按规则有界重试，Deploy `35081808390` PASS，healthz、登录页和代理 Ping 均通过。ERP/AI Deploy `35081643907` 的两个 attempts 都在显式 pull 成功后，被 `compose up` 因服务器 `PULL_POLICY=always` 再次请求 GHCR manifest 的 EOF 阻断；未执行 migrate，不能表述为 Backend 已部署。
+- 已修复部署脚本：显式 `compose pull` 成功后导出 `PULL_POLICY=never`，使该次 pull 成为唯一 Registry 边界，`compose up` 只复用已验证的本地镜像；新增顺序回归和部署说明。`PYTHONPATH=apps/myapp python3 -m unittest discover -s deploy/staging/tests -p 'test_*.py'` 34 tests PASS，Shell 语法和 Parent diff check PASS。下一步提交并推送该部署修复，再继续使用原不可变 ERP/AI 标签部署、迁移和完整健康/业务验收，不重建业务镜像。
+- Web 用户既有 `public/scripts/loading.js` 未提交；Parent 继续保留用户既有 AGENTS/规范/模板/已知问题/.codex/笔记。
 
 ## 2026-09-16 商品昵称全链路补齐并部署 staging
 

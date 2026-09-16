@@ -68,6 +68,11 @@ fi
 echo "Pulling latest staging images..."
 compose pull
 
+# The explicit pull above is the only registry boundary for this deployment.
+# Reusing the verified local images prevents `compose up` from issuing a second
+# manifest request that can fail after a successful pull and leave migration
+# unstarted during transient registry outages.
+export PULL_POLICY=never
 echo "Restarting staging stack..."
 compose up -d
 
