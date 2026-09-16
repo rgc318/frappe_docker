@@ -2,13 +2,18 @@
 
 更新时间：2026-09-14 CST
 
-## 2026-09-14 商品昵称全链路补齐（已提交推送，待 staging 部署）
+## 2026-09-16 商品昵称全链路补齐并部署 staging
 
 - 用户确认商品昵称用于区分相似商品。根因是 Web 商品维护工作区改版时保留了 Backend `Item.custom_nickname`、详情 DTO 和选品结果映射，但通用保存载荷、主工作区、新增表单及列表显示遗漏接入；数据字段和既有搜索能力没有被取消。
 - Web 已补商品新增、全屏维护、显式清空、列表辅助显示、搜索提示及 CSV 导入导出；销售/采购/库存共用 `ProductSelect` 明确支持按昵称搜索并展示昵称。`RemoteProductSelect` 也在 AI 草稿目标选择和数据任务入口显示昵称，不再出现“能搜到但候选无法区分”。
 - AI 商品搜索原有链路已复核：Web `searchProducts` 固定提交 `nickname` 搜索字段，Backend `search_product_v2`、精确/标准化匹配、混合重排和向量文档均包含昵称；Item 更新 `on_update` 会在事务提交后排队刷新向量索引。AI 商品建档/完善草稿本次新增 `patch.nickname`、编辑/清空/冲突字段、现有基线和正式 create/update 执行贯通，Prompt 升级为 `product-setup-draft-v9`，Backend runtime 期望版本同步。
 - 验证：Web tsc、Biome 324 files、全量 63 suites / 434 tests PASS，昵称相关定向 10 suites / 149 tests PASS；Backend 商品/AI/向量 265 tests PASS；AI Orchestrator Schema/Prompt/Main/Client 63 tests PASS，定向 Ruff PASS；四仓 Python compile/diff check PASS。Jest 定向/全量仍可能提示既有延迟退出，但 exit 0。AI 复验首次因宿主机 uv cache 只读、随后因直接运行 unittest 未注入测试 Token 而未启动；改用 `/tmp` cache 并按仓库测试约定注入非生产测试 Token 后 63 tests PASS，不是代码失败。
-- 已提交并推送 AI `c04d7a6`（develop）、Backend `c7df002`（develop）、Web `50b97dd`（main）；Backend 与 Web 契约/设计文档已补商品昵称、清空、候选展示和搜索边界。父仓本节将固定 Backend/AI gitlink。保留用户既有 Parent AGENTS/规范/模板/已知问题/.codex/笔记及 Web `public/scripts/loading.js`，未修改 Mobile。尚未构建或部署；上线时 Backend 与 AI v9 必须成对发布，不能只部署其中一侧。
+- 已提交并推送 AI `c04d7a6`（develop）、Backend `c7df002`（develop）、Web `50b97dd`（main）、Parent `aeed3661`（develop）；Backend 与 Web 契约/设计文档已补商品昵称、清空、候选展示和搜索边界。保留用户既有 Parent AGENTS/规范/模板/已知问题/.codex/笔记及 Web `public/scripts/loading.js`，未修改 Mobile。
+- Backend/AI Build `34945031772` PASS，成对标签 `staging-20260915-c7df002`；Web 首次 Build `34945164810` 因人工传错完整 commit SHA，在 checkout 前失败、未生成镜像，纠正为远端真实 SHA `50b97dd0b530f013e13a706bfbfc62e4b1629fed` 后 Build `34976742700` PASS，标签 `staging-web-20260915-50b97dd`。两个构建都没有覆盖 `latest`。
+- Backend/AI 首次 Deploy `34997819992` 在 SSH 握手阶段 EOF，服务器未执行脚本；同制品有上限重试 `35055102417` 已完整下载候选镜像，但 Compose 再次读取 GHCR manifest 时 EOF，旧容器尚未切换。随后只读核对缓存镜像标签、revision 和磁盘，使用 `PULL_POLICY=never` 离线完成受控切换，没有重建候选或无界重试。切换前完整备份为 `/srv/frappe_docker/backups/staging/staging-backup-staging.example.com-20260916-124644.tar.gz`，站点原始备份文件前缀 `20260916_124654-staging_example_com-*`。
+- 最终 ERP 镜像 ID `sha256:93949f1c16f3147962500ea3e5a36160bb2e03850ab325cdc96de7c80448893a`，Backend revision `c7df0026503efc68f68eb37b4db4d0f08f8680ff`；AI 镜像 ID `sha256:eb98ccd8590dab77892b2fcc700d80e2834c64fda7a1666f190d25a740b4c1a6`，runtime revision `c04d7a623d488309221cc643fc2fbc4edea2f9eb`；Web Deploy `35057275920` PASS，镜像 ID `sha256:19f5b4b472b32e09e604d3045524b472026ce39235e3fa44bb89924d9d1ebba9`。Backend、AI、Web RestartCount 均为 0，AI/Web healthy。
+- `bench migrate`、`enable-scheduler` 和完整 `RUN_AI_STAGING_CANARY=1 check-staging.sh` PASS；7 schemas / 9 scenarios、Backend→AI 内部认证、运行 revision、单副本一致性和有效 Runtime Policy 通过。Canary `staging-20260915-c7df002-20260916T044757Z.json` passed；SLO `...044812Z.json` 为样本不足 warning，不宣称 SLO 达标；发布对已登记 `artifacts/staging/ai-releases/staging-20260915-c7df002.json`。首页和 Ping 200，Web health/login/proxy Ping 由部署 workflow 验证通过。
+- staging 只读业务 smoke 选用现有商品 `可口可乐-5000ML-2` / 昵称 `可口可乐`：正式 `search_product_v2` 仅按 `nickname` 搜索命中该商品；AI `_resolve_item_candidates` 在调用方只请求 `item_name` 时仍强制追加昵称并选中同一商品，候选返回昵称。向量 Provider/collection 可达、failed=0；站点当前向量功能标记 `enabled=false` 且存在 109 个 due 项，因此本次昵称验收以数据库关键词召回为正式证据，不把向量索引表述为已全量启用。production 未部署。
 
 ## 2026-09-14 AI 商品完善草稿价格误删误报修复
 
