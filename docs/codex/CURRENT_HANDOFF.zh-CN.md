@@ -2,7 +2,7 @@
 
 更新时间：2026-09-16 CST
 
-## 2026-09-16 AI 模型友好名称治理（已提交，部署进行中）
+## 2026-09-16 AI 模型友好名称治理已部署 staging
 
 - 已在 Backend 模型注册表新增可空人工字段 `display_name`：完整 `model_alias` 继续作为策略、Run、审计和 Provider 调用的稳定技术主键；人工名称只影响展示。LiteLLM 同步 SQL 不读写该字段，健康检查也不会覆盖它；管理员提交空名称时清除覆盖并恢复自动命名。
 - 新增共享模型名称工具：通配符发现的 `siliconflow/deepseek-ai/DeepSeek-R1` 自动展示为 `DeepSeek R1`，并返回 `provider_label=硅基流动`；搜索同时支持人工名称、长 alias、空格/连字符形式和中文 Provider 标签。注册表、可选模型、AI 工作台、历史 Run/消息恢复均优先显示人工或自动友好名称，技术 alias 仍仅作为治理辅助信息和提交值。
@@ -11,7 +11,10 @@
 - 验证：Backend 治理/Repository/AI Service 定向 302 tests PASS，随后 Backend 全量 1085 tests PASS；新增同步不覆盖人工名称测试后治理定向 39 tests PASS。Web `npm run tsc`、Biome 324 files、治理 Service 定向 18 tests、全量 63 suites / 435 tests PASS；Jest 仍有既有延迟退出提示但 exit 0。Python compile 与 Backend/Web diff check PASS。
 - 已提交并推送 Backend `35c2bd5`（develop）、Web `491e44f`（main）和 Parent `213da6de`（develop）。Backend/AI Build `35080949998` PASS，标签 `staging-20260916-213da6de`；Web 首次因误传短 SHA 在 checkout 阶段失败、未产出镜像，改用完整 SHA 后 Build `35081072097` PASS，标签 `staging-web-20260916-491e44f`。均未覆盖 `latest`。
 - Web 首次 Deploy `35081643774` 在删除旧容器前遇到 GHCR EOF；同一不可变标签按规则有界重试，Deploy `35081808390` PASS，healthz、登录页和代理 Ping 均通过。ERP/AI Deploy `35081643907` 的两个 attempts 都在显式 pull 成功后，被 `compose up` 因服务器 `PULL_POLICY=always` 再次请求 GHCR manifest 的 EOF 阻断；未执行 migrate，不能表述为 Backend 已部署。
-- 已修复部署脚本：显式 `compose pull` 成功后导出 `PULL_POLICY=never`，使该次 pull 成为唯一 Registry 边界，`compose up` 只复用已验证的本地镜像；新增顺序回归和部署说明。`PYTHONPATH=apps/myapp python3 -m unittest discover -s deploy/staging/tests -p 'test_*.py'` 34 tests PASS，Shell 语法和 Parent diff check PASS。下一步提交并推送该部署修复，再继续使用原不可变 ERP/AI 标签部署、迁移和完整健康/业务验收，不重建业务镜像。
+- 已修复并推送 Parent `13dc6f95`：显式 `compose pull` 成功后导出 `PULL_POLICY=never`，使该次 pull 成为唯一 Registry 边界，`compose up` 只复用已验证的本地镜像；新增顺序回归和部署说明。`PYTHONPATH=apps/myapp python3 -m unittest discover -s deploy/staging/tests -p 'test_*.py'` 34 tests PASS，Shell 语法和 Parent diff check PASS。修复后的 Deploy `35087879529` 及其唯一有界重试均在脚本执行前的 `docker login ghcr.io` 遇到 EOF，旧服务未因此中断；自动 workflow 如实保留 failure。
+- 服务器已同步 `13dc6f95`，候选 ERP/AI 镜像均已完整缓存且标签、release ID、Backend revision 匹配。切换前完整备份 `/srv/frappe_docker/backups/staging/staging-backup-staging.example.com-20260916-191159.tar.gz`，站点原始备份前缀 `20260916_191220-staging_example_com-*`；随后使用 `PULL_POLICY=never` 离线受控切换，没有重建或覆盖标签。`bench migrate` 成功执行 `myapp.patches.add_ai_model_display_name`，Scheduler 已启用。
+- 最终 ERP 镜像 ID `sha256:cb4f30ac41679a2b5ac3eb031648772ab76e7e6337c22d4b9e3dd8f17c13fd62`、Backend revision `35c2bd54662b3776260005ce7d55ee5f2309d30f`；AI 镜像 ID `sha256:6a0366e61d4c6ced578e91253c4ecc93b01f214f77bcd63ff8a8c726d0fd685d`、runtime revision `c04d7a623d488309221cc643fc2fbc4edea2f9eb`；Web revision `491e44faa2e04d8d3d367871a83d0d703fd0f1c9`、标签 `staging-web-20260916-491e44f`。三者 RestartCount=0，AI/Web healthy，ERP 首页、Ping 和 Web healthz 均为 200。
+- 完整 `RUN_AI_STAGING_CANARY=1 check-staging.sh` PASS：7 schemas / 9 scenarios、Backend→AI 内部认证、单副本一致性、Runtime Policy 和 Scheduler active 均通过。Canary `staging-20260916-213da6de-20260916T111735Z.json` passed；SLO `...111750Z.json` 为样本量不足 warning，不宣称 SLO 达标；发布对已登记。真实站点确认 `display_name` 列存在，`DeepSeek R1` / `硅基流动` 自动展示正常；事务性写入人工名称、按人工名称搜索、清除后恢复自动名称全部通过并 rollback，未改变正式模型配置。
 - Web 用户既有 `public/scripts/loading.js` 未提交；Parent 继续保留用户既有 AGENTS/规范/模板/已知问题/.codex/笔记。
 
 ## 2026-09-16 商品昵称全链路补齐并部署 staging
