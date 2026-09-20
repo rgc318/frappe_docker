@@ -39,7 +39,7 @@
    - 继续通过 `Deploy staging stack`
    - 若站点已存在，则自动执行 `bench migrate`
 
-部署脚本以显式 `docker compose pull` 作为唯一 Registry 边界；拉取成功后，`compose up` 强制复用刚验证的本地镜像，不再重复请求 manifest。这样单次 GHCR 波动不会在镜像已经完整缓存后阻断容器切换和迁移。
+部署脚本以显式 `docker compose pull backend ai-orchestrator` 作为唯一 Registry 边界，只拉取本次发布的 ERP 与 AI 制品；Redis、MariaDB、Qdrant 和 HAProxy 等固定摘要基础设施镜像由环境初始化负责，不在每次业务发布时重复访问 Docker Hub。拉取成功后，`compose up` 强制复用刚验证的本地镜像，不再重复请求 manifest。
 
 核心原则：
 

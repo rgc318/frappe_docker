@@ -8,6 +8,8 @@
 - Backend 已将内部结构化意图路由与用户固定的业务模型解耦：所有正式前置意图调用不再携带用户 `model_alias`，由已发布 `intent_parse` 策略选择结构化合规模型；固定 alias 仍绑定一次性 resolution 指纹，并继续用于后续 Chat/SSE/草稿的资格检查和实际调用。缺工具能力的固定模型会按既有 Agent readiness 进入兼容只读路径，不会因此静默换掉用户的业务回答模型；结构化草稿等不合格场景仍失败关闭。
 - 已同步 Backend API、AI 配置和 Web 设计说明。验证：Backend `test_ai_service` 212 tests PASS，响应安全/动作安全/模型治理 72 tests PASS，Backend 全量 1086 tests PASS；Python compile 与四仓 diff check PASS。隔离本地未同步 alias 的注册表前置后，使用真实 Orchestrator 和固定 `siliconflow/deepseek-ai/DeepSeek-V4.1-Flash` 调用 `resolve_ai_scenario_v1("你好")`，成功返回 `general / structured_intent`，证明固定 alias 已不再进入内部意图请求；没有业务写入。全量测试仅输出既有模拟 HTTPError ResourceWarning/无站点日志提示，exit 0。
 - 已提交并推送 Backend `31c7205`（develop）、AI 文档 `d13e59c`（develop）和 Web 设计文档 `4580376`（main）；Web 无运行时代码变化，不需要重新构建或切换 Web 镜像。Parent 正在固定 Backend/AI 子模块指针，尚未构建或部署新的 ERP/AI staging 制品。Web 用户既有 `public/scripts/loading.js` 未纳入提交。
+- Parent `aa027de8` 已固定 Backend/AI 指针并推送；Backend/AI Build `35495964430` PASS，唯一标签 `staging-20260920-aa027de8`，未覆盖 `latest`。Deploy `35496213888` 及唯一有界重试均在切换前因 Docker Hub 查询已固定 Redis manifest 遇到 `unexpected EOF` 而失败，候选 ERP/AI 镜像尚未缓存，旧服务未切换。
+- 该失败暴露部署脚本仍会在每次业务发布中无差别拉取 Redis、MariaDB、Qdrant、HAProxy 等未变基础镜像。现已将唯一 Registry 边界收紧为 `compose pull backend ai-orchestrator`：只拉 ERP/AI 发布制品，基础设施镜像由环境初始化负责；随后仍以 `PULL_POLICY=never` 切换。staging 34 tests、Shell 语法和 diff check PASS；待提交该部署修复后继续使用同一不可变业务标签，不重建候选。
 
 ## 2026-09-16 AI 模型友好名称治理已部署 staging
 

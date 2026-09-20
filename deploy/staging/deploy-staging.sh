@@ -65,8 +65,13 @@ PY
     echo "Preserving ${rollout_values[0]} AI rollout at ${rollout_values[1]}% candidate traffic."
   fi
 fi
-echo "Pulling latest staging images..."
-compose pull
+echo "Pulling release staging images..."
+# Backend, workers, scheduler, websocket and Frappe frontend share the same ERP
+# image, so pulling one representative service fetches that immutable artifact.
+# Infrastructure images are digest-pinned and already provisioned by staging
+# initialization; re-querying Docker Hub for them makes an application release
+# depend on unrelated registry availability.
+compose pull backend ai-orchestrator
 
 # The explicit pull above is the only registry boundary for this deployment.
 # Reusing the verified local images prevents `compose up` from issuing a second

@@ -57,7 +57,10 @@ class StagingRuntimeTests(unittest.TestCase):
 
     def test_deploy_reuses_images_after_the_explicit_pull(self):
         deploy = (self.root / "deploy/staging/deploy-staging.sh").read_text()
-        pull_offset = deploy.index("compose pull")
+        release_pull = "compose pull backend ai-orchestrator"
+        self.assertIn(release_pull, deploy)
+        self.assertNotIn("compose pull\n", deploy)
+        pull_offset = deploy.index(release_pull)
         cached_offset = deploy.index("export PULL_POLICY=never")
         up_offset = deploy.index("compose up -d")
         self.assertLess(pull_offset, cached_offset)
